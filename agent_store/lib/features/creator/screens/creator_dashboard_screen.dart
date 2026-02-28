@@ -95,7 +95,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
       const SizedBox(width: 10),
       const Text('Creator Dashboard',
         style: TextStyle(
-          color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          color: Color(0xFF2B2C1E), fontSize: 20, fontWeight: FontWeight.bold)),
       const Spacer(),
       Text('${_agents.length} agents',
         style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
@@ -215,7 +215,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
           SizedBox(width: 8),
           Text('Agent Performance',
             style: TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontWeight: FontWeight.w600,
               fontSize: 14)),
         ]),
@@ -278,7 +278,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
                       ? '${agent.title.substring(0, 20)}…'
                       : agent.title,
                   style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w500),
+                    color: Color(0xFF2B2C1E), fontWeight: FontWeight.w500),
                 )),
                 DataCell(_CategoryChip(category: agent.category)),
                 DataCell(Row(children: [
@@ -348,7 +348,7 @@ class _StatCard extends StatelessWidget {
       const SizedBox(height: 8),
       Text(value,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF2B2C1E),
           fontWeight: FontWeight.bold,
           fontSize: 22,
         )),

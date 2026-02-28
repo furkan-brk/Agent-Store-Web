@@ -156,7 +156,7 @@ class _Sidebar extends StatelessWidget {
             Container(
               width: 32, height: 32,
               decoration: BoxDecoration(color: const Color(0xFF81231E), borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.auto_awesome, color: Color(0xFF2B2C1E), size: 18),
+              child: const Icon(Icons.auto_awesome, color: Color(0xFFDDD1BB), size: 18),
             ),
             const SizedBox(width: 10),
             const Text('AgentStore', style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 15)),

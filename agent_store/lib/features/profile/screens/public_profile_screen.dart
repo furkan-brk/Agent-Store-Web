@@ -154,7 +154,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       backgroundColor: const Color(0xFFC8BA9A),
       pinned: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF2B2C1E), size: 18),
         onPressed: () {
           if (context.canPop()) {
             context.pop();
@@ -166,7 +166,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       title: Text(
         _shortenWallet(widget.wallet),
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF2B2C1E),
           fontSize: 15,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
@@ -202,7 +202,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 Text(
                   _shortenWallet(widget.wallet),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF2B2C1E),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -250,7 +250,7 @@ class _StatChip extends StatelessWidget {
           TextSpan(
             text: value,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontWeight: FontWeight.bold,
               fontSize: 15,
             ),

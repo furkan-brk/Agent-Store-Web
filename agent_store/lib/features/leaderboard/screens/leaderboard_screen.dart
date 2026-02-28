@@ -43,7 +43,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           Icon(Icons.emoji_events_outlined, color: Color(0xFF9B7B1A), size: 22),
           SizedBox(width: 10),
           Text('Leaderboard',
-            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 20, fontWeight: FontWeight.bold)),
           Spacer(),
           Text('Top Creators', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
         ]),
@@ -120,7 +120,7 @@ class _RankCard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(short, style: const TextStyle(
-            color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+            color: Color(0xFF2B2C1E), fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 2),
           Text('$totalAgents agents created',
             style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11)),

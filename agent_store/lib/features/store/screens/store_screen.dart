@@ -302,7 +302,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   child: Text(
                     '$_activeFilterCount',
                     style: const TextStyle(
-                      color: Color(0xFF2B2C1E),
+                      color: Color(0xFFDDD1BB),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),

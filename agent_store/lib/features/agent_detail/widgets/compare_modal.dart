@@ -224,7 +224,7 @@ class _CompareModalState extends State<CompareModal> {
           Text(
             agent.title,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -273,7 +273,7 @@ class _CompareModalState extends State<CompareModal> {
                   const Text(
                     'Compare Agents',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -375,7 +375,7 @@ class _CompareModalState extends State<CompareModal> {
                                       isExpanded: true,
                                       underline: const SizedBox.shrink(),
                                       dropdownColor: const Color(0xFFE8DEC9),
-                                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13),
                                       icon: const Icon(
                                         Icons.keyboard_arrow_down,
                                         color: Color(0xFF7A6E52),
@@ -411,7 +411,7 @@ class _CompareModalState extends State<CompareModal> {
                                   Text(
                                     _compareAgent!.title,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: Color(0xFF2B2C1E),
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),

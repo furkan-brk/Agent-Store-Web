@@ -273,7 +273,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
     if (_agent == null) {
       return const Scaffold(
         backgroundColor: Color(0xFFDDD1BB),
-        body: Center(child: Text('Agent not found', style: TextStyle(color: Colors.white))),
+        body: Center(child: Text('Agent not found', style: TextStyle(color: Color(0xFF2B2C1E)))),
       );
     }
     final a = _agent!;
@@ -388,7 +388,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
               padding: const EdgeInsets.fromLTRB(36, 32, 36, 0),
               child: Row(children: [
                 Expanded(child: Text(a.title,
-                  style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))),
+                  style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 26, fontWeight: FontWeight.bold))),
                 if (a.price > 0) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -442,7 +442,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                   Tab(text: 'Test Agent'),
                   Tab(text: 'Similar'),
                 ],
-                labelColor: Colors.white,
+                labelColor: const Color(0xFF2B2C1E),
                 unselectedLabelColor: const Color(0xFF7A6E52),
                 indicator: BoxDecoration(
                   color: const Color(0xFF81231E),
@@ -468,7 +468,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                         const SizedBox(height: 20),
                         const Text(
                           'Character Profile',
-                          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                          style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 17, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 10),
                         Container(
@@ -523,7 +523,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                       )).toList()),
                       const SizedBox(height: 28),
                       Row(children: [
-                        const Text('Prompt', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
+                        const Text('Prompt', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 17, fontWeight: FontWeight.bold)),
                         const Spacer(),
                         TextButton.icon(
                           onPressed: _copyPrompt,
@@ -571,7 +571,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                       const Text(
                         'Ratings',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Color(0xFF2B2C1E),
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -631,7 +631,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                                       Text(
                                         agent.title,
                                         style: const TextStyle(
-                                          color: Colors.white,
+                                          color: Color(0xFF2B2C1E),
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
                                         ),

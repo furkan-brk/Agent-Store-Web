@@ -60,7 +60,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         backgroundColor: const Color(0xFFB8AA88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Wallet Required',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold)),
         content: const Text(
           'Connect your wallet to join or leave guilds.',
           style: TextStyle(color: Color(0xFF6B5A40)),
@@ -126,7 +126,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         backgroundColor: const Color(0xFFB8AA88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Leave Guild?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold)),
         content: Text(
           'Are you sure you want to leave "${_detail?.guild.name}"?',
           style: const TextStyle(color: Color(0xFF6B5A40)),
@@ -204,7 +204,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
       backgroundColor: const Color(0xFFDDD1BB),
       appBar: AppBar(
         backgroundColor: const Color(0xFFC8BA9A),
-        foregroundColor: Colors.white,
+        foregroundColor: const Color(0xFF2B2C1E),
         title: Text(_detail?.guild.name ?? 'Guild Detail',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
@@ -242,7 +242,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         TextButton(onPressed: _load, child: const Text('Retry')),
       ]));
     }
-    if (_detail == null) return const Center(child: Text('Guild not found', style: TextStyle(color: Colors.white)));
+    if (_detail == null) return const Center(child: Text('Guild not found', style: TextStyle(color: Color(0xFF2B2C1E))));
 
     final guild = _detail!.guild;
     final rarityColor = _rarityColor(guild.rarity);
@@ -258,7 +258,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
           Text(guild.roleIcon, style: const TextStyle(fontSize: 32)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(guild.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(guild.name, style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Row(children: [
               Container(
@@ -462,7 +462,7 @@ class _StatCell extends StatelessWidget {
       Icon(icon, color: iconColor, size: 18),
       const SizedBox(height: 6),
       Text(value, style: TextStyle(
-        color: valueColor ?? Colors.white,
+        color: valueColor ?? const Color(0xFF2B2C1E),
         fontWeight: FontWeight.bold,
         fontSize: 13,
       )),

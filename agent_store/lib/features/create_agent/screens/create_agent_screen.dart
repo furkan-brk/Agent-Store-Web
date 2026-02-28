@@ -271,7 +271,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           onChanged: (_) => _updatePreview(),
           maxLines: 10,
           style: const TextStyle(
-              color: Colors.white, fontFamily: 'monospace', fontSize: 12),
+              color: Color(0xFF2B2C1E), fontFamily: 'monospace', fontSize: 12),
           validator: (v) =>
               (v == null || v.isEmpty) ? 'Prompt is required' : null,
           decoration: const InputDecoration(
@@ -552,7 +552,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                 const Text(
                   'Create Agent',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 28,
                       fontWeight: FontWeight.bold),
                 ),
@@ -609,7 +609,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       TextFormField(
         controller: ctrl,
         maxLines: lines,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Color(0xFF2B2C1E)),
         validator: required
             ? (v) => (v == null || v.isEmpty) ? '$label is required' : null
             : null,

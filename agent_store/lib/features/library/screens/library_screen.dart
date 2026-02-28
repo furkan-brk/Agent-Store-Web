@@ -152,7 +152,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 children: [
               Text(short,
                   style: const TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 15,
                       fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
@@ -286,7 +286,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           const Text(
             'Collections',
             style: TextStyle(
-                color: Colors.white,
+                color: Color(0xFF2B2C1E),
                 fontSize: 14,
                 fontWeight: FontWeight.w600),
           ),
@@ -413,7 +413,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFFB8AA88),
         title: const Text('Delete Collection',
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(color: Color(0xFF2B2C1E))),
         content: Text(
           'Delete "${col.name}"? Agents won\'t be removed from your library.',
           style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 13),
@@ -605,7 +605,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               const SizedBox(height: 16),
               const Text('Connect your wallet',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 20,
                       fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
@@ -713,7 +713,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
             const Text(
               'Add to collection',
               style: TextStyle(
-                  color: Colors.white,
+                  color: Color(0xFF2B2C1E),
                   fontSize: 16,
                   fontWeight: FontWeight.w600),
             ),
@@ -793,7 +793,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                       child: Text(
                         col.name,
                         style: TextStyle(
-                          color: isIn ? colColor : Colors.white,
+                          color: isIn ? colColor : const Color(0xFF2B2C1E),
                           fontWeight: isIn
                               ? FontWeight.w600
                               : FontWeight.normal,
@@ -852,7 +852,7 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
     return AlertDialog(
       backgroundColor: const Color(0xFFB8AA88),
       title: const Text('New Collection',
-          style: TextStyle(color: Colors.white)),
+          style: TextStyle(color: Color(0xFF2B2C1E))),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -860,7 +860,7 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
           TextField(
             controller: _ctrl,
             autofocus: true,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Color(0xFF2B2C1E)),
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFFC8BA9A),
@@ -987,7 +987,7 @@ class _SetPriceDialogState extends State<_SetPriceDialog> {
     return AlertDialog(
       backgroundColor: const Color(0xFFB8AA88),
       title: const Text('Set Agent Price',
-          style: TextStyle(color: Colors.white)),
+          style: TextStyle(color: Color(0xFF2B2C1E))),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         const Text(
           'Set a price in MON. Set to 0 to make it free.',
@@ -999,7 +999,7 @@ class _SetPriceDialogState extends State<_SetPriceDialog> {
           controller: _ctrl,
           keyboardType:
               const TextInputType.numberWithOptions(decimal: true),
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: Color(0xFF2B2C1E)),
           decoration: InputDecoration(
             filled: true,
             fillColor: const Color(0xFFC8BA9A),

@@ -59,7 +59,7 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
       backgroundColor: const Color(0xFFDDD1BB),
       appBar: AppBar(
         backgroundColor: const Color(0xFFC8BA9A),
-        foregroundColor: Colors.white,
+        foregroundColor: const Color(0xFF2B2C1E),
         title: const Text('Create Guild', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
       body: _creating
@@ -75,7 +75,7 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nameCtrl,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Color(0xFF2B2C1E)),
                   decoration: InputDecoration(
                     hintText: 'e.g. Wizard-Oracle Guild',
                     hintStyle: const TextStyle(color: Color(0xFF5A5038)),
@@ -204,7 +204,7 @@ class _AgentSelector extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(agent.title,
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 10, fontWeight: FontWeight.bold),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
               Text('${agent.characterType.displayName} · ${agent.subclass.displayName}',

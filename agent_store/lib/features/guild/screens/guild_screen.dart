@@ -60,7 +60,7 @@ class _GuildScreenState extends State<GuildScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Text('Guilds', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text('Guilds', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 24, fontWeight: FontWeight.bold)),
             const Spacer(),
             FilledButton.icon(
               style: FilledButton.styleFrom(backgroundColor: const Color(0xFF81231E)),
@@ -90,7 +90,7 @@ class _GuildScreenState extends State<GuildScreen> {
             Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.groups_outlined, color: Color(0xFFC0B490), size: 64),
               const SizedBox(height: 16),
-              const Text('No guilds yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('No guilds yet', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text('Be the first to create one!',
                 style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
@@ -155,7 +155,7 @@ class _GuildCard extends StatelessWidget {
             Text(guild.roleIcon, style: const TextStyle(fontSize: 20)),
             const SizedBox(width: 8),
             Expanded(child: Text(guild.name,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 14),
               maxLines: 1, overflow: TextOverflow.ellipsis)),
           ]),
           const SizedBox(height: 8),

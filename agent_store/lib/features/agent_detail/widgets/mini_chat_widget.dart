@@ -150,7 +150,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 const Text(
                   '\u{1F4AC} Test Agent',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF2B2C1E),
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -258,7 +258,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   child: TextField(
                     controller: _ctrl,
                     style:
-                        const TextStyle(color: Colors.white, fontSize: 13),
+                        const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13),
                     onSubmitted: (_) => _send(),
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',

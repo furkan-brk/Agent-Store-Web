@@ -227,7 +227,7 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF81231E),
-                    foregroundColor: const Color(0xFF2B2C1E),
+                    foregroundColor: const Color(0xFFDDD1BB),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: _findTeam,
@@ -424,7 +424,7 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF81231E),
-                        foregroundColor: const Color(0xFF2B2C1E),
+                        foregroundColor: const Color(0xFFDDD1BB),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                       ),

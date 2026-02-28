@@ -39,7 +39,7 @@ class SettingsScreen extends StatelessWidget {
             ? Icon(leading, color: const Color(0xFF6B5A40), size: 20)
             : null,
         title: Text(title,
-            style: const TextStyle(color: Colors.white, fontSize: 14)),
+            style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
         trailing: Text(subtitle,
             style:
                 const TextStyle(color: Color(0xFF6B5A40), fontSize: 13)),
@@ -49,7 +49,7 @@ class SettingsScreen extends StatelessWidget {
   Widget _iconTile(String title, IconData icon) => ListTile(
         leading: Icon(icon, color: const Color(0xFF6B5A40), size: 20),
         title: Text(title,
-            style: const TextStyle(color: Colors.white, fontSize: 14)),
+            style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
         dense: true,
       );
 
@@ -61,7 +61,7 @@ class SettingsScreen extends StatelessWidget {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Clear All Data',
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(color: Color(0xFF2B2C1E))),
         content: const Text(
           'This will clear all locally stored preferences and cached data. '
           'Your on-chain data will not be affected.',
@@ -114,9 +114,9 @@ class SettingsScreen extends StatelessWidget {
         title: const Text(
           'Settings',
           style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+              color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF2B2C1E)),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -140,7 +140,7 @@ class SettingsScreen extends StatelessWidget {
               onChanged: null, // coming soon — always dark
               activeThumbColor: _accent,
               title: Text('Dark Mode',
-                  style: TextStyle(color: Colors.white, fontSize: 14)),
+                  style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
               subtitle: Text('Coming soon',
                   style:
                       TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),

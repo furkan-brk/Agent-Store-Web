@@ -79,7 +79,7 @@ class _RatingWidgetState extends State<RatingWidget> {
           Text(
             _average.toStringAsFixed(1),
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontSize: 28,
               fontWeight: FontWeight.bold,
             ),

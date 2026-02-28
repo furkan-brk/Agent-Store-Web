@@ -111,7 +111,7 @@ class _SimilarCard extends StatelessWidget {
                   Text(
                     agent.title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),

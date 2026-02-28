@@ -120,7 +120,7 @@ class AgentCard extends StatelessWidget {
                   color: const Color(0xFF81231E),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('MINE', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                child: const Text('MINE', style: TextStyle(color: Color(0xFFDDD1BB), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ),
             ),
         ]),
