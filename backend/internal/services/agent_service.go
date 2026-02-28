@@ -134,13 +134,13 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		log.Printf("[Gemini] agent profile generated: name=%q type=%s", profile.Name, analysis.CharacterType)
 	}
 
-	// ── Step 3: Generate 16-bit pixel-art avatar via Pollinations API (sole image source)
-	generatedImage, imgErr := s.pollinationsSvc.GenerateImage(profile)
+	// ── Step 3: Generate 16-bit pixel-art avatar via Gemini Imagen
+	generatedImage, imgErr := s.geminiSvc.GenerateImage(analysis.ImagePrompt, analysis.CharacterType)
 	if imgErr != nil {
-		log.Printf("[Pollinations] avatar image generation failed, agent will have no image: %v", imgErr)
+		log.Printf("[Gemini] avatar image generation failed, agent will have no image: %v", imgErr)
 		generatedImage = "" // frontend shows shimmer skeleton placeholder
 	} else {
-		log.Printf("[Pollinations] 16-bit avatar generated (type=%s)", analysis.CharacterType)
+		log.Printf("[Gemini] 16-bit avatar generated (type=%s)", analysis.CharacterType)
 	}
 
 	// ── Step 4: Build stats / traits / colors, then merge visual profile into character_data
@@ -274,17 +274,10 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		return nil, fmt.Errorf("original agent not found: %w", err)
 	}
 
-	// Generate a fresh visual profile + 16-bit avatar for the fork (sole image source)
-	forkConcept := original.Title + " (forked variant)"
-	forkProfile, profileErr := s.geminiSvc.GenerateAgentProfile(forkConcept)
-	if profileErr != nil {
-		log.Printf("[Gemini] fork profile failed, using fallback: %v", profileErr)
-		forkProfile = buildFallbackProfile(forkConcept, original.CharacterType)
-	}
-
-	forkedImage, imgErr := s.pollinationsSvc.GenerateImage(forkProfile)
+	// Generate a fresh 16-bit avatar for the fork via Gemini Imagen
+	forkedImage, imgErr := s.geminiSvc.GenerateImage("A variant of "+original.CharacterType, original.CharacterType)
 	if imgErr != nil {
-		log.Printf("[Pollinations] fork avatar image failed, fork will have no image: %v", imgErr)
+		log.Printf("[Gemini] fork avatar generation failed, fork will have no image: %v", imgErr)
 		forkedImage = "" // frontend shows shimmer skeleton placeholder
 	}
 
