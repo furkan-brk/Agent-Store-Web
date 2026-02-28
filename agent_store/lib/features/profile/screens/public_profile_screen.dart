@@ -80,7 +80,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF181910),
+      backgroundColor: const Color(0xFFDDD1BB),
       body: CustomScrollView(
         slivers: [
           _buildAppBar(context),
@@ -98,7 +98,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                     const SizedBox(height: 12),
                     Text(
                       _error!,
-                      style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 16),
+                      style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 16),
                     ),
                     const SizedBox(height: 20),
                     TextButton(
@@ -117,11 +117,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.auto_awesome_outlined, color: Color(0xFF4A4A33), size: 56),
+                      Icon(Icons.auto_awesome_outlined, color: Color(0xFFC0B490), size: 56),
                       SizedBox(height: 12),
                       Text(
                         'No agents created yet',
-                        style: TextStyle(color: Color(0xFF9E8F72), fontSize: 16),
+                        style: TextStyle(color: Color(0xFF6B5A40), fontSize: 16),
                       ),
                     ],
                   ),
@@ -151,7 +151,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   SliverAppBar _buildAppBar(BuildContext context) {
     return SliverAppBar(
-      backgroundColor: const Color(0xFF22231A),
+      backgroundColor: const Color(0xFFC8BA9A),
       pinned: true,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
@@ -178,7 +178,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   Widget _buildProfileHeader() {
     return Container(
-      color: const Color(0xFF22231A),
+      color: const Color(0xFFC8BA9A),
       padding: const EdgeInsets.fromLTRB(32, 24, 32, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -220,12 +220,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             ),
           ]),
           const SizedBox(height: 20),
-          const Divider(color: Color(0xFF3D3E2A), height: 1),
+          const Divider(color: Color(0xFFADA07A), height: 1),
           const SizedBox(height: 16),
           const Text(
             'Created Agents',
             style: TextStyle(
-              color: Color(0xFF9E8F72),
+              color: Color(0xFF6B5A40),
               fontSize: 13,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -270,6 +270,6 @@ class _VerticalDivider extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 1,
     height: 14,
-    color: const Color(0xFF4A4A33),
+    color: const Color(0xFFC0B490),
   );
 }

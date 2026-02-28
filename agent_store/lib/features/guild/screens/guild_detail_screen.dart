@@ -57,13 +57,13 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1F14),
+        backgroundColor: const Color(0xFFB8AA88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Wallet Required',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: const Text(
           'Connect your wallet to join or leave guilds.',
-          style: TextStyle(color: Color(0xFF9E8F72)),
+          style: TextStyle(color: Color(0xFF6B5A40)),
         ),
         actions: [
           TextButton(
@@ -123,13 +123,13 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E1F14),
+        backgroundColor: const Color(0xFFB8AA88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Leave Guild?',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: Text(
           'Are you sure you want to leave "${_detail?.guild.name}"?',
-          style: const TextStyle(color: Color(0xFF9E8F72)),
+          style: const TextStyle(color: Color(0xFF6B5A40)),
         ),
         actions: [
           TextButton(
@@ -154,7 +154,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Left guild.'),
-            backgroundColor: const Color(0xFF1E1F14),
+            backgroundColor: const Color(0xFFB8AA88),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -201,9 +201,9 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF181910),
+      backgroundColor: const Color(0xFFDDD1BB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF22231A),
+        backgroundColor: const Color(0xFFC8BA9A),
         foregroundColor: Colors.white,
         title: Text(_detail?.guild.name ?? 'Guild Detail',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -238,7 +238,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 40),
         const SizedBox(height: 12),
-        Text(_error!, style: const TextStyle(color: Color(0xFF9E8F72))),
+        Text(_error!, style: const TextStyle(color: Color(0xFF6B5A40))),
         TextButton(onPressed: _load, child: const Text('Retry')),
       ]));
     }
@@ -307,7 +307,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: isFull ? const Color(0xFF4A4A33) : const Color(0xFF5A8A48),
+                  backgroundColor: isFull ? const Color(0xFFC0B490) : const Color(0xFF5A8A48),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -412,9 +412,9 @@ class _GuildStatsRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2B1E),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF3D3E2A)),
+        border: Border.all(color: const Color(0xFFADA07A)),
       ),
       child: Row(children: [
         _StatCell(
@@ -476,7 +476,7 @@ class _VertDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: 1, height: 40,
-    color: const Color(0xFF3D3E2A),
+    color: const Color(0xFFADA07A),
     margin: const EdgeInsets.symmetric(horizontal: 8),
   );
 }
@@ -490,7 +490,7 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(title, style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 11,
+      Text(title, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11,
         fontWeight: FontWeight.w600, letterSpacing: 1)),
       const SizedBox(height: 12),
       child,
@@ -596,7 +596,7 @@ class _MemberRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2B1E),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: typeColor.withValues(alpha: 0.2)),
       ),
@@ -630,7 +630,7 @@ class _MemberRow extends StatelessWidget {
             color: const Color(0xFF282918),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(member.role, style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 10)),
+          child: Text(member.role, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10)),
         ),
       ]),
     );

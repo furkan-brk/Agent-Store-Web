@@ -36,11 +36,11 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF181910),
+    backgroundColor: const Color(0xFFDDD1BB),
     body: Column(children: [
       Container(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         child: Row(children: [
           const Icon(Icons.history, color: Color(0xFF81231E), size: 22),
           const SizedBox(width: 10),
@@ -50,7 +50,7 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF2A2B1E),
+              color: const Color(0xFFE8DEC9),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -62,7 +62,7 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
           ),
         ]),
       ),
-      const Divider(height: 1, color: Color(0xFF3D3E2A)),
+      const Divider(height: 1, color: Color(0xFFADA07A)),
       if (_loading)
         const Expanded(child: Center(
           child: CircularProgressIndicator(color: Color(0xFF81231E))))
@@ -72,7 +72,7 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
       else if (_transactions.isEmpty)
         const Expanded(child: Center(child: Column(
           mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.receipt_long_outlined, color: Color(0xFF4A4A33), size: 56),
+            Icon(Icons.receipt_long_outlined, color: Color(0xFFC0B490), size: 56),
             SizedBox(height: 14),
             Text('No transactions yet',
               style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
@@ -129,9 +129,9 @@ class _TxCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF3D3E2A)),
+        border: Border.all(color: const Color(0xFFADA07A)),
       ),
       child: Row(children: [
         Container(

@@ -42,7 +42,7 @@ class AppTheme {
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _border)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: _primary)),
       labelStyle: const TextStyle(color: Color(0xFF6B5A40)),
-      hintStyle: const TextStyle(color: Color(0xFF9E8F72)),
+      hintStyle: const TextStyle(color: Color(0xFF6B5A40)),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(

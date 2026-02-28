@@ -33,7 +33,7 @@ class _NotificationBellState extends State<NotificationBell> {
     clipBehavior: Clip.none,
     children: [
       IconButton(
-        icon: const Icon(Icons.notifications_outlined, color: Color(0xFF9E8F72), size: 20),
+        icon: const Icon(Icons.notifications_outlined, color: Color(0xFF6B5A40), size: 20),
         onPressed: _openPanel,
         tooltip: 'Notifications',
         padding: EdgeInsets.zero,
@@ -86,20 +86,20 @@ class _NotificationDialogState extends State<_NotificationDialog> {
     switch (type) {
       case 'purchase': return const Color(0xFF5A8A48);
       case 'save': return const Color(0xFF81231E);
-      default: return const Color(0xFF9E8F72);
+      default: return const Color(0xFF6B5A40);
     }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xFF1E1F14),
+    backgroundColor: const Color(0xFFB8AA88),
     title: Row(children: [
       const Text('Notifications', style: TextStyle(color: Colors.white, fontSize: 16)),
       const Spacer(),
       if (_notifications.isNotEmpty)
         TextButton(
           onPressed: () { NotificationService.instance.clear(); setState(() => _notifications = []); },
-          child: const Text('Clear all', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
+          child: const Text('Clear all', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
         ),
     ]),
     content: SizedBox(
@@ -111,7 +111,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
           : ListView.separated(
               shrinkWrap: true,
               itemCount: _notifications.length,
-              separatorBuilder: (_, __) => const Divider(color: Color(0xFF3D3E2A), height: 1),
+              separatorBuilder: (_, __) => const Divider(color: Color(0xFFADA07A), height: 1),
               itemBuilder: (_, i) {
                 final n = _notifications[i];
                 return ListTile(

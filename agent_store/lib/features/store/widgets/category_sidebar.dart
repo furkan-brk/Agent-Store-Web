@@ -30,7 +30,7 @@ class CategorySidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 180,
-      color: const Color(0xFF22231A),
+      color: const Color(0xFFC8BA9A),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -118,7 +118,7 @@ class _CategoryItem extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? _highlight : const Color(0xFF9E8F72),
+                  color: isSelected ? _highlight : const Color(0xFF6B5A40),
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),

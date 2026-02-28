@@ -34,11 +34,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF181910),
+    backgroundColor: const Color(0xFFDDD1BB),
     body: Column(children: [
       Container(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         child: const Row(children: [
           Icon(Icons.emoji_events_outlined, color: Color(0xFF9B7B1A), size: 22),
           SizedBox(width: 10),
@@ -48,7 +48,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           Text('Top Creators', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
         ]),
       ),
-      const Divider(height: 1, color: Color(0xFF3D3E2A)),
+      const Divider(height: 1, color: Color(0xFFADA07A)),
       if (_loading)
         const Expanded(child: Center(
           child: CircularProgressIndicator(color: Color(0xFF81231E))))
@@ -58,7 +58,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       else if (_rankings.isEmpty)
         const Expanded(child: Center(child: Column(
           mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.emoji_events_outlined, color: Color(0xFF4A4A33), size: 56),
+            Icon(Icons.emoji_events_outlined, color: Color(0xFFC0B490), size: 56),
             SizedBox(height: 14),
             Text('No creators yet',
               style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
@@ -92,18 +92,18 @@ class _RankCard extends StatelessWidget {
     final Color rankColor;
     final IconData? rankIcon;
     if (rank == 1) { rankColor = const Color(0xFF9B7B1A); rankIcon = Icons.emoji_events; }
-    else if (rank == 2) { rankColor = const Color(0xFF9E8F72); rankIcon = Icons.emoji_events; }
+    else if (rank == 2) { rankColor = const Color(0xFF6B5A40); rankIcon = Icons.emoji_events; }
     else if (rank == 3) { rankColor = const Color(0xFFCD7C32); rankIcon = Icons.emoji_events; }
-    else { rankColor = const Color(0xFF4A4A33); rankIcon = null; }
+    else { rankColor = const Color(0xFFC0B490); rankIcon = null; }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: rank <= 3 ? rankColor.withValues(alpha: 0.3) : const Color(0xFF3D3E2A)),
+          color: rank <= 3 ? rankColor.withValues(alpha: 0.3) : const Color(0xFFADA07A)),
         gradient: rank == 1 ? LinearGradient(
           colors: [const Color(0xFF9B7B1A).withValues(alpha: 0.05), Colors.transparent],
           begin: Alignment.topLeft, end: Alignment.bottomRight,
@@ -130,14 +130,14 @@ class _RankCard extends StatelessWidget {
             const Icon(Icons.bookmark_border, color: Color(0xFF81231E), size: 13),
             const SizedBox(width: 3),
             Text('$totalSaves',
-              style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
+              style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
           ]),
           const SizedBox(height: 3),
           Row(children: [
             const Icon(Icons.chat_bubble_outline, color: Color(0xFF81231E), size: 12),
             const SizedBox(width: 3),
             Text('$totalUses',
-              style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
+              style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
           ]),
         ]),
       ]),

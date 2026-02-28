@@ -55,7 +55,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
     final isLast = _step == _steps.length - 1;
 
     return Dialog(
-      backgroundColor: const Color(0xFF1E1F14),
+      backgroundColor: const Color(0xFFB8AA88),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SizedBox(
         width: 400,
@@ -71,7 +71,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
                 width: i == _step ? 20 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _step ? const Color(0xFF81231E) : const Color(0xFF4A4A33),
+                  color: i == _step ? const Color(0xFF81231E) : const Color(0xFFC0B490),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -96,7 +96,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
             // Body
             Text(step.body,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 14, height: 1.5)),
+              style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 14, height: 1.5)),
             const SizedBox(height: 32),
             // Buttons
             Row(children: [

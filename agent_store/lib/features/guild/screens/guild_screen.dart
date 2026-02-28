@@ -37,7 +37,7 @@ class _GuildScreenState extends State<GuildScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Connect your wallet to create a guild'),
-          backgroundColor: const Color(0xFF1E1F14),
+          backgroundColor: const Color(0xFFB8AA88),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           action: SnackBarAction(
@@ -55,7 +55,7 @@ class _GuildScreenState extends State<GuildScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF181910),
+      backgroundColor: const Color(0xFFDDD1BB),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -82,13 +82,13 @@ class _GuildScreenState extends State<GuildScreen> {
             Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 40),
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Color(0xFF9E8F72))),
+              Text(_error!, style: const TextStyle(color: Color(0xFF6B5A40))),
               const SizedBox(height: 16),
               TextButton(onPressed: _load, child: const Text('Retry')),
             ])))
           else if (_guilds.isEmpty)
             Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.groups_outlined, color: Color(0xFF4A4A33), size: 64),
+              const Icon(Icons.groups_outlined, color: Color(0xFFC0B490), size: 64),
               const SizedBox(height: 16),
               const Text('No guilds yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
@@ -145,7 +145,7 @@ class _GuildCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2B1E),
+          color: const Color(0xFFE8DEC9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: rarityColor.withValues(alpha: 0.35)),
           boxShadow: [BoxShadow(color: rarityColor.withValues(alpha: 0.06), blurRadius: 8)],
@@ -177,7 +177,7 @@ class _GuildCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(categoryLabel,
-                style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 9, fontWeight: FontWeight.w500)),
+                style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 9, fontWeight: FontWeight.w500)),
             ),
           ]),
           const Spacer(),

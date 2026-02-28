@@ -147,7 +147,7 @@ class _Sidebar extends StatelessWidget {
     final loc = GoRouterState.of(context).uri.toString();
     return Container(
       width: 210,
-      color: const Color(0xFF22231A),
+      color: const Color(0xFFC8BA9A),
       child: Column(children: [
         const SizedBox(height: 32),
         Padding(
@@ -156,10 +156,10 @@ class _Sidebar extends StatelessWidget {
             Container(
               width: 32, height: 32,
               decoration: BoxDecoration(color: const Color(0xFF81231E), borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.auto_awesome, color: Color(0xFFE8D9B8), size: 18),
+              child: const Icon(Icons.auto_awesome, color: Color(0xFF2B2C1E), size: 18),
             ),
             const SizedBox(width: 10),
-            const Text('AgentStore', style: TextStyle(color: Color(0xFFE8D9B8), fontWeight: FontWeight.bold, fontSize: 15)),
+            const Text('AgentStore', style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 15)),
           ]),
         ),
         const SizedBox(height: 28),
@@ -171,11 +171,11 @@ class _Sidebar extends StatelessWidget {
         _NavItem(icon: Icons.emoji_events_outlined,         label: 'Leaderboard', path: '/leaderboard', loc: loc),
         _NavItem(icon: Icons.analytics_outlined,            label: 'Creator',     path: '/creator',      loc: loc),
         const Spacer(),
-        const Divider(color: Color(0xFF3D3E2A), height: 1),
+        const Divider(color: Color(0xFFADA07A), height: 1),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Row(children: [
-            Text('', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
+            Text('', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
             Spacer(),
             NotificationBell(),
           ]),
@@ -214,7 +214,7 @@ class _NavItem extends StatelessWidget {
             Icon(icon, color: selected ? const Color(0xFF81231E) : const Color(0xFF7A6E52), size: 20),
             const SizedBox(width: 10),
             Text(label, style: TextStyle(
-              color: selected ? const Color(0xFF81231E) : const Color(0xFF9E8F72),
+              color: selected ? const Color(0xFF81231E) : const Color(0xFF6B5A40),
               fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             )),
           ]),

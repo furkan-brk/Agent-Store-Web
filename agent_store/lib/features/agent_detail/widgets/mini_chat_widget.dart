@@ -133,9 +133,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF3D3E2A)),
+        border: Border.all(color: const Color(0xFFADA07A)),
       ),
       child: Column(
         children: [
@@ -143,7 +143,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFF3D3E2A))),
+              border: Border(bottom: BorderSide(color: Color(0xFFADA07A))),
             ),
             child: Row(
               children: [
@@ -235,7 +235,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                             style: TextStyle(
                               color: isUser
                                   ? Colors.white
-                                  : const Color(0xFFD0BF98),
+                                  : const Color(0xFF4A4033),
                               fontSize: 13,
                               height: 1.4,
                             ),
@@ -250,7 +250,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFF3D3E2A))),
+              border: Border(top: BorderSide(color: Color(0xFFADA07A))),
             ),
             child: Row(
               children: [
@@ -268,12 +268,12 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                       contentPadding: EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                       filled: true,
-                      fillColor: Color(0xFF1E1F14),
+                      fillColor: Color(0xFFB8AA88),
                       enabledBorder: OutlineInputBorder(
                         borderRadius:
                             BorderRadius.all(Radius.circular(8)),
                         borderSide:
-                            BorderSide(color: Color(0xFF3D3E2A)),
+                            BorderSide(color: Color(0xFFADA07A)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius:
@@ -289,7 +289,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   onPressed: _sending ? null : _send,
                   icon: const Icon(Icons.send_rounded),
                   color: const Color(0xFF81231E),
-                  disabledColor: const Color(0xFF4A4A33),
+                  disabledColor: const Color(0xFFC0B490),
                   style: IconButton.styleFrom(
                     backgroundColor:
                         const Color(0xFF81231E).withValues(alpha: 0.1),

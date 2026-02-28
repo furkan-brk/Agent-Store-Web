@@ -148,7 +148,7 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF181910),
+    backgroundColor: const Color(0xFFDDD1BB),
     body: Row(
       children: [
         // Category sidebar
@@ -216,7 +216,7 @@ class _StoreScreenState extends State<StoreScreen> {
   Widget _header() => Padding(
     padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Agent Store', style: TextStyle(color: Color(0xFFE8D9B8), fontSize: 30, fontWeight: FontWeight.bold)),
+      const Text('Agent Store', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 30, fontWeight: FontWeight.bold)),
       const SizedBox(height: 4),
       Text('$_total agents available', style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
       const SizedBox(height: 16),
@@ -226,7 +226,7 @@ class _StoreScreenState extends State<StoreScreen> {
             controller: _searchCtrl,
             onSubmitted: (v) { _debounce?.cancel(); setState(() => _search = v); _saveRecentSearch(v); _load(); },
             onChanged: _onSearchChanged,
-            style: const TextStyle(color: Color(0xFFE8D9B8)),
+            style: const TextStyle(color: Color(0xFF2B2C1E)),
             decoration: InputDecoration(
               hintText: 'Search agents...',
               prefixIcon: const Icon(Icons.search, color: Color(0xFF7A6E52)),
@@ -240,16 +240,16 @@ class _StoreScreenState extends State<StoreScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E1F14),
+            color: const Color(0xFFB8AA88),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF4A4A33)),
+            border: Border.all(color: const Color(0xFFC0B490)),
           ),
           child: DropdownButton<String>(
             value: _sort,
-            dropdownColor: const Color(0xFF1E1F14),
+            dropdownColor: const Color(0xFFB8AA88),
             underline: const SizedBox(),
-            icon: const Icon(Icons.sort, color: Color(0xFF9E8F72), size: 16),
-            style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 12),
+            icon: const Icon(Icons.sort, color: Color(0xFF6B5A40), size: 16),
+            style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12),
             items: const [
               DropdownMenuItem(value: 'newest',     child: Text('Newest')),
               DropdownMenuItem(value: 'popular',    child: Text('Popular')),
@@ -270,12 +270,12 @@ class _StoreScreenState extends State<StoreScreen> {
               decoration: BoxDecoration(
                 color: _showFilter
                     ? const Color(0xFF81231E).withValues(alpha: 0.15)
-                    : const Color(0xFF1E1F14),
+                    : const Color(0xFFB8AA88),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: _showFilter
                       ? const Color(0xFF81231E)
-                      : const Color(0xFF4A4A33),
+                      : const Color(0xFFC0B490),
                 ),
               ),
               child: IconButton(
@@ -283,7 +283,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   Icons.tune,
                   color: _showFilter
                       ? const Color(0xFF81231E)
-                      : const Color(0xFF9E8F72),
+                      : const Color(0xFF6B5A40),
                   size: 18,
                 ),
                 onPressed: () => setState(() => _showFilter = !_showFilter),
@@ -302,7 +302,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   child: Text(
                     '$_activeFilterCount',
                     style: const TextStyle(
-                      color: Color(0xFFE8D9B8),
+                      color: Color(0xFF2B2C1E),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -364,15 +364,15 @@ class _StoreScreenState extends State<StoreScreen> {
               ..._recentSearches.map((s) => Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: ActionChip(
-                  label: Text(s, style: const TextStyle(fontSize: 10, color: Color(0xFF9E8F72))),
+                  label: Text(s, style: const TextStyle(fontSize: 10, color: Color(0xFF6B5A40))),
                   onPressed: () {
                     _debounce?.cancel();
                     _searchCtrl.text = s;
                     setState(() => _search = s);
                     _load();
                   },
-                  backgroundColor: const Color(0xFF1E1F14),
-                  side: const BorderSide(color: Color(0xFF4A4A33)),
+                  backgroundColor: const Color(0xFFB8AA88),
+                  side: const BorderSide(color: Color(0xFFC0B490)),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   visualDensity: VisualDensity.compact,
                 ),
@@ -405,7 +405,7 @@ class _StoreScreenState extends State<StoreScreen> {
               ? '${_category[0].toUpperCase()}${_category.substring(1)} Agents'
               : 'All Agents',
       style: const TextStyle(
-        color: Color(0xFFE8D9B8),
+        color: Color(0xFF2B2C1E),
         fontSize: 16,
         fontWeight: FontWeight.bold,
         letterSpacing: 0.5,
@@ -414,9 +414,9 @@ class _StoreScreenState extends State<StoreScreen> {
   );
 
   Widget _errorView() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    const Icon(Icons.cloud_off_outlined, color: Color(0xFF4A4A33), size: 56),
+    const Icon(Icons.cloud_off_outlined, color: Color(0xFFC0B490), size: 56),
     const SizedBox(height: 12),
-    const Text('Could not load agents', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 18)),
+    const Text('Could not load agents', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 18)),
     const SizedBox(height: 6),
     const Text('Check your connection and try again', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
     const SizedBox(height: 20),
@@ -430,9 +430,9 @@ class _StoreScreenState extends State<StoreScreen> {
   Widget _empty() {
     if (_search.isNotEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.search_off, color: Color(0xFF4A4A33), size: 52),
+        const Icon(Icons.search_off, color: Color(0xFFC0B490), size: 52),
         const SizedBox(height: 12),
-        const Text('No agents found', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 16)),
+        const Text('No agents found', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 16)),
         const SizedBox(height: 6),
         const Text('Try a different search term', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
         const SizedBox(height: 16),
@@ -440,9 +440,9 @@ class _StoreScreenState extends State<StoreScreen> {
       ]));
     }
     return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Icon(Icons.search_off, color: Color(0xFF4A4A33), size: 56),
+      const Icon(Icons.search_off, color: Color(0xFFC0B490), size: 56),
       const SizedBox(height: 12),
-      const Text('No agents found', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 18)),
+      const Text('No agents found', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 18)),
       if (_category.isNotEmpty) ...[
         const SizedBox(height: 8),
         TextButton(onPressed: () { setState(() => _category = ''); _load(); }, child: const Text('Clear filters')),
@@ -473,7 +473,7 @@ class _StoreScreenState extends State<StoreScreen> {
         // ── Category grid ──────────────────────────────────────────────────
         const Text(
           'Browse by Category',
-          style: TextStyle(color: Color(0xFFE8D9B8), fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 10),
         GridView.builder(
@@ -500,7 +500,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [color.withValues(alpha: 0.25), const Color(0xFF2A2B1E)],
+                    colors: [color.withValues(alpha: 0.25), const Color(0xFFE8DEC9)],
                   ),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: color.withValues(alpha: 0.35)),
@@ -510,7 +510,7 @@ class _StoreScreenState extends State<StoreScreen> {
                   const SizedBox(height: 4),
                   Text(
                     type.displayName,
-                    style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 11, fontWeight: FontWeight.w600),
+                    style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ]),
               ),
@@ -521,14 +521,14 @@ class _StoreScreenState extends State<StoreScreen> {
         // ── Popular tags ───────────────────────────────────────────────────
         const Text(
           'Popular Tags',
-          style: TextStyle(color: Color(0xFFE8D9B8), fontSize: 14, fontWeight: FontWeight.w600),
+          style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 14, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 6,
           runSpacing: 6,
           children: _kPopularTags.map((tag) => ActionChip(
-            label: Text(tag, style: const TextStyle(color: Color(0xFFD0BF98), fontSize: 11)),
+            label: Text(tag, style: const TextStyle(color: Color(0xFF4A4033), fontSize: 11)),
             onPressed: () {
               _debounce?.cancel();
               _searchCtrl.text = tag;
@@ -536,8 +536,8 @@ class _StoreScreenState extends State<StoreScreen> {
               _saveRecentSearch(tag);
               _load();
             },
-            backgroundColor: const Color(0xFF1E1F14),
-            side: const BorderSide(color: Color(0xFF3D3E2A)),
+            backgroundColor: const Color(0xFFB8AA88),
+            side: const BorderSide(color: Color(0xFFADA07A)),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
             visualDensity: VisualDensity.compact,
           )).toList(),
@@ -570,11 +570,11 @@ class _AgentCardWithSave extends StatelessWidget {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: const Color(0xFF181910).withValues(alpha: 0.75),
+              color: const Color(0xFFDDD1BB).withValues(alpha: 0.75),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF4A4A33)),
+              border: Border.all(color: const Color(0xFFC0B490)),
             ),
-            child: const Icon(Icons.bookmark_add_outlined, size: 15, color: Color(0xFF9E8F72)),
+            child: const Icon(Icons.bookmark_add_outlined, size: 15, color: Color(0xFF6B5A40)),
           ),
         ),
       ),

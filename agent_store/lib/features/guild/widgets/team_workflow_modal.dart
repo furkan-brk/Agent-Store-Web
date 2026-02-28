@@ -58,9 +58,9 @@ class TeamWorkflowModal extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 520),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF22231A),
+            color: const Color(0xFFC8BA9A),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF3D3E2A), width: 1.5),
+            border: Border.all(color: const Color(0xFFADA07A), width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF81231E).withValues(alpha: 0.12),
@@ -161,7 +161,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     title.toUpperCase(),
     style: const TextStyle(
-      color: Color(0xFF9E8F72),
+      color: Color(0xFF6B5A40),
       fontSize: 10,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.2,
@@ -186,7 +186,7 @@ class _MemberRoleCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2B1E),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
@@ -213,7 +213,7 @@ class _MemberRoleCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             '${type.displayName} → ${step.label}: ${step.description}',
-            style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 10),
+            style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -313,7 +313,7 @@ class _CoverageBar extends StatelessWidget {
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 6,
-              backgroundColor: const Color(0xFF3D3E2A),
+              backgroundColor: const Color(0xFFADA07A),
               color: pct >= 0.75
                   ? const Color(0xFF5A8A48)
                   : pct >= 0.5
@@ -325,7 +325,7 @@ class _CoverageBar extends StatelessWidget {
         const SizedBox(width: 10),
         Text(
           '${covered.length}/${_kPipelineOrder.length} phases',
-          style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 11),
+          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11),
         ),
       ]),
       if (missing.isNotEmpty) ...[

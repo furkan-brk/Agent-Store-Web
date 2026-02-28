@@ -67,11 +67,11 @@ class _TrendingRowState extends State<TrendingRow> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: const LinearGradient(
-            colors: [Color(0xFF2A2B1E), Color(0xFF22231A)],
+            colors: [Color(0xFFE8DEC9), Color(0xFFC8BA9A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border.all(color: const Color(0xFF3D3E2A)),
+          border: Border.all(color: const Color(0xFFADA07A)),
         ),
       ),
     );
@@ -101,7 +101,7 @@ class _TrendingCard extends StatelessWidget {
         width: 130,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2B1E),
+          color: const Color(0xFFE8DEC9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: rc.withValues(alpha: 0.35)),
           boxShadow: [BoxShadow(color: rc.withValues(alpha: 0.08), blurRadius: 8)],

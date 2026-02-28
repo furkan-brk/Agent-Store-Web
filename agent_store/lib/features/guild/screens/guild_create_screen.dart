@@ -56,9 +56,9 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF181910),
+      backgroundColor: const Color(0xFFDDD1BB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF22231A),
+        backgroundColor: const Color(0xFFC8BA9A),
         foregroundColor: Colors.white,
         title: const Text('Create Guild', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
@@ -66,12 +66,12 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
           ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               CircularProgressIndicator(color: Color(0xFF81231E)),
               SizedBox(height: 16),
-              Text('Creating guild...', style: TextStyle(color: Color(0xFF9E8F72))),
+              Text('Creating guild...', style: TextStyle(color: Color(0xFF6B5A40))),
             ]))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Guild Name', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12, letterSpacing: 1)),
+                const Text('Guild Name', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12, letterSpacing: 1)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nameCtrl,
@@ -80,10 +80,10 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
                     hintText: 'e.g. Wizard-Oracle Guild',
                     hintStyle: const TextStyle(color: Color(0xFF5A5038)),
                     filled: true,
-                    fillColor: const Color(0xFF2A2B1E),
+                    fillColor: const Color(0xFFE8DEC9),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF4A4A33)),
+                      borderSide: const BorderSide(color: Color(0xFFC0B490)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -94,7 +94,7 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
                 const SizedBox(height: 24),
 
                 Row(children: [
-                  const Text('Select Members', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12, letterSpacing: 1)),
+                  const Text('Select Members', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12, letterSpacing: 1)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -187,7 +187,7 @@ class _AgentSelector extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFF81231E).withValues(alpha: 0.12) : const Color(0xFF2A2B1E),
+              color: selected ? const Color(0xFF81231E).withValues(alpha: 0.12) : const Color(0xFFE8DEC9),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: selected ? const Color(0xFF81231E) : rc.withValues(alpha: 0.25),

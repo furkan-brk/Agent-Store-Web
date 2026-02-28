@@ -87,7 +87,7 @@ class _BonusRow extends StatelessWidget {
         width: 90,
         child: Text(
           stat.toUpperCase(),
-          style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 10, letterSpacing: 0.8),
+          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10, letterSpacing: 0.8),
         ),
       ),
       const Icon(Icons.add, size: 12, color: Color(0xFF5A8A48)),

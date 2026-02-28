@@ -114,9 +114,9 @@ class AchievementBadge extends StatelessWidget {
       preferBelow: false,
       textStyle: const TextStyle(color: Colors.white, fontSize: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1F14),
+        color: const Color(0xFFB8AA88),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF4A4A33)),
+        border: Border.all(color: const Color(0xFFC0B490)),
       ),
       child: Opacity(
         opacity: opacity,

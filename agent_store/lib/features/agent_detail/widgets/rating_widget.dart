@@ -90,7 +90,7 @@ class _RatingWidgetState extends State<RatingWidget> {
           Text(
             '($_count)',
             style:
-                const TextStyle(color: Color(0xFF9E8F72), fontSize: 13),
+                const TextStyle(color: Color(0xFF6B5A40), fontSize: 13),
           ),
         ]),
         const SizedBox(height: 12),
@@ -98,7 +98,7 @@ class _RatingWidgetState extends State<RatingWidget> {
         if (ApiService.instance.isAuthenticated) ...[
           const Text(
             'Your rating:',
-            style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12),
+            style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12),
           ),
           const SizedBox(height: 4),
           Row(

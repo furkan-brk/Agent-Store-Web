@@ -48,7 +48,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           title: const Text('Insufficient Credits', style: TextStyle(color: Colors.white)),
           content: Text(
             'You need \u26A110 credits to create an agent. You have \u26A1$_credits.',
-            style: const TextStyle(color: Color(0xFF9E8F72)),
+            style: const TextStyle(color: Color(0xFF6B5A40)),
           ),
           actions: [
             TextButton(
@@ -306,7 +306,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
               Text(
                 _preview.description,
                 style: const TextStyle(
-                    color: Color(0xFF9E8F72), fontSize: 12, height: 1.5),
+                    color: Color(0xFF6B5A40), fontSize: 12, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
@@ -326,7 +326,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           decoration: BoxDecoration(
             color: const Color(0xFF282918),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF4A4A33)),
+            border: Border.all(color: const Color(0xFFC0B490)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,8 +393,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
             icon: const Icon(Icons.arrow_back, size: 16),
             label: const Text('Back'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF9E8F72),
-              side: const BorderSide(color: Color(0xFF4A4A33)),
+              foregroundColor: const Color(0xFF6B5A40),
+              side: const BorderSide(color: Color(0xFFC0B490)),
               padding:
                   const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
@@ -450,12 +450,12 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   }
 
   Widget _buildForm(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF181910),
+    backgroundColor: const Color(0xFFDDD1BB),
     body: Row(children: [
       // ── Left preview panel ─────────────────────────────────────────────
       Container(
         width: 260,
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         child: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             if (_createdAgent != null) ...[
@@ -559,7 +559,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                 const SizedBox(height: 4),
                 const Text(
                   'Describe your AI agent — category, tags and character art will be generated automatically.',
-                  style: TextStyle(color: Color(0xFF9E8F72), fontSize: 13),
+                  style: TextStyle(color: Color(0xFF6B5A40), fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 // ── Step indicator ───────────────────────────────────────

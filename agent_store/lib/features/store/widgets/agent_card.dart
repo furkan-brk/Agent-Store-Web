@@ -17,7 +17,7 @@ class AgentCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2B1E),
+          color: const Color(0xFFE8DEC9),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: rc.withValues(alpha: 0.3)),
           boxShadow: [BoxShadow(color: rc.withValues(alpha: 0.06), blurRadius: 10)],
@@ -48,11 +48,11 @@ class AgentCard extends StatelessWidget {
               ]),
               const SizedBox(height: 4),
               Text(agent.title,
-                style: const TextStyle(color: Color(0xFFE8D9B8), fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 13),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
               Text(agent.description,
-                style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 11),
+                style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11),
                 maxLines: 2, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 8),
               // Mini stat bars
@@ -105,7 +105,7 @@ class AgentCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(color: const Color(0xFF282918), borderRadius: BorderRadius.circular(4)),
-                  child: Text(agent.category, style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 9)),
+                  child: Text(agent.category, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 9)),
                 ),
               ]),
             ]),
@@ -120,7 +120,7 @@ class AgentCard extends StatelessWidget {
                   color: const Color(0xFF81231E),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('MINE', style: TextStyle(color: Color(0xFFE8D9B8), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                child: const Text('MINE', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ),
             ),
         ]),
@@ -174,7 +174,7 @@ class _CharacterBanner extends StatelessWidget {
       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       gradient: LinearGradient(
         begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        colors: [agent.characterType.secondaryColor.withValues(alpha: 0.4), const Color(0xFF181910)],
+        colors: [agent.characterType.secondaryColor.withValues(alpha: 0.4), const Color(0xFFDDD1BB)],
       ),
     ),
     child: Center(

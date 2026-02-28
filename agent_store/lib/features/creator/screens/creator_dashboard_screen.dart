@@ -56,10 +56,10 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF181910),
+      backgroundColor: const Color(0xFFDDD1BB),
       body: Column(children: [
         _buildHeader(),
-        const Divider(height: 1, color: Color(0xFF3D3E2A)),
+        const Divider(height: 1, color: Color(0xFFADA07A)),
         if (!ApiService.instance.isAuthenticated)
           _buildUnauthState()
         else if (_loading)
@@ -89,7 +89,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
 
   Widget _buildHeader() => Container(
     padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-    color: const Color(0xFF22231A),
+    color: const Color(0xFFC8BA9A),
     child: Row(children: [
       const Icon(Icons.analytics_outlined, color: Color(0xFF81231E), size: 22),
       const SizedBox(width: 10),
@@ -113,7 +113,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
   Widget _buildUnauthState() => Expanded(
     child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.account_balance_wallet_outlined,
-        color: Color(0xFF4A4A33), size: 64),
+        color: Color(0xFFC0B490), size: 64),
       const SizedBox(height: 16),
       const Text('Connect wallet to view your creator stats',
         style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
@@ -138,7 +138,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
     if (_agents.isEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.auto_awesome_outlined,
-          color: Color(0xFF4A4A33), size: 64),
+          color: Color(0xFFC0B490), size: 64),
         const SizedBox(height: 16),
         const Text('No agents created yet',
           style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
@@ -202,9 +202,9 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
 
   Widget _buildAgentsTable() => Container(
     decoration: BoxDecoration(
-      color: const Color(0xFF22231A),
+      color: const Color(0xFFC8BA9A),
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFF3D3E2A)),
+      border: Border.all(color: const Color(0xFFADA07A)),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Padding(
@@ -220,14 +220,14 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
               fontSize: 14)),
         ]),
       ),
-      const Divider(height: 1, color: Color(0xFF3D3E2A)),
+      const Divider(height: 1, color: Color(0xFFADA07A)),
       SizedBox(
         width: double.infinity,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(
-              const Color(0xFF2A2B1E)),
+              const Color(0xFFE8DEC9)),
             dataRowColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
                 return const Color(0xFF81231E).withValues(alpha: 0.08);
@@ -244,7 +244,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
               letterSpacing: 0.8,
             ),
             dataTextStyle: const TextStyle(
-              color: Color(0xFFD0BF98),
+              color: Color(0xFF4A4033),
               fontSize: 13,
             ),
             columns: const [
@@ -286,14 +286,14 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
                     color: Color(0xFF81231E), size: 14),
                   const SizedBox(width: 4),
                   Text('${agent.saveCount}',
-                    style: const TextStyle(color: Color(0xFFD0BF98))),
+                    style: const TextStyle(color: Color(0xFF4A4033))),
                 ])),
                 DataCell(Row(children: [
                   const Icon(Icons.play_circle_outline,
                     color: Color(0xFF5A8A48), size: 14),
                   const SizedBox(width: 4),
                   Text('${agent.useCount}',
-                    style: const TextStyle(color: Color(0xFFD0BF98))),
+                    style: const TextStyle(color: Color(0xFF4A4033))),
                 ])),
                 DataCell(Text(
                   agent.price == 0
@@ -334,13 +334,13 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFF2A2B1E),
+      color: const Color(0xFFE8DEC9),
       borderRadius: BorderRadius.circular(10),
       border: const Border(
         top: BorderSide(color: Color(0xFF81231E), width: 2),
-        left: BorderSide(color: Color(0xFF3D3E2A)),
-        right: BorderSide(color: Color(0xFF3D3E2A)),
-        bottom: BorderSide(color: Color(0xFF3D3E2A)),
+        left: BorderSide(color: Color(0xFFADA07A)),
+        right: BorderSide(color: Color(0xFFADA07A)),
+        bottom: BorderSide(color: Color(0xFFADA07A)),
       ),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -370,13 +370,13 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: const Color(0xFF3D3E2A),
+      color: const Color(0xFFADA07A),
       borderRadius: BorderRadius.circular(4),
     ),
     child: Text(
       category.isEmpty ? '—' : category,
       style: const TextStyle(
-        color: Color(0xFF9E8F72),
+        color: Color(0xFF6B5A40),
         fontSize: 11,
       ),
     ),

@@ -43,7 +43,7 @@ class PixelArtPainter extends CustomPainter {
       s,                           // 2 secondary
       const Color(0xFFF5CBA7),     // 3 skin
       a,                           // 4 accent
-      const Color(0xFF1E1F14),     // 5 dark outline
+      const Color(0xFFB8AA88),     // 5 dark outline
       const Color(0xFFFFFFFF),     // 6 highlight
       const Color(0xFF8B7340),     // 7 book/gold detail
       const Color(0xFF2D2D2D),     // 8 eyes
@@ -68,7 +68,7 @@ class PixelArtPainter extends CustomPainter {
 
     // ── Layer −1: Checkered background — only for transparent pixels ──
     final checkerDark  = Paint()..style = PaintingStyle.fill..color = const Color(0xFF141508);
-    final checkerLight = Paint()..style = PaintingStyle.fill..color = const Color(0xFF181910);
+    final checkerLight = Paint()..style = PaintingStyle.fill..color = const Color(0xFFDDD1BB);
     for (int row = 0; row < pixels.length; row++) {
       final rowData = pixels[row];
       for (int col = 0; col < rowData.length; col++) {

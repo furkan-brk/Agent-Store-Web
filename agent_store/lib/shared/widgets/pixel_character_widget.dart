@@ -158,7 +158,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
       width: widget.size + 16,
       height: widget.size + 16,
       decoration: BoxDecoration(
-        color: const Color(0xFF22231A),
+        color: const Color(0xFFC8BA9A),
         border: Border.all(color: fc, width: 2),
         boxShadow: [BoxShadow(color: fc.withValues(alpha: 0.35), blurRadius: 14, spreadRadius: 2)],
       ),
@@ -374,7 +374,7 @@ class _StatRow extends StatelessWidget {
         ),
       )),
       const SizedBox(width: 6),
-      Text('$value', style: const TextStyle(color: Color(0xFFD0BF98), fontSize: 9)),
+      Text('$value', style: const TextStyle(color: Color(0xFF4A4033), fontSize: 9)),
     ]),
   );
 }
