@@ -66,7 +66,7 @@ class _RatingWidgetState extends State<RatingWidget> {
         child: Center(
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: Color(0xFF6366F1),
+            color: Color(0xFF81231E),
           ),
         ),
       );
@@ -90,7 +90,7 @@ class _RatingWidgetState extends State<RatingWidget> {
           Text(
             '($_count)',
             style:
-                const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                const TextStyle(color: Color(0xFF9E8F72), fontSize: 13),
           ),
         ]),
         const SizedBox(height: 12),
@@ -98,7 +98,7 @@ class _RatingWidgetState extends State<RatingWidget> {
         if (ApiService.instance.isAuthenticated) ...[
           const Text(
             'Your rating:',
-            style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+            style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12),
           ),
           const SizedBox(height: 4),
           Row(
@@ -113,8 +113,8 @@ class _RatingWidgetState extends State<RatingWidget> {
                         ? Icons.star_rounded
                         : Icons.star_outline_rounded,
                     color: star <= _userRating
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFF4B5563),
+                        ? const Color(0xFF9B7B1A)
+                        : const Color(0xFF5A5038),
                     size: 28,
                   ),
                 ),
@@ -144,7 +144,7 @@ class _StarRow extends StatelessWidget {
                 : half
                     ? Icons.star_half_rounded
                     : Icons.star_outline_rounded,
-            color: const Color(0xFFF59E0B),
+            color: const Color(0xFF9B7B1A),
             size: size,
           );
         }),

@@ -123,9 +123,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F1E),
+        color: const Color(0xFF22231A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E1E35)),
+        border: Border.all(color: const Color(0xFF3D3E2A)),
       ),
       child: Column(
         children: [
@@ -133,7 +133,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFF1E1E35))),
+              border: Border(bottom: BorderSide(color: Color(0xFF3D3E2A))),
             ),
             child: Row(
               children: [
@@ -150,7 +150,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   child: Text(
                     widget.agentTitle,
                     style: const TextStyle(
-                        color: Color(0xFF6B7280), fontSize: 12),
+                        color: Color(0xFF7A6E52), fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -159,12 +159,12 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF6366F1)),
+                        strokeWidth: 2, color: Color(0xFF81231E)),
                   ),
                 if (_messages.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.delete_outline,
-                        size: 16, color: Color(0xFF6B7280)),
+                        size: 16, color: Color(0xFF7A6E52)),
                     tooltip: 'Clear chat history',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -181,7 +181,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                     child: Text(
                       'Send a message to test this agent...',
                       style: TextStyle(
-                          color: Color(0xFF4B5563), fontSize: 13),
+                          color: Color(0xFF5A5038), fontSize: 13),
                     ),
                   )
                 : ListView.builder(
@@ -206,9 +206,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                           ),
                           decoration: BoxDecoration(
                             color: isUser
-                                ? const Color(0xFF6366F1)
+                                ? const Color(0xFF81231E)
                                     .withValues(alpha: 0.8)
-                                : const Color(0xFF1F2937),
+                                : const Color(0xFF282918),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -216,7 +216,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                             style: TextStyle(
                               color: isUser
                                   ? Colors.white
-                                  : const Color(0xFFD1D5DB),
+                                  : const Color(0xFFD0BF98),
                               fontSize: 13,
                               height: 1.4,
                             ),
@@ -231,7 +231,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFF1E1E35))),
+              border: Border(top: BorderSide(color: Color(0xFF3D3E2A))),
             ),
             child: Row(
               children: [
@@ -244,23 +244,23 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
                       hintStyle: TextStyle(
-                          color: Color(0xFF4B5563), fontSize: 13),
+                          color: Color(0xFF5A5038), fontSize: 13),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                       filled: true,
-                      fillColor: Color(0xFF111827),
+                      fillColor: Color(0xFF1E1F14),
                       enabledBorder: OutlineInputBorder(
                         borderRadius:
                             BorderRadius.all(Radius.circular(8)),
                         borderSide:
-                            BorderSide(color: Color(0xFF1E1E35)),
+                            BorderSide(color: Color(0xFF3D3E2A)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius:
                             BorderRadius.all(Radius.circular(8)),
                         borderSide:
-                            BorderSide(color: Color(0xFF6366F1)),
+                            BorderSide(color: Color(0xFF81231E)),
                       ),
                     ),
                   ),
@@ -269,11 +269,11 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 IconButton(
                   onPressed: _sending ? null : _send,
                   icon: const Icon(Icons.send_rounded),
-                  color: const Color(0xFF6366F1),
-                  disabledColor: const Color(0xFF374151),
+                  color: const Color(0xFF81231E),
+                  disabledColor: const Color(0xFF4A4A33),
                   style: IconButton.styleFrom(
                     backgroundColor:
-                        const Color(0xFF6366F1).withValues(alpha: 0.1),
+                        const Color(0xFF81231E).withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),

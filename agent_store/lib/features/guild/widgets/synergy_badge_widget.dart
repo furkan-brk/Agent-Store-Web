@@ -11,7 +11,7 @@ class SynergyBadgeList extends StatelessWidget {
     if (synergies.isEmpty) {
       return const Text(
         'No active synergies yet',
-        style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+        style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12),
       );
     }
     return Wrap(
@@ -27,12 +27,12 @@ class _SynergyChip extends StatelessWidget {
   const _SynergyChip({required this.synergy});
 
   Color get _chipColor {
-    if (synergy.name.contains('Legendary')) return const Color(0xFFF59E0B);
-    if (synergy.name.contains('Force'))     return const Color(0xFFA855F7);
+    if (synergy.name.contains('Legendary')) return const Color(0xFF9B7B1A);
+    if (synergy.name.contains('Force'))     return const Color(0xFF70683B);
     if (synergy.name.contains('Sorcerer') ||
         synergy.name.contains('Tank') ||
-        synergy.name.contains('Think')) { return const Color(0xFF3B82F6); }
-    return const Color(0xFF6366F1);
+        synergy.name.contains('Think')) { return const Color(0xFF5F6A54); }
+    return const Color(0xFF81231E);
   }
 
   @override
@@ -87,13 +87,13 @@ class _BonusRow extends StatelessWidget {
         width: 90,
         child: Text(
           stat.toUpperCase(),
-          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 10, letterSpacing: 0.8),
+          style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 10, letterSpacing: 0.8),
         ),
       ),
-      const Icon(Icons.add, size: 12, color: Color(0xFF22C55E)),
+      const Icon(Icons.add, size: 12, color: Color(0xFF5A8A48)),
       Text(
         '$value',
-        style: const TextStyle(color: Color(0xFF22C55E), fontSize: 11, fontWeight: FontWeight.bold),
+        style: const TextStyle(color: Color(0xFF5A8A48), fontSize: 11, fontWeight: FontWeight.bold),
       ),
     ]),
   );

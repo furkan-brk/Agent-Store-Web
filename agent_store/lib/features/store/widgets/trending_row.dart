@@ -67,11 +67,11 @@ class _TrendingRowState extends State<TrendingRow> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: const LinearGradient(
-            colors: [Color(0xFF13131F), Color(0xFF1F1F2E)],
+            colors: [Color(0xFF2A2B1E), Color(0xFF22231A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: Border.all(color: const Color(0xFF1E1E35)),
+          border: Border.all(color: const Color(0xFF3D3E2A)),
         ),
       ),
     );
@@ -101,7 +101,7 @@ class _TrendingCard extends StatelessWidget {
         width: 130,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF13131F),
+          color: const Color(0xFF2A2B1E),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: rc.withValues(alpha: 0.35)),
           boxShadow: [BoxShadow(color: rc.withValues(alpha: 0.08), blurRadius: 8)],
@@ -137,11 +137,11 @@ class _TrendingCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.bookmarks_outlined, size: 10, color: Color(0xFF6B7280)),
+                const Icon(Icons.bookmarks_outlined, size: 10, color: Color(0xFF7A6E52)),
                 const SizedBox(width: 3),
                 Text(
                   '${agent.saveCount}',
-                  style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10),
+                  style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 10),
                 ),
               ],
             ),

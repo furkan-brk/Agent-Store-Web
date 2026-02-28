@@ -34,7 +34,8 @@
       "Bash(powershell:*)",
       "Bash(git:*)",
       "Bash(go build:*)",
-      "Bash(go vet:*)"
+      "Bash(go vet:*)",
+      "Bash(cd:*)"
     ]
   }
 }

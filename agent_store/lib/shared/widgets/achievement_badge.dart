@@ -33,7 +33,7 @@ class Achievement {
         title: 'First Agent',
         description: 'Created your first agent',
         icon: Icons.auto_fix_high,
-        color: const Color(0xFF6366F1),
+        color: const Color(0xFF81231E),
         unlocked: agentCount >= 1,
       ),
       Achievement(
@@ -41,7 +41,7 @@ class Achievement {
         title: 'Prolific Creator',
         description: 'Created 5 agents',
         icon: Icons.rocket_launch_outlined,
-        color: const Color(0xFF8B5CF6),
+        color: const Color(0xFF9B7B1A),
         unlocked: agentCount >= 5,
       ),
       Achievement(
@@ -49,7 +49,7 @@ class Achievement {
         title: 'Popular',
         description: 'Your agents saved 10 times',
         icon: Icons.bookmark,
-        color: const Color(0xFF10B981),
+        color: const Color(0xFF5A8A48),
         unlocked: totalSaves >= 10,
       ),
       Achievement(
@@ -57,7 +57,7 @@ class Achievement {
         title: 'Influencer',
         description: 'Your agents saved 50 times',
         icon: Icons.star,
-        color: const Color(0xFFF59E0B),
+        color: const Color(0xFF9B7B1A),
         unlocked: totalSaves >= 50,
       ),
       Achievement(
@@ -65,7 +65,7 @@ class Achievement {
         title: 'Utility Master',
         description: 'Agents used 100 times',
         icon: Icons.bolt,
-        color: const Color(0xFFEAB308),
+        color: const Color(0xFF9B7B1A),
         unlocked: totalUses >= 100,
       ),
       Achievement(
@@ -73,7 +73,7 @@ class Achievement {
         title: 'Collector',
         description: 'Saved 10 agents to library',
         icon: Icons.collections_bookmark,
-        color: const Color(0xFF3B82F6),
+        color: const Color(0xFF5A8A48),
         unlocked: libraryCount >= 10,
       ),
       Achievement(
@@ -81,7 +81,7 @@ class Achievement {
         title: 'Wealthy',
         description: 'Earned 100+ credits',
         icon: Icons.monetization_on_outlined,
-        color: const Color(0xFFD97706),
+        color: const Color(0xFF9B7B1A),
         unlocked: credits >= 100,
       ),
       const Achievement(
@@ -89,7 +89,7 @@ class Achievement {
         title: 'Legend',
         description: 'Created a legendary agent',
         icon: Icons.workspace_premium,
-        color: Color(0xFFF59E0B),
+        color: Color(0xFF9B7B1A),
         unlocked: false, // requires backend rarity check
       ),
     ];
@@ -106,7 +106,7 @@ class AchievementBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final unlocked = achievement.unlocked;
-    final color = unlocked ? achievement.color : const Color(0xFF4B5563);
+    final color = unlocked ? achievement.color : const Color(0xFF5A5038);
     final opacity = unlocked ? 1.0 : 0.4;
 
     return Tooltip(
@@ -114,9 +114,9 @@ class AchievementBadge extends StatelessWidget {
       preferBelow: false,
       textStyle: const TextStyle(color: Colors.white, fontSize: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1A2E),
+        color: const Color(0xFF1E1F14),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF374151)),
+        border: Border.all(color: const Color(0xFF4A4A33)),
       ),
       child: Opacity(
         opacity: opacity,
@@ -180,16 +180,16 @@ class AchievementRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withAlpha(30),
+                color: const Color(0xFF81231E).withAlpha(30),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: const Color(0xFF6366F1).withAlpha(77),
+                  color: const Color(0xFF81231E).withAlpha(77),
                 ),
               ),
               child: Text(
                 '$unlockedCount / $total unlocked',
                 style: const TextStyle(
-                  color: Color(0xFF6366F1),
+                  color: Color(0xFF81231E),
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),

@@ -56,65 +56,65 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: const Color(0xFF181910),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F0F1E),
+        backgroundColor: const Color(0xFF22231A),
         foregroundColor: Colors.white,
         title: const Text('Create Guild', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ),
       body: _creating
           ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(color: Color(0xFF6366F1)),
+              CircularProgressIndicator(color: Color(0xFF81231E)),
               SizedBox(height: 16),
-              Text('Creating guild...', style: TextStyle(color: Color(0xFF9CA3AF))),
+              Text('Creating guild...', style: TextStyle(color: Color(0xFF9E8F72))),
             ]))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('Guild Name', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, letterSpacing: 1)),
+                const Text('Guild Name', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12, letterSpacing: 1)),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _nameCtrl,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'e.g. Wizard-Oracle Guild',
-                    hintStyle: const TextStyle(color: Color(0xFF4B5563)),
+                    hintStyle: const TextStyle(color: Color(0xFF5A5038)),
                     filled: true,
-                    fillColor: const Color(0xFF13131F),
+                    fillColor: const Color(0xFF2A2B1E),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF374151)),
+                      borderSide: const BorderSide(color: Color(0xFF4A4A33)),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                      borderSide: const BorderSide(color: Color(0xFF81231E)),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
 
                 Row(children: [
-                  const Text('Select Members', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12, letterSpacing: 1)),
+                  const Text('Select Members', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12, letterSpacing: 1)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                      color: const Color(0xFF81231E).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text('${_selectedAgentIds.length}/4',
-                      style: const TextStyle(color: Color(0xFF6366F1), fontSize: 11, fontWeight: FontWeight.bold)),
+                      style: const TextStyle(color: Color(0xFF81231E), fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ]),
                 const SizedBox(height: 4),
                 const Text('2–4 agents. Tip: Mix different types for synergy bonuses.',
-                  style: TextStyle(color: Color(0xFF4B5563), fontSize: 11)),
+                  style: TextStyle(color: Color(0xFF5A5038), fontSize: 11)),
                 const SizedBox(height: 12),
 
                 if (_loadingAgents)
                   const Center(child: Padding(
                     padding: EdgeInsets.all(32),
-                    child: CircularProgressIndicator(color: Color(0xFF6366F1)),
+                    child: CircularProgressIndicator(color: Color(0xFF81231E)),
                   ))
                 else
                   _AgentSelector(
@@ -133,7 +133,7 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
 
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+                  Text(_error!, style: const TextStyle(color: Color(0xFF81231E), fontSize: 12)),
                 ],
                 const SizedBox(height: 24),
 
@@ -141,7 +141,7 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: const Color(0xFF81231E),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -187,10 +187,10 @@ class _AgentSelector extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFF6366F1).withValues(alpha: 0.12) : const Color(0xFF13131F),
+              color: selected ? const Color(0xFF81231E).withValues(alpha: 0.12) : const Color(0xFF2A2B1E),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: selected ? const Color(0xFF6366F1) : rc.withValues(alpha: 0.25),
+                color: selected ? const Color(0xFF81231E) : rc.withValues(alpha: 0.25),
                 width: selected ? 2 : 1,
               ),
             ),
@@ -213,7 +213,7 @@ class _AgentSelector extends StatelessWidget {
               if (selected)
                 const Padding(
                   padding: EdgeInsets.only(top: 4),
-                  child: Icon(Icons.check_circle, color: Color(0xFF6366F1), size: 14),
+                  child: Icon(Icons.check_circle, color: Color(0xFF81231E), size: 14),
                 ),
             ]),
           ),

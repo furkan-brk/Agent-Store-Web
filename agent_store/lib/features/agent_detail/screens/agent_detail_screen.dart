@@ -93,11 +93,11 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1F2937),
+          backgroundColor: const Color(0xFF282918),
           title: const Text('Connect Wallet', style: TextStyle(color: Colors.white)),
           content: const Text(
             'Connect wallet to save agents?',
-            style: TextStyle(color: Color(0xFF9CA3AF)),
+            style: TextStyle(color: Color(0xFF9E8F72)),
           ),
           actions: [
             TextButton(
@@ -145,11 +145,11 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1F2937),
+          backgroundColor: const Color(0xFF282918),
           title: const Text('Connect Wallet', style: TextStyle(color: Colors.white)),
           content: const Text(
             'Connect your wallet to fork agents.',
-            style: TextStyle(color: Color(0xFF9CA3AF)),
+            style: TextStyle(color: Color(0xFF9E8F72)),
           ),
           actions: [
             TextButton(
@@ -190,11 +190,11 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1F2937),
+          backgroundColor: const Color(0xFF282918),
           title: const Text('Connect Wallet', style: TextStyle(color: Colors.white)),
           content: const Text(
             'Connect wallet to purchase.',
-            style: TextStyle(color: Color(0xFF9CA3AF)),
+            style: TextStyle(color: Color(0xFF9E8F72)),
           ),
           actions: [
             TextButton(
@@ -266,24 +266,24 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0A0A14),
+        backgroundColor: Color(0xFF181910),
         body: Center(child: CircularProgressIndicator()),
       );
     }
     if (_agent == null) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0A0A14),
+        backgroundColor: Color(0xFF181910),
         body: Center(child: Text('Agent not found', style: TextStyle(color: Colors.white))),
       );
     }
     final a = _agent!;
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: const Color(0xFF181910),
       body: Row(children: [
         // Left panel — character
         Container(
           width: 300,
-          color: const Color(0xFF0F0F1E),
+          color: const Color(0xFF22231A),
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(28),
             child: Column(children: [
@@ -305,7 +305,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
               ],
               Text(
                 a.characterType.description,
-                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12, height: 1.5),
+                style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 12, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -326,14 +326,14 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      color: const Color(0xFF5A8A48).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      border: Border.all(color: const Color(0xFF5A8A48).withValues(alpha: 0.4)),
                     ),
                     child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 16),
+                      Icon(Icons.check_circle_outline, color: Color(0xFF5A8A48), size: 16),
                       SizedBox(width: 6),
-                      Text('Purchased', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.w600)),
+                      Text('Purchased', style: TextStyle(color: Color(0xFF5A8A48), fontWeight: FontWeight.w600)),
                     ]),
                   )
                 else
@@ -341,7 +341,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                     width: double.infinity,
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
+                        backgroundColor: const Color(0xFF5A8A48),
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       ),
                       onPressed: _buying ? null : _buyAgent,
@@ -368,7 +368,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                         : const Icon(Icons.fork_right, size: 18),
                     label: Text(_forking ? 'Forking...' : 'Fork  \u26A15'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1F2937),
+                      backgroundColor: const Color(0xFF282918),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -393,13 +393,13 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                      color: const Color(0xFF9B7B1A).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
+                      border: Border.all(color: const Color(0xFF9B7B1A).withValues(alpha: 0.5)),
                     ),
                     child: Text(
                       '${a.price.toStringAsFixed(2)} MON',
-                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w600),
+                      style: const TextStyle(color: Color(0xFF9B7B1A), fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -412,13 +412,13 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                     ),
                     icon: const Icon(
                       Icons.compare_arrows,
-                      color: Color(0xFF9CA3AF),
+                      color: Color(0xFF9E8F72),
                       size: 24,
                     ),
                     tooltip: 'Compare agents',
                   ),
                 IconButton(
-                  icon: const Icon(Icons.share_outlined, color: Color(0xFF9CA3AF)),
+                  icon: const Icon(Icons.share_outlined, color: Color(0xFF9E8F72)),
                   tooltip: 'Share Agent',
                   onPressed: () { if (_agent != null) _shareAgent(_agent!); },
                 ),
@@ -426,7 +426,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                   onPressed: _toggleLibrary,
                   icon: Icon(
                     _inLibrary ? Icons.bookmark : Icons.bookmark_outline,
-                    color: _inLibrary ? const Color(0xFF6366F1) : const Color(0xFF9CA3AF),
+                    color: _inLibrary ? const Color(0xFF81231E) : const Color(0xFF9E8F72),
                     size: 26,
                   ),
                 ),
@@ -443,13 +443,13 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                   Tab(text: 'Similar'),
                 ],
                 labelColor: Colors.white,
-                unselectedLabelColor: const Color(0xFF6B7280),
+                unselectedLabelColor: const Color(0xFF7A6E52),
                 indicator: BoxDecoration(
-                  color: const Color(0xFF6366F1),
+                  color: const Color(0xFF81231E),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: const Color(0xFF1E1E35),
+                dividerColor: const Color(0xFF3D3E2A),
               ),
             ),
             // Tab content
@@ -462,7 +462,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                     padding: const EdgeInsets.all(36),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(a.description,
-                        style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15, height: 1.6)),
+                        style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 15, height: 1.6)),
                       // Character Profile — populated by the v2.6 world-builder + Imagen pipeline.
                       if (a.profileMood != null || a.profileRolePurpose != null) ...[
                         const SizedBox(height: 20),
@@ -475,7 +475,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F0F1E),
+                            color: const Color(0xFF22231A),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: a.characterType.primaryColor.withValues(alpha: 0.25)),
                           ),
@@ -491,7 +491,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                                     child: Text(
                                       a.profileMood!,
                                       style: const TextStyle(
-                                          color: Color(0xFFD1D5DB), fontSize: 13, height: 1.5),
+                                          color: Color(0xFFD0BF98), fontSize: 13, height: 1.5),
                                     ),
                                   ),
                                 ]),
@@ -507,7 +507,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                                     child: Text(
                                       a.profileRolePurpose!,
                                       style: const TextStyle(
-                                          color: Color(0xFF9CA3AF), fontSize: 12, height: 1.6),
+                                          color: Color(0xFF9E8F72), fontSize: 12, height: 1.6),
                                     ),
                                   ),
                                 ]),
@@ -518,8 +518,8 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                       const SizedBox(height: 20),
                       Wrap(spacing: 8, runSpacing: 8, children: a.tags.map((t) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(6)),
-                        child: Text('#$t', style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+                        decoration: BoxDecoration(color: const Color(0xFF282918), borderRadius: BorderRadius.circular(6)),
+                        child: Text('#$t', style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
                       )).toList()),
                       const SizedBox(height: 28),
                       Row(children: [
@@ -536,16 +536,16 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F0F1E),
+                          color: const Color(0xFF22231A),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF1E1E35))),
+                          border: Border.all(color: const Color(0xFF3D3E2A))),
                         child: SelectableText(a.prompt,
-                          style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 13, height: 1.7, fontFamily: 'monospace')),
+                          style: const TextStyle(color: Color(0xFFD0BF98), fontSize: 13, height: 1.7, fontFamily: 'monospace')),
                       ),
                       const SizedBox(height: 20),
                       Text(
                         'By ${a.creatorWallet.length > 10 ? '${a.creatorWallet.substring(0, 6)}...${a.creatorWallet.substring(a.creatorWallet.length - 4)}' : a.creatorWallet}',
-                        style: const TextStyle(color: Color(0xFF4B5563), fontSize: 12),
+                        style: const TextStyle(color: Color(0xFF5A5038), fontSize: 12),
                       ),
                       if (a.tags.isNotEmpty) ...[
                         const SizedBox(height: 16),
@@ -556,11 +556,11 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                             label: Text(
                               '#$tag',
                               style: const TextStyle(
-                                color: Color(0xFF6366F1),
+                                color: Color(0xFF81231E),
                                 fontSize: 10,
                               ),
                             ),
-                            backgroundColor: const Color(0xFF1F2937),
+                            backgroundColor: const Color(0xFF282918),
                             side: BorderSide.none,
                             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -590,7 +590,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                       ? const Center(
                           child: Text(
                             'No similar agents found',
-                            style: TextStyle(color: Color(0xFF6B7280)),
+                            style: TextStyle(color: Color(0xFF7A6E52)),
                           ),
                         )
                       : Padding(
@@ -612,7 +612,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                                 child: Container(
                                   padding: const EdgeInsets.all(14),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF13131F),
+                                    color: const Color(0xFF2A2B1E),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
                                       color: rc.withValues(alpha: 0.25),
@@ -643,7 +643,7 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                                       Text(
                                         agent.description,
                                         style: const TextStyle(
-                                          color: Color(0xFF9CA3AF),
+                                          color: Color(0xFF9E8F72),
                                           fontSize: 10,
                                         ),
                                         maxLines: 2,
@@ -657,13 +657,13 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                                           const Icon(
                                             Icons.bookmarks_outlined,
                                             size: 11,
-                                            color: Color(0xFF6B7280),
+                                            color: Color(0xFF7A6E52),
                                           ),
                                           const SizedBox(width: 3),
                                           Text(
                                             '${agent.saveCount}',
                                             style: const TextStyle(
-                                              color: Color(0xFF6B7280),
+                                              color: Color(0xFF7A6E52),
                                               fontSize: 10,
                                             ),
                                           ),

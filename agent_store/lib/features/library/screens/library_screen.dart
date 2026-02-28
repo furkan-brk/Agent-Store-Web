@@ -102,17 +102,17 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget build(BuildContext context) {
     if (!ApiService.instance.isAuthenticated) return _loginPrompt(context);
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: const Color(0xFF181910),
       body: RefreshIndicator(
         onRefresh: _load,
-        color: const Color(0xFF6366F1),
+        color: const Color(0xFF81231E),
         child: Column(children: [
           _buildHeader(),
           Expanded(
             child: _loading
                 ? const Center(
                     child: CircularProgressIndicator(
-                        color: Color(0xFF6366F1)))
+                        color: Color(0xFF81231E)))
                 : TabBarView(controller: _tabCtrl, children: [
                     _buildSavedTab(),
                     _buildCreatedTab(),
@@ -129,7 +129,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         ? '${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}'
         : wallet;
     return Container(
-      color: const Color(0xFF0F0F1E),
+      color: const Color(0xFF22231A),
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -137,13 +137,13 @@ class _LibraryScreenState extends State<LibraryScreen>
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+              color: const Color(0xFF81231E).withValues(alpha: 0.15),
               shape: BoxShape.circle,
               border: Border.all(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.4)),
+                  color: const Color(0xFF81231E).withValues(alpha: 0.4)),
             ),
             child: const Icon(Icons.person_outline,
-                color: Color(0xFF6366F1), size: 22),
+                color: Color(0xFF81231E), size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -158,13 +158,13 @@ class _LibraryScreenState extends State<LibraryScreen>
               const SizedBox(height: 4),
               Row(children: [
                 _statChip(Icons.bolt, '$_credits',
-                    const Color(0xFFFCD34D), 'credits'),
+                    const Color(0xFF9B7B1A), 'credits'),
                 const SizedBox(width: 14),
                 _statChip(Icons.auto_awesome_outlined,
-                    '${_created.length}', const Color(0xFF6366F1), 'created'),
+                    '${_created.length}', const Color(0xFF81231E), 'created'),
                 const SizedBox(width: 14),
                 _statChip(Icons.bookmark_border, '$_totalSaves',
-                    const Color(0xFF8B5CF6), 'saves'),
+                    const Color(0xFF81231E), 'saves'),
               ]),
             ]),
           ),
@@ -176,10 +176,10 @@ class _LibraryScreenState extends State<LibraryScreen>
             Tab(text: 'Saved (${_saved.length})'),
             Tab(text: 'Created (${_created.length})'),
           ],
-          labelColor: const Color(0xFF6366F1),
-          unselectedLabelColor: const Color(0xFF6B7280),
-          indicatorColor: const Color(0xFF6366F1),
-          dividerColor: const Color(0xFF1E1E35),
+          labelColor: const Color(0xFF81231E),
+          unselectedLabelColor: const Color(0xFF7A6E52),
+          indicatorColor: const Color(0xFF81231E),
+          dividerColor: const Color(0xFF3D3E2A),
         ),
       ]),
     );
@@ -198,7 +198,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         const SizedBox(width: 3),
         Text(label,
             style: const TextStyle(
-                color: Color(0xFF6B7280), fontSize: 11)),
+                color: Color(0xFF7A6E52), fontSize: 11)),
       ]);
 
   // ── Saved Tab ─────────────────────────────────────────────────────────────
@@ -216,14 +216,14 @@ class _LibraryScreenState extends State<LibraryScreen>
             child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.bookmarks_outlined,
-                    color: Color(0xFF374151), size: 52),
+                    color: Color(0xFF4A4A33), size: 52),
                 const SizedBox(height: 12),
                 Text(
                   _selectedCollectionId != null
                       ? 'No agents in this collection'
                       : 'No saved agents yet',
                   style: const TextStyle(
-                      color: Color(0xFF9CA3AF), fontSize: 16),
+                      color: Color(0xFF9E8F72), fontSize: 16),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -231,7 +231,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ? 'Long-press an agent card to add it here'
                       : 'Browse the store and save agents',
                   style: const TextStyle(
-                      color: Color(0xFF6B7280), fontSize: 12),
+                      color: Color(0xFF7A6E52), fontSize: 12),
                 ),
               ]),
             ),
@@ -293,7 +293,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.add,
-                color: Color(0xFF6366F1), size: 20),
+                color: Color(0xFF81231E), size: 20),
             onPressed: () => _showNewCollectionDialog(),
             tooltip: 'New collection',
             constraints: const BoxConstraints(),
@@ -307,7 +307,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             child: Text(
               'No collections yet. Tap + to create one.',
               style: TextStyle(
-                  color: Color(0xFF6B7280), fontSize: 12),
+                  color: Color(0xFF7A6E52), fontSize: 12),
             ),
           )
         else
@@ -333,7 +333,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     decoration: BoxDecoration(
                       color: isSelected
                           ? colColor.withValues(alpha: 0.18)
-                          : const Color(0xFF1A1A2E),
+                          : const Color(0xFF1E1F14),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected
@@ -359,7 +359,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         style: TextStyle(
                           color: isSelected
                               ? colColor
-                              : const Color(0xFFD1D5DB),
+                              : const Color(0xFFD0BF98),
                           fontSize: 12,
                           fontWeight: isSelected
                               ? FontWeight.w600
@@ -372,7 +372,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         style: TextStyle(
                           color: isSelected
                               ? colColor.withValues(alpha: 0.8)
-                              : const Color(0xFF6B7280),
+                              : const Color(0xFF7A6E52),
                           fontSize: 11,
                         ),
                       ),
@@ -384,7 +384,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                             size: 12,
                             color: isSelected
                                 ? colColor.withValues(alpha: 0.8)
-                                : const Color(0xFF6B7280)),
+                                : const Color(0xFF7A6E52)),
                       ),
                     ]),
                   ),
@@ -393,7 +393,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           ),
         const SizedBox(height: 4),
-        const Divider(color: Color(0xFF1E1E35)),
+        const Divider(color: Color(0xFF3D3E2A)),
       ]),
     );
   }
@@ -411,22 +411,22 @@ class _LibraryScreenState extends State<LibraryScreen>
     showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
+        backgroundColor: const Color(0xFF1E1F14),
         title: const Text('Delete Collection',
             style: TextStyle(color: Colors.white)),
         content: Text(
           'Delete "${col.name}"? Agents won\'t be removed from your library.',
-          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+          style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF9CA3AF))),
+                style: TextStyle(color: Color(0xFF9E8F72))),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444)),
+                backgroundColor: const Color(0xFF81231E)),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -443,7 +443,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   void _showAddToCollectionSheet(AgentModel agent) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF13131F),
+      backgroundColor: const Color(0xFF2A2B1E),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -479,15 +479,15 @@ class _LibraryScreenState extends State<LibraryScreen>
             child: Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.auto_awesome_outlined,
-                  color: Color(0xFF374151), size: 52),
+                  color: Color(0xFF4A4A33), size: 52),
               SizedBox(height: 12),
               Text('No agents created yet',
                   style: TextStyle(
-                      color: Color(0xFF9CA3AF), fontSize: 16)),
+                      color: Color(0xFF9E8F72), fontSize: 16)),
               SizedBox(height: 6),
               Text('Create your first agent',
                   style: TextStyle(
-                      color: Color(0xFF6B7280), fontSize: 12)),
+                      color: Color(0xFF7A6E52), fontSize: 12)),
             ])),
           ),
         ],
@@ -567,8 +567,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: a.price > 0
-                              ? const Color(0xFFF59E0B).withAlpha(217)
-                              : const Color(0xFF374151).withAlpha(217),
+                              ? const Color(0xFF9B7B1A).withAlpha(217)
+                              : const Color(0xFF4A4A33).withAlpha(217),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -595,13 +595,13 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _loginPrompt(BuildContext context) => Scaffold(
-        backgroundColor: const Color(0xFF0A0A14),
+        backgroundColor: const Color(0xFF181910),
         body: Center(
             child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
               const Icon(Icons.account_balance_wallet_outlined,
-                  color: Color(0xFF374151), size: 56),
+                  color: Color(0xFF4A4A33), size: 56),
               const SizedBox(height: 16),
               const Text('Connect your wallet',
                   style: TextStyle(
@@ -612,7 +612,7 @@ class _LibraryScreenState extends State<LibraryScreen>
               const Text(
                   'Sign in to view your library and created agents',
                   style: TextStyle(
-                      color: Color(0xFF6B7280), fontSize: 13),
+                      color: Color(0xFF7A6E52), fontSize: 13),
                   textAlign: TextAlign.center),
               const SizedBox(height: 24),
               ElevatedButton.icon(
@@ -631,7 +631,7 @@ Color _hexToColor(String hex) {
   if (h.length == 6) {
     return Color(int.parse('FF$h', radix: 16));
   }
-  return const Color(0xFF6366F1);
+  return const Color(0xFF81231E);
 }
 
 // ── Collection Dots ──────────────────────────────────────────────────────────
@@ -720,7 +720,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
             const Spacer(),
             IconButton(
               icon: const Icon(Icons.add,
-                  color: Color(0xFF6366F1), size: 20),
+                  color: Color(0xFF81231E), size: 20),
               onPressed: () async {
                 Navigator.pop(context);
                 await showDialog<void>(
@@ -743,7 +743,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
           Text(
             widget.agent.title,
             style: const TextStyle(
-                color: Color(0xFF9CA3AF), fontSize: 12),
+                color: Color(0xFF9E8F72), fontSize: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -754,7 +754,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
               child: Text(
                 'No collections yet. Tap + to create one.',
                 style:
-                    TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+                    TextStyle(color: Color(0xFF7A6E52), fontSize: 13),
               ),
             )
           else
@@ -770,7 +770,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                   decoration: BoxDecoration(
                     color: isIn
                         ? colColor.withValues(alpha: 0.1)
-                        : const Color(0xFF1A1A2E),
+                        : const Color(0xFF1E1F14),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isIn
@@ -804,7 +804,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                     Text(
                       '${col.agentIds.length} agents',
                       style: const TextStyle(
-                          color: Color(0xFF6B7280), fontSize: 11),
+                          color: Color(0xFF7A6E52), fontSize: 11),
                     ),
                     const SizedBox(width: 8),
                     Icon(
@@ -813,7 +813,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                           : Icons.radio_button_unchecked,
                       color: isIn
                           ? colColor
-                          : const Color(0xFF4B5563),
+                          : const Color(0xFF5A5038),
                       size: 18,
                     ),
                   ]),
@@ -850,7 +850,7 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: const Color(0xFF1E1F14),
       title: const Text('New Collection',
           style: TextStyle(color: Colors.white)),
       content: Column(
@@ -863,31 +863,31 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               filled: true,
-              fillColor: const Color(0xFF0F0F1E),
+              fillColor: const Color(0xFF22231A),
               hintText: 'Collection name',
               hintStyle:
-                  const TextStyle(color: Color(0xFF4B5563)),
+                  const TextStyle(color: Color(0xFF5A5038)),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: Color(0xFF374151)),
+                    const BorderSide(color: Color(0xFF4A4A33)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: Color(0xFF374151)),
+                    const BorderSide(color: Color(0xFF4A4A33)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide:
-                    const BorderSide(color: Color(0xFF6366F1)),
+                    const BorderSide(color: Color(0xFF81231E)),
               ),
             ),
           ),
           const SizedBox(height: 16),
           const Text('Color',
               style: TextStyle(
-                  color: Color(0xFF9CA3AF), fontSize: 12)),
+                  color: Color(0xFF9E8F72), fontSize: 12)),
           const SizedBox(height: 8),
           Row(
             children: CollectionService.colorOptions.map((hex) {
@@ -930,11 +930,11 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel',
-              style: TextStyle(color: Color(0xFF9CA3AF))),
+              style: TextStyle(color: Color(0xFF9E8F72))),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1)),
+              backgroundColor: const Color(0xFF81231E)),
           onPressed: () {
             final name = _ctrl.text.trim();
             if (name.isEmpty) return;
@@ -985,14 +985,14 @@ class _SetPriceDialogState extends State<_SetPriceDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: const Color(0xFF1E1F14),
       title: const Text('Set Agent Price',
           style: TextStyle(color: Colors.white)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         const Text(
           'Set a price in MON. Set to 0 to make it free.',
           style:
-              TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+              TextStyle(color: Color(0xFF9E8F72), fontSize: 13),
         ),
         const SizedBox(height: 16),
         TextField(
@@ -1002,22 +1002,22 @@ class _SetPriceDialogState extends State<_SetPriceDialog> {
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFF0F0F1E),
+            fillColor: const Color(0xFF22231A),
             hintText: '0.00',
             hintStyle:
-                const TextStyle(color: Color(0xFF4B5563)),
+                const TextStyle(color: Color(0xFF5A5038)),
             suffixText: 'MON',
             suffixStyle:
-                const TextStyle(color: Color(0xFFF59E0B)),
+                const TextStyle(color: Color(0xFF9B7B1A)),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide:
-                  const BorderSide(color: Color(0xFF374151)),
+                  const BorderSide(color: Color(0xFF4A4A33)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide:
-                  const BorderSide(color: Color(0xFF374151)),
+                  const BorderSide(color: Color(0xFF4A4A33)),
             ),
           ),
         ),
@@ -1026,11 +1026,11 @@ class _SetPriceDialogState extends State<_SetPriceDialog> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancel',
-              style: TextStyle(color: Color(0xFF9CA3AF))),
+              style: TextStyle(color: Color(0xFF9E8F72))),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1)),
+              backgroundColor: const Color(0xFF81231E)),
           onPressed: _saving
               ? null
               : () async {
