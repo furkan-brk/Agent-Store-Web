@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app/theme.dart';
 import '../../../shared/services/api_service.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -23,8 +24,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final data = await ApiService.instance.getLeaderboard();
     if (data != null) {
       setState(() {
-        _rankings = List<Map<String, dynamic>>.from(
-            data['rankings'] as List? ?? []);
+        _rankings = List<Map<String, dynamic>>.from(data['rankings'] as List? ?? []);
         _loading = false;
       });
     } else {
@@ -34,34 +34,38 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFDDD1BB),
+    backgroundColor: AppTheme.bg,
     body: Column(children: [
       Container(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-        color: const Color(0xFFC8BA9A),
-        child: const Row(children: [
-          Icon(Icons.emoji_events_outlined, color: Color(0xFF9B7B1A), size: 22),
-          SizedBox(width: 10),
-          Text('Leaderboard',
-            style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 20, fontWeight: FontWeight.bold)),
-          Spacer(),
-          Text('Top Creators', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
+        decoration: const BoxDecoration(
+          color: AppTheme.surface,
+          border: Border(bottom: BorderSide(color: AppTheme.border)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.emoji_events_rounded, color: AppTheme.gold, size: 22),
+          const SizedBox(width: 10),
+          ShaderMask(
+            shaderCallback: (b) => const LinearGradient(
+              colors: [AppTheme.textH, AppTheme.gold],
+            ).createShader(b),
+            child: const Text('Leaderboard',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          ),
+          const Spacer(),
+          const Text('Top Creators', style: TextStyle(color: AppTheme.textM, fontSize: 12)),
         ]),
       ),
-      const Divider(height: 1, color: Color(0xFFADA07A)),
       if (_loading)
-        const Expanded(child: Center(
-          child: CircularProgressIndicator(color: Color(0xFF81231E))))
+        const Expanded(child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
       else if (_error != null)
-        Expanded(child: Center(
-          child: Text(_error!, style: const TextStyle(color: Color(0xFFCAB891)))))
+        Expanded(child: Center(child: Text(_error!, style: const TextStyle(color: AppTheme.textB))))
       else if (_rankings.isEmpty)
         const Expanded(child: Center(child: Column(
           mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.emoji_events_outlined, color: Color(0xFFC0B490), size: 56),
+            Icon(Icons.emoji_events_outlined, color: AppTheme.border2, size: 56),
             SizedBox(height: 14),
-            Text('No creators yet',
-              style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
+            Text('No creators yet', style: TextStyle(color: AppTheme.textM, fontSize: 15)),
           ],
         )))
       else
@@ -91,21 +95,22 @@ class _RankCard extends StatelessWidget {
 
     final Color rankColor;
     final IconData? rankIcon;
-    if (rank == 1) { rankColor = const Color(0xFF9B7B1A); rankIcon = Icons.emoji_events; }
-    else if (rank == 2) { rankColor = const Color(0xFF6B5A40); rankIcon = Icons.emoji_events; }
-    else if (rank == 3) { rankColor = const Color(0xFFCD7C32); rankIcon = Icons.emoji_events; }
-    else { rankColor = const Color(0xFFC0B490); rankIcon = null; }
+    if (rank == 1) { rankColor = AppTheme.gold; rankIcon = Icons.emoji_events_rounded; }
+    else if (rank == 2) { rankColor = const Color(0xFF8A9A9A); rankIcon = Icons.emoji_events_rounded; }
+    else if (rank == 3) { rankColor = const Color(0xFFCD7C32); rankIcon = Icons.emoji_events_rounded; }
+    else { rankColor = AppTheme.textM; rankIcon = null; }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFC8BA9A),
+        color: AppTheme.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: rank <= 3 ? rankColor.withValues(alpha: 0.3) : const Color(0xFFADA07A)),
+          color: rank <= 3 ? rankColor.withValues(alpha: 0.4) : AppTheme.border,
+        ),
         gradient: rank == 1 ? LinearGradient(
-          colors: [const Color(0xFF9B7B1A).withValues(alpha: 0.05), Colors.transparent],
+          colors: [AppTheme.gold.withValues(alpha: 0.08), Colors.transparent],
           begin: Alignment.topLeft, end: Alignment.bottomRight,
         ) : null,
       ),
@@ -120,24 +125,23 @@ class _RankCard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(short, style: const TextStyle(
-            color: Color(0xFF2B2C1E), fontWeight: FontWeight.w600, fontSize: 14)),
+            color: AppTheme.textH, fontWeight: FontWeight.w600, fontSize: 14,
+            fontFamily: 'monospace')),
           const SizedBox(height: 2),
           Text('$totalAgents agents created',
-            style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11)),
+            style: const TextStyle(color: AppTheme.textM, fontSize: 11)),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Row(children: [
-            const Icon(Icons.bookmark_border, color: Color(0xFF81231E), size: 13),
+            const Icon(Icons.bookmark_border, color: AppTheme.primary, size: 13),
             const SizedBox(width: 3),
-            Text('$totalSaves',
-              style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
+            Text('$totalSaves', style: const TextStyle(color: AppTheme.textB, fontSize: 12)),
           ]),
           const SizedBox(height: 3),
           Row(children: [
-            const Icon(Icons.chat_bubble_outline, color: Color(0xFF81231E), size: 12),
+            const Icon(Icons.chat_bubble_outline, color: AppTheme.primary, size: 12),
             const SizedBox(width: 3),
-            Text('$totalUses',
-              style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
+            Text('$totalUses', style: const TextStyle(color: AppTheme.textB, fontSize: 12)),
           ]),
         ]),
       ]),

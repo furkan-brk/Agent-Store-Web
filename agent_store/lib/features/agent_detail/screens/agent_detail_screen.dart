@@ -420,15 +420,18 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                 ],
                 if (_agent != null)
                   IconButton(
-                      context: context,
-                      builder: (_) => CompareModal(baseAgent: _agent!),
-                    ),
                     icon: const Icon(
                       Icons.compare_arrows,
                       color: Color(0xFF6B5A40),
                       size: 24,
                     ),
                     tooltip: 'Compare agents',
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => CompareModal(baseAgent: _agent!),
+                      );
+                    },
                   ),
                 IconButton(
                   icon: const Icon(Icons.share_outlined, color: Color(0xFF6B5A40)),
