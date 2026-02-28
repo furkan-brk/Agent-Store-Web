@@ -143,7 +143,6 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
             child: const Icon(Icons.person_outline, color: AppTheme.primary, size: 22),
           ),
-          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
