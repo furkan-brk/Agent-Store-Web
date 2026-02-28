@@ -181,6 +181,23 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
     );
   }
 
+  void _openInGuildMaster() {
+    if (_detail == null) return;
+    final agents = _detail!.guild.members
+        .where((m) => m.agent != null)
+        .map((m) => <String, dynamic>{
+              'id': m.agentId,
+              'title': m.agent!.title,
+              'character_type': m.agent!.characterType.name,
+              'subclass': m.agent!.subclass.name,
+            })
+        .toList();
+    context.go('/guild-master', extra: <String, dynamic>{
+      'guild_name': _detail!.guild.name,
+      'agents': agents,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,12 +208,18 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         title: Text(_detail?.guild.name ?? 'Guild Detail',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
-          if (_detail != null)
+          if (_detail != null) ...[
+            IconButton(
+              icon: const Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6)),
+              tooltip: 'Open in Guild Master',
+              onPressed: _openInGuildMaster,
+            ),
             IconButton(
               icon: const Icon(Icons.account_tree_outlined, color: Color(0xFF6366F1)),
               tooltip: 'Team Workflow',
               onPressed: _onTeamWorkflow,
             ),
+          ],
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
       ),
@@ -355,6 +378,14 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
                 : guild.members.map((m) => _MemberRow(member: m)).toList(),
           ),
         ),
+
+        if (guild.members.isNotEmpty) ...[
+          const SizedBox(height: 28),
+          // ── Guild Master CTA ──
+          _GuildMasterCTA(onPressed: _openInGuildMaster),
+        ],
+
+        const SizedBox(height: 32),
       ]),
     );
   }
@@ -465,6 +496,71 @@ class _Section extends StatelessWidget {
       child,
     ],
   );
+}
+
+// ── Guild Master CTA Card ─────────────────────────────────────────────────────
+
+class _GuildMasterCTA extends StatelessWidget {
+  final VoidCallback onPressed;
+  const _GuildMasterCTA({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF6366F1).withValues(alpha: 0.15),
+              const Color(0xFF8B5CF6).withValues(alpha: 0.10),
+            ],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.4)),
+        ),
+        child: Row(children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                  blurRadius: 12,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6), size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text(
+                'Open in Guild Master',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 3),
+              const Text(
+                'Chat with your team and get AI-powered insights',
+                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.arrow_forward_ios, color: Color(0xFF6366F1), size: 14),
+        ]),
+      ),
+    );
+  }
 }
 
 class _MemberRow extends StatelessWidget {

@@ -23,7 +23,16 @@ enum _Phase { input, loading, ready }
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 class GuildMasterScreen extends StatefulWidget {
-  const GuildMasterScreen({super.key});
+  /// When provided, the screen skips the input phase and loads
+  /// the given agents directly into the team chat.
+  final List<Map<String, dynamic>>? initialAgents;
+  final String? initialGuildName;
+
+  const GuildMasterScreen({
+    super.key,
+    this.initialAgents,
+    this.initialGuildName,
+  });
 
   @override
   State<GuildMasterScreen> createState() => _GuildMasterScreenState();
@@ -44,6 +53,21 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
   final _scrollCtrl = ScrollController();
   bool _chatLoading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final agents = widget.initialAgents;
+    if (agents != null && agents.isNotEmpty) {
+      _teamAgents.addAll(agents);
+      _selectedAgentIds.addAll(agents.map((a) => (a['id'] as num).toInt()));
+      _suggestion = {
+        'suggested_name': widget.initialGuildName ?? 'Guild Team',
+        'reasoning': 'Team assembled from your guild. Chat to collaborate!',
+      };
+      _phase = _Phase.ready;
+    }
+  }
 
   @override
   void dispose() {

@@ -69,7 +69,18 @@ class AppRouter {
               return GuildDetailScreen(guildId: id);
             },
           ),
-          GoRoute(path: '/guild-master',     builder: (_, __) => const GuildMasterScreen()),
+          GoRoute(
+            path: '/guild-master',
+            builder: (_, s) {
+              final extra = s.extra as Map<String, dynamic>?;
+              final agents = extra?['agents'] as List<Map<String, dynamic>>?;
+              final guildName = extra?['guild_name'] as String?;
+              return GuildMasterScreen(
+                initialAgents: agents,
+                initialGuildName: guildName,
+              );
+            },
+          ),
           GoRoute(path: '/credits/history', builder: (_, __) => const CreditHistoryScreen()),
           GoRoute(path: '/leaderboard',     builder: (_, __) => const LeaderboardScreen()),
           GoRoute(path: '/creator',         builder: (_, __) => const CreatorDashboardScreen()),
