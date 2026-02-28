@@ -27,8 +27,9 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	aiSvc := services.NewAIService(claudeAPIKey)
 	geminiSvc := services.NewGeminiService(geminiAPIKey)
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
-	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc)
-	guildSvc := services.NewGuildService()
+	scoreSvc := services.NewScoreService(geminiAPIKey)
+	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc)
+	guildSvc := services.NewGuildService(scoreSvc)
 
 	authH := handlers.NewAuthHandler(authSvc)
 	agentH := handlers.NewAgentHandler(agentSvc)
@@ -74,6 +75,7 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 		guilds.DELETE("/:id/members/:agentId", middleware.AuthMiddleware(authSvc), guildH.RemoveMember)
 		guilds.POST("/:id/join", middleware.AuthMiddleware(authSvc), guildH.JoinGuild)
 		guilds.DELETE("/:id/join", middleware.AuthMiddleware(authSvc), guildH.LeaveGuild)
+		guilds.GET("/:id/compatibility", guildH.GetCompatibility)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

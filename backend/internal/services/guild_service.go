@@ -8,9 +8,11 @@ import (
 	"github.com/agentstore/backend/internal/models"
 )
 
-type GuildService struct{}
+type GuildService struct {
+	scoreSvc *ScoreService
+}
 
-func NewGuildService() *GuildService { return &GuildService{} }
+func NewGuildService(scoreSvc *ScoreService) *GuildService { return &GuildService{scoreSvc: scoreSvc} }
 
 type CreateGuildInput struct {
 	Name          string `json:"name" binding:"required"`
@@ -157,6 +159,27 @@ func (s *GuildService) RemoveMember(guildID, agentID uint, wallet string) error 
 	}
 	return database.DB.Where("guild_id = ? AND agent_id = ?", guildID, agentID).
 		Delete(&models.GuildMember{}).Error
+}
+
+// CheckCompatibility analyzes how well the agents in a guild complement each other.
+func (s *GuildService) CheckCompatibility(guildID uint) (*GuildCompatibilityResult, error) {
+	var guild models.Guild
+	if err := database.DB.Preload("Members.Agent").First(&guild, guildID).Error; err != nil {
+		return nil, errors.New("guild not found")
+	}
+
+	summaries := make([]guildMemberSummary, 0, len(guild.Members))
+	for _, m := range guild.Members {
+		summaries = append(summaries, guildMemberSummary{
+			AgentID:     m.AgentID,
+			Title:       m.Agent.Title,
+			CharType:    m.Agent.CharacterType,
+			Category:    m.Agent.Category,
+			ServiceDesc: m.Agent.ServiceDescription,
+		})
+	}
+
+	return s.scoreSvc.AnalyzeGuildCompatibility(guildID, summaries), nil
 }
 
 func calculateGuildRarity(members []models.GuildMember) string {

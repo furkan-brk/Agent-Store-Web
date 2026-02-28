@@ -25,10 +25,11 @@ type AgentService struct {
 	aiSvc        *AIService
 	geminiSvc    *GeminiService
 	replicateSvc *ReplicateService
+	scoreSvc     *ScoreService
 }
 
-func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService) *AgentService {
-	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc}
+func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService) *AgentService {
+	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc}
 }
 
 type CreateAgentInput struct {
@@ -65,7 +66,7 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 	}
 	// Select only list-view fields, skip heavy prompt and character_data
 	err := query.
-		Select("id, title, description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, created_at").
 		Offset(offset).Limit(limit).Order(orderClause).Find(&agents).Error
 	return agents, total, err
 }
@@ -142,7 +143,10 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		charData = "{}"
 	}
 
-	// ── Step 3.5: Deduct 10 credits for agent creation
+	// ── Step 3.5: Score prompt and generate service description
+	scoreResult := s.scoreSvc.ScoreAndDescribe(input.Prompt)
+
+	// ── Step 3.6: Deduct 10 credits for agent creation
 	if input.CreatorWallet != "" {
 		if err := s.deductCredits(input.CreatorWallet, 10, "create", nil); err != nil {
 			return nil, fmt.Errorf("credit check failed: %w", err)
@@ -151,17 +155,19 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 
 	// ── Step 4: Persist
 	agent := &models.Agent{
-		Title:          input.Title,
-		Description:    input.Description,
-		Prompt:         input.Prompt,
-		Category:       analysis.Category,
-		CreatorWallet:  input.CreatorWallet,
-		CharacterType:  analysis.CharacterType,
-		Subclass:       analysis.Subclass,
-		CharacterData:  charData,
-		Rarity:         rarity,
-		Tags:           analysis.Tags,
-		GeneratedImage: generatedImage,
+		Title:              input.Title,
+		Description:        input.Description,
+		Prompt:             input.Prompt,
+		Category:           analysis.Category,
+		CreatorWallet:      input.CreatorWallet,
+		CharacterType:      analysis.CharacterType,
+		Subclass:           analysis.Subclass,
+		CharacterData:      charData,
+		Rarity:             rarity,
+		Tags:               analysis.Tags,
+		GeneratedImage:     generatedImage,
+		PromptScore:        scoreResult.TotalScore,
+		ServiceDescription: scoreResult.ServiceDescription,
 	}
 	err = database.DB.Create(agent).Error
 	if err == nil && input.CreatorWallet != "" {
@@ -247,7 +253,7 @@ func (s *AgentService) GetTrending() ([]models.Agent, error) {
 	var agents []models.Agent
 	// Select only list-view fields, skip heavy prompt and character_data
 	err := database.DB.
-		Select("id, title, description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, created_at").
 		Order("(save_count * 3 + use_count * 2) DESC").
 		Limit(6).
 		Find(&agents).Error
