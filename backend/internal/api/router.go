@@ -30,10 +30,12 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	scoreSvc := services.NewScoreService(geminiAPIKey)
 	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc)
 	guildSvc := services.NewGuildService(scoreSvc)
+	gmSvc := services.NewGuildMasterService(aiSvc)
 
 	authH := handlers.NewAuthHandler(authSvc)
 	agentH := handlers.NewAgentHandler(agentSvc)
 	guildH := handlers.NewGuildHandler(guildSvc)
+	gmH := handlers.NewGuildMasterHandler(gmSvc)
 
 	v1 := r.Group("/api/v1")
 	{
@@ -76,6 +78,10 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 		guilds.POST("/:id/join", middleware.AuthMiddleware(authSvc), guildH.JoinGuild)
 		guilds.DELETE("/:id/join", middleware.AuthMiddleware(authSvc), guildH.LeaveGuild)
 		guilds.GET("/:id/compatibility", guildH.GetCompatibility)
+
+		gm := v1.Group("/guild-master")
+		gm.POST("/suggest", gmH.Suggest)
+		gm.POST("/chat", gmH.TeamChat)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

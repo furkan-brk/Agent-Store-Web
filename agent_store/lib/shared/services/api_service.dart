@@ -397,4 +397,36 @@ class ApiService {
       return res.statusCode == 200;
     } catch (e) { debugPrint('leaveGuild: $e'); return false; }
   }
+
+  // ── Guild Master ──────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> suggestGuild(String problem) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guildMaster}/suggest'),
+        headers: _headers,
+        body: jsonEncode({'problem': problem}),
+      ).timeout(const Duration(seconds: 30));
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('suggestGuild: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('suggestGuild: $e'); }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>?> teamChat(String message, List<int> agentIds) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guildMaster}/chat'),
+        headers: _headers,
+        body: jsonEncode({'message': message, 'agent_ids': agentIds}),
+      ).timeout(const Duration(seconds: 120));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['responses'] as List<dynamic>)
+            .map((e) => e as Map<String, dynamic>).toList();
+      }
+      debugPrint('teamChat: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('teamChat: $e'); }
+    return null;
+  }
 }

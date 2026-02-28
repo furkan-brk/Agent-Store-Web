@@ -15,6 +15,7 @@ import '../features/creator/screens/creator_dashboard_screen.dart';
 import '../shared/widgets/notification_panel.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
+import '../features/guild_master/screens/guild_master_screen.dart';
 
 // Intent classes for keyboard shortcuts
 class _GoStoreIntent extends Intent {
@@ -68,6 +69,7 @@ class AppRouter {
               return GuildDetailScreen(guildId: id);
             },
           ),
+          GoRoute(path: '/guild-master',     builder: (_, __) => const GuildMasterScreen()),
           GoRoute(path: '/credits/history', builder: (_, __) => const CreditHistoryScreen()),
           GoRoute(path: '/leaderboard',     builder: (_, __) => const LeaderboardScreen()),
           GoRoute(path: '/creator',         builder: (_, __) => const CreatorDashboardScreen()),
@@ -153,7 +155,8 @@ class _Sidebar extends StatelessWidget {
         _NavItem(icon: Icons.storefront_outlined,           label: 'Store',   path: '/',       loc: loc, tooltip: 'Alt+S'),
         _NavItem(icon: Icons.bookmarks_outlined,            label: 'Library', path: '/library',loc: loc, tooltip: 'Alt+L'),
         _NavItem(icon: Icons.add_box_outlined,              label: 'Create',  path: '/create', loc: loc, tooltip: 'Alt+C'),
-        _NavItem(icon: Icons.groups_outlined,               label: 'Guilds',  path: '/guild',  loc: loc, tooltip: 'Alt+G'),
+        _NavItem(icon: Icons.groups_outlined,               label: 'Guilds',       path: '/guild',        loc: loc, tooltip: 'Alt+G'),
+        _NavItem(icon: Icons.auto_awesome,                  label: 'Guild Master', path: '/guild-master', loc: loc, tooltip: 'AI Team Builder'),
         _NavItem(icon: Icons.emoji_events_outlined,         label: 'Leaderboard', path: '/leaderboard', loc: loc),
         _NavItem(icon: Icons.analytics_outlined,            label: 'Creator',     path: '/creator',      loc: loc),
         const Spacer(),

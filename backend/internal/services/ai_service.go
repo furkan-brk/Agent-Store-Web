@@ -104,6 +104,60 @@ Respond with ONLY the category name in lowercase, nothing else. Example: wizard`
 	return charType, nil
 }
 
+// Chat sends a single-turn message to Claude and returns the text response.
+// Uses slowClient (60s) because multi-agent sequential calls can be slow.
+func (s *AIService) Chat(systemPrompt, userMessage string) (string, error) {
+	if s.apiKey == "" {
+		return "", fmt.Errorf("claude api key not configured")
+	}
+
+	reqBody := map[string]interface{}{
+		"model":      "claude-haiku-4-5-20251001",
+		"max_tokens": 1024,
+		"system":     systemPrompt,
+		"messages": []map[string]string{
+			{"role": "user", "content": userMessage},
+		},
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest("POST", claudeAPIURL, bytes.NewBuffer(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("x-api-key", s.apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("content-type", "application/json")
+
+	resp, err := s.slowClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("claude api error %d: %s", resp.StatusCode, string(b))
+	}
+
+	var result struct {
+		Content []struct {
+			Text string `json:"text"`
+		} `json:"content"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if len(result.Content) == 0 {
+		return "", fmt.Errorf("empty response from claude")
+	}
+	return strings.TrimSpace(result.Content[0].Text), nil
+}
+
 // GeneratePixelArt asks Claude to produce a unique 16×16 pixel matrix for the given prompt.
 // Returns nil if generation fails — the caller should fall back to static data.
 func (s *AIService) GeneratePixelArt(prompt, charType string) ([][]int, error) {
