@@ -430,7 +430,6 @@ func extractCharacteristics(chars []string) (face, chest, rightHand, distinction
 
 // Chat sends a user message to Gemini Flash using systemPrompt as context and returns the text reply.
 func (g *GeminiService) Chat(systemPrompt, userMessage string) (string, error) {
-
 	// Combine system prompt and user message into a single turn
 	combinedText := "System instructions:\n" + systemPrompt + "\n\nUser message:\n" + userMessage
 
