@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/theme.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/collection_service.dart';
@@ -102,10 +103,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   Widget build(BuildContext context) {
     if (!ApiService.instance.isAuthenticated) return _loginPrompt(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFDDD1BB),
+      backgroundColor: AppTheme.bg,
       body: RefreshIndicator(
         onRefresh: _load,
-        color: const Color(0xFF81231E),
+        color: AppTheme.primary,
         child: Column(children: [
           _buildHeader(),
           Expanded(
@@ -129,21 +130,19 @@ class _LibraryScreenState extends State<LibraryScreen>
         ? '${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}'
         : wallet;
     return Container(
-      color: const Color(0xFFC8BA9A),
+      color: AppTheme.surface,
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 44, height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF81231E).withValues(alpha: 0.15),
+              color: AppTheme.primary.withValues(alpha: 0.15),
               shape: BoxShape.circle,
-              border: Border.all(
-                  color: const Color(0xFF81231E).withValues(alpha: 0.4)),
+              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
             ),
-            child: const Icon(Icons.person_outline,
-                color: Color(0xFF81231E), size: 22),
+            child: const Icon(Icons.person_outline, color: AppTheme.primary, size: 22),
+          ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -152,19 +151,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                 children: [
               Text(short,
                   style: const TextStyle(
-                      color: Color(0xFF2B2C1E),
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold)),
+                      color: AppTheme.textH, fontSize: 15, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
               Row(children: [
-                _statChip(Icons.bolt, '$_credits',
-                    const Color(0xFF9B7B1A), 'credits'),
+                _statChip(Icons.bolt, '$_credits', AppTheme.gold, 'credits'),
                 const SizedBox(width: 14),
-                _statChip(Icons.auto_awesome_outlined,
-                    '${_created.length}', const Color(0xFF81231E), 'created'),
+                _statChip(Icons.auto_awesome_outlined, '${_created.length}', AppTheme.primary, 'created'),
                 const SizedBox(width: 14),
-                _statChip(Icons.bookmark_border, '$_totalSaves',
-                    const Color(0xFF81231E), 'saves'),
+                _statChip(Icons.bookmark_border, '$_totalSaves', AppTheme.primary, 'saves'),
               ]),
             ]),
           ),
@@ -176,10 +170,10 @@ class _LibraryScreenState extends State<LibraryScreen>
             Tab(text: 'Saved (${_saved.length})'),
             Tab(text: 'Created (${_created.length})'),
           ],
-          labelColor: const Color(0xFF81231E),
-          unselectedLabelColor: const Color(0xFF7A6E52),
-          indicatorColor: const Color(0xFF81231E),
-          dividerColor: const Color(0xFFADA07A),
+          labelColor: AppTheme.primary,
+          unselectedLabelColor: AppTheme.textM,
+          indicatorColor: AppTheme.primary,
+          dividerColor: AppTheme.border,
         ),
       ]),
     );
@@ -197,8 +191,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 fontSize: 13)),
         const SizedBox(width: 3),
         Text(label,
-            style: const TextStyle(
-                color: Color(0xFF7A6E52), fontSize: 11)),
+            style: const TextStyle(color: AppTheme.textM, fontSize: 11)),
       ]);
 
   // ── Saved Tab ─────────────────────────────────────────────────────────────
@@ -215,23 +208,20 @@ class _LibraryScreenState extends State<LibraryScreen>
           SliverFillRemaining(
             child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.bookmarks_outlined,
-                    color: Color(0xFFC0B490), size: 52),
+                const Icon(Icons.bookmarks_outlined, color: AppTheme.border2, size: 52),
                 const SizedBox(height: 12),
                 Text(
                   _selectedCollectionId != null
                       ? 'No agents in this collection'
                       : 'No saved agents yet',
-                  style: const TextStyle(
-                      color: Color(0xFF6B5A40), fontSize: 16),
+                  style: const TextStyle(color: AppTheme.textB, fontSize: 16),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   _selectedCollectionId != null
                       ? 'Long-press an agent card to add it here'
                       : 'Browse the store and save agents',
-                  style: const TextStyle(
-                      color: Color(0xFF7A6E52), fontSize: 12),
+                  style: const TextStyle(color: AppTheme.textM, fontSize: 12),
                 ),
               ]),
             ),
@@ -285,15 +275,11 @@ class _LibraryScreenState extends State<LibraryScreen>
         Row(children: [
           const Text(
             'Collections',
-            style: TextStyle(
-                color: Color(0xFF2B2C1E),
-                fontSize: 14,
-                fontWeight: FontWeight.w600),
+            style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w600),
           ),
           const Spacer(),
           IconButton(
-            icon: const Icon(Icons.add,
-                color: Color(0xFF81231E), size: 20),
+            icon: const Icon(Icons.add, color: AppTheme.primary, size: 20),
             onPressed: () => _showNewCollectionDialog(),
             tooltip: 'New collection',
             constraints: const BoxConstraints(),
@@ -307,7 +293,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             child: Text(
               'No collections yet. Tap + to create one.',
               style: TextStyle(
-                  color: Color(0xFF7A6E52), fontSize: 12),
+                  color: AppTheme.textM, fontSize: 12),
             ),
           )
         else
@@ -333,7 +319,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     decoration: BoxDecoration(
                       color: isSelected
                           ? colColor.withValues(alpha: 0.18)
-                          : const Color(0xFFB8AA88),
+                          : AppTheme.card2,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSelected
@@ -359,7 +345,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         style: TextStyle(
                           color: isSelected
                               ? colColor
-                              : const Color(0xFF4A4033),
+                              : AppTheme.textB,
                           fontSize: 12,
                           fontWeight: isSelected
                               ? FontWeight.w600
@@ -368,23 +354,17 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${col.agentIds.length}',
-                        style: TextStyle(
-                          color: isSelected
-                              ? colColor.withValues(alpha: 0.8)
-                              : const Color(0xFF7A6E52),
-                          fontSize: 11,
-                        ),
-                      ),
+                         '${col.agentIds.length}',
+                         style: TextStyle(
+                           color: isSelected ? colColor.withValues(alpha: 0.8) : AppTheme.textM,
+                           fontSize: 11,
+                         ),
+                       ),
                       const SizedBox(width: 4),
                       GestureDetector(
-                        onTap: () =>
-                            _confirmDeleteCollection(col),
-                        child: Icon(Icons.close,
-                            size: 12,
-                            color: isSelected
-                                ? colColor.withValues(alpha: 0.8)
-                                : const Color(0xFF7A6E52)),
+                        onTap: () => _confirmDeleteCollection(col),
+                        child: Icon(Icons.close, size: 12,
+                            color: isSelected ? colColor.withValues(alpha: 0.8) : AppTheme.textM),
                       ),
                     ]),
                   ),
@@ -393,7 +373,7 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           ),
         const SizedBox(height: 4),
-        const Divider(color: Color(0xFFADA07A)),
+        const Divider(color: AppTheme.border),
       ]),
     );
   }
@@ -411,22 +391,23 @@ class _LibraryScreenState extends State<LibraryScreen>
     showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFFB8AA88),
-        title: const Text('Delete Collection',
-            style: TextStyle(color: Color(0xFF2B2C1E))),
+        backgroundColor: AppTheme.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.border2)),
+        title: const Text('Delete Collection', style: TextStyle(color: AppTheme.textH)),
         content: Text(
           'Delete "${col.name}"? Agents won\'t be removed from your library.',
-          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 13),
+          style: const TextStyle(color: AppTheme.textB, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF6B5A40))),
+            child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF81231E)),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.primary),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
           ),
@@ -443,7 +424,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   void _showAddToCollectionSheet(AgentModel agent) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFFE8DEC9),
+      backgroundColor: AppTheme.card2,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -478,16 +459,11 @@ class _LibraryScreenState extends State<LibraryScreen>
           const SliverFillRemaining(
             child: Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.auto_awesome_outlined,
-                  color: Color(0xFFC0B490), size: 52),
-              SizedBox(height: 12),
-              Text('No agents created yet',
-                  style: TextStyle(
-                      color: Color(0xFF6B5A40), fontSize: 16)),
-              SizedBox(height: 6),
-              Text('Create your first agent',
-                  style: TextStyle(
-                      color: Color(0xFF7A6E52), fontSize: 12)),
+              const Icon(Icons.auto_awesome_outlined, color: AppTheme.border2, size: 52),
+              const SizedBox(height: 12),
+              Text('No agents created yet', style: const TextStyle(color: AppTheme.textB, fontSize: 16)),
+              const SizedBox(height: 6),
+              Text('Create your first agent', style: const TextStyle(color: AppTheme.textM, fontSize: 12)),
             ])),
           ),
         ],
@@ -566,20 +542,20 @@ class _LibraryScreenState extends State<LibraryScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: a.price > 0
-                              ? const Color(0xFF9B7B1A).withAlpha(217)
-                              : const Color(0xFFC0B490).withAlpha(217),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          a.price > 0
-                              ? '${a.price.toStringAsFixed(2)} MON'
-                              : 'Free',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600),
-                        ),
+                           color: a.price > 0
+                               ? AppTheme.gold.withValues(alpha: 0.85)
+                               : AppTheme.card2.withValues(alpha: 0.9),
+                           borderRadius: BorderRadius.circular(4),
+                         ),
+                         child: Text(
+                           a.price > 0
+                               ? '${a.price.toStringAsFixed(2)} MON'
+                               : 'Free',
+                           style: const TextStyle(
+                               color: Color(0xFF1E1A14),
+                               fontSize: 10,
+                               fontWeight: FontWeight.w600),
+                         ),
                       ),
                     ),
                   ),
@@ -595,32 +571,22 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _loginPrompt(BuildContext context) => Scaffold(
-        backgroundColor: const Color(0xFFDDD1BB),
-        body: Center(
-            child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-              const Icon(Icons.account_balance_wallet_outlined,
-                  color: Color(0xFFC0B490), size: 56),
-              const SizedBox(height: 16),
-              const Text('Connect your wallet',
-                  style: TextStyle(
-                      color: Color(0xFF2B2C1E),
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text(
-                  'Sign in to view your library and created agents',
-                  style: TextStyle(
-                      color: Color(0xFF7A6E52), fontSize: 13),
-                  textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () => context.go('/wallet'),
-                icon: const Icon(Icons.account_balance_wallet),
-                label: const Text('Connect Wallet'),
-              ),
-            ])),
+        backgroundColor: AppTheme.bg,
+        body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.account_balance_wallet_outlined, color: AppTheme.border2, size: 56),
+          const SizedBox(height: 16),
+          const Text('Connect your wallet', style: TextStyle(
+              color: AppTheme.textH, fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Sign in to view your library and created agents',
+              style: TextStyle(color: AppTheme.textM, fontSize: 13), textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => context.go('/wallet'),
+            icon: const Icon(Icons.account_balance_wallet_rounded),
+            label: const Text('Connect Wallet'),
+          ),
+        ])),
       );
 }
 
@@ -742,8 +708,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
           const SizedBox(height: 4),
           Text(
             widget.agent.title,
-            style: const TextStyle(
-                color: Color(0xFF6B5A40), fontSize: 12),
+           style: const TextStyle(color: AppTheme.textB, fontSize: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -753,8 +718,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
                 'No collections yet. Tap + to create one.',
-                style:
-                    TextStyle(color: Color(0xFF7A6E52), fontSize: 13),
+                 style: TextStyle(color: AppTheme.textM, fontSize: 13),
               ),
             )
           else
@@ -768,9 +732,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isIn
-                        ? colColor.withValues(alpha: 0.1)
-                        : const Color(0xFFB8AA88),
+                    color: isIn ? colColor.withValues(alpha: 0.1) : AppTheme.card,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isIn
@@ -793,7 +755,7 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                       child: Text(
                         col.name,
                         style: TextStyle(
-                          color: isIn ? colColor : const Color(0xFF2B2C1E),
+                           color: isIn ? colColor : AppTheme.textH,
                           fontWeight: isIn
                               ? FontWeight.w600
                               : FontWeight.normal,
@@ -803,17 +765,14 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                     ),
                     Text(
                       '${col.agentIds.length} agents',
-                      style: const TextStyle(
-                          color: Color(0xFF7A6E52), fontSize: 11),
+                       style: const TextStyle(color: AppTheme.textM, fontSize: 11),
                     ),
                     const SizedBox(width: 8),
                     Icon(
                       isIn
                           ? Icons.check_circle
                           : Icons.radio_button_unchecked,
-                      color: isIn
-                          ? colColor
-                          : const Color(0xFF5A5038),
+                      color: isIn ? colColor : AppTheme.textM,
                       size: 18,
                     ),
                   ]),
@@ -850,9 +809,12 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: const Color(0xFFB8AA88),
-      title: const Text('New Collection',
-          style: TextStyle(color: Color(0xFF2B2C1E))),
+      backgroundColor: AppTheme.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppTheme.border2)),
+      title: const Text('New Collection', style: TextStyle(color: AppTheme.textH)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -860,7 +822,7 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
           TextField(
             controller: _ctrl,
             autofocus: true,
-            style: const TextStyle(color: Color(0xFF2B2C1E)),
+            style: const TextStyle(color: AppTheme.textH),
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFFC8BA9A),
