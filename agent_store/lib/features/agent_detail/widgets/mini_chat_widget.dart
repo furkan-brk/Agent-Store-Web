@@ -116,6 +116,16 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     });
   }
 
+  void _showTerminalModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => _TerminalModal(
+        agentId: widget.agentId,
+        agentTitle: widget.agentTitle,
+      ),
+    );
+  }
+
   // ── UI ─────────────────────────────────────────────────────────────────────
 
   @override
@@ -161,6 +171,15 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: Color(0xFF6366F1)),
                   ),
+                IconButton(
+                  icon: const Icon(Icons.terminal,
+                      size: 16, color: Color(0xFF6366F1)),
+                  tooltip: 'Terminal\'den çalıştır',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _showTerminalModal(context),
+                ),
+                const SizedBox(width: 8),
                 if (_messages.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.delete_outline,
@@ -284,5 +303,213 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
         ],
       ),
     );
+  }
+}
+
+class _TerminalModal extends StatelessWidget {
+  final int agentId;
+  final String agentTitle;
+
+  const _TerminalModal({
+    required this.agentId,
+    required this.agentTitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final curlCommand = '''curl 'http://localhost:8080/api/v1/agents/$agentId/chat' \\
+  -X POST \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN' \\
+  --data-raw '{"message":"Merhaba, nasılsın?"}' ''';
+
+    final pythonExample = '''import requests
+
+url = "http://localhost:8080/api/v1/agents/$agentId/chat"
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_JWT_TOKEN"
+}
+data = {"message": "Merhaba, nasılsın?"}
+
+response = requests.post(url, headers=headers, json=data)
+print(response.json())''';
+
+    final nodeExample = '''const axios = require('axios');
+
+async function chatWithAgent() {
+  try {
+    const response = await axios.post(
+      'http://localhost:8080/api/v1/agents/$agentId/chat',
+      { message: 'Merhaba, nasılsın?' },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer YOUR_JWT_TOKEN'
+        }
+      }
+    );
+    console.log(response.data);
+  } catch (error) {
+    console.error(error.response.data);
+  }
+}
+
+chatWithAgent();''';
+
+    return Dialog(
+      backgroundColor: const Color(0xFF1F2937),
+      child: Container(
+        width: 700,
+        height: 600,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.terminal, color: Color(0xFF6366F1), size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Terminal\'den $agentTitle Agent\'ı Kullan',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: DefaultTabController(
+                length: 3,
+                child: Column(
+                  children: [
+                    const TabBar(
+                      labelColor: Color(0xFF6366F1),
+                      unselectedLabelColor: Color(0xFF6B7280),
+                      indicatorColor: Color(0xFF6366F1),
+                      tabs: [
+                        Tab(text: 'cURL'),
+                        Tab(text: 'Python'),
+                        Tab(text: 'Node.js'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          _buildCodeSection('Bash/Terminal', curlCommand),
+                          _buildCodeSection('Python', pythonExample),
+                          _buildCodeSection('JavaScript', nodeExample),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F1419),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF374151)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '💡 Authentication',
+                    style: TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'JWT token almanız gerekiyor. Wallet bağlandıktan sonra browser developer tools\'tan Authorization header\'ını kopyalayın.',
+                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCodeSection(String language, String code) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1419),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF374151)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF374151))),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  language,
+                  style: const TextStyle(
+                    color: Color(0xFF6366F1),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _copyToClipboard(code),
+                  icon: const Icon(Icons.copy, size: 14, color: Color(0xFF6B7280)),
+                  label: const Text(
+                    'Kopyala',
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+                  ),
+                  style: TextButton.styleFrom(
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                code,
+                style: const TextStyle(
+                  color: Color(0xFFD1D5DB),
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyToClipboard(String text) {
+    html.window.navigator.clipboard?.writeText(text);
   }
 }
