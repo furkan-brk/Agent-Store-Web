@@ -28,7 +28,8 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	geminiSvc := services.NewGeminiService(geminiAPIKey)
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
 	scoreSvc := services.NewScoreService(geminiAPIKey)
-	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc)
+	pollinationsSvc := services.NewPollinationsService()
+	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc)
 	guildSvc := services.NewGuildService(scoreSvc)
 	gmSvc := services.NewGuildMasterService(aiSvc)
 

@@ -22,14 +22,15 @@ type UserProfile struct {
 }
 
 type AgentService struct {
-	aiSvc        *AIService
-	geminiSvc    *GeminiService
-	replicateSvc *ReplicateService
-	scoreSvc     *ScoreService
+	aiSvc           *AIService
+	geminiSvc       *GeminiService
+	replicateSvc    *ReplicateService
+	scoreSvc        *ScoreService
+	pollinationsSvc *PollinationsService
 }
 
-func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService) *AgentService {
-	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc}
+func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService) *AgentService {
+	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc}
 }
 
 type CreateAgentInput struct {
@@ -133,13 +134,13 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		log.Printf("[Gemini] agent profile generated: name=%q type=%s", profile.Name, analysis.CharacterType)
 	}
 
-	// ── Step 3: Generate 16-bit pixel-art avatar via GenerateAvatarImage (sole image source)
-	generatedImage, imgErr := s.geminiSvc.GenerateAvatarImage(profile)
+	// ── Step 3: Generate 16-bit pixel-art avatar via Pollinations API (sole image source)
+	generatedImage, imgErr := s.pollinationsSvc.GenerateImage(profile)
 	if imgErr != nil {
-		log.Printf("[Gemini] avatar image generation failed, agent will have no image: %v", imgErr)
+		log.Printf("[Pollinations] avatar image generation failed, agent will have no image: %v", imgErr)
 		generatedImage = "" // frontend shows shimmer skeleton placeholder
 	} else {
-		log.Printf("[Gemini] 16-bit avatar generated (type=%s)", analysis.CharacterType)
+		log.Printf("[Pollinations] 16-bit avatar generated (type=%s)", analysis.CharacterType)
 	}
 
 	// ── Step 4: Build stats / traits / colors, then merge visual profile into character_data
@@ -281,9 +282,9 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		forkProfile = buildFallbackProfile(forkConcept, original.CharacterType)
 	}
 
-	forkedImage, imgErr := s.geminiSvc.GenerateAvatarImage(forkProfile)
+	forkedImage, imgErr := s.pollinationsSvc.GenerateImage(forkProfile)
 	if imgErr != nil {
-		log.Printf("[Gemini] fork avatar image failed, fork will have no image: %v", imgErr)
+		log.Printf("[Pollinations] fork avatar image failed, fork will have no image: %v", imgErr)
 		forkedImage = "" // frontend shows shimmer skeleton placeholder
 	}
 
