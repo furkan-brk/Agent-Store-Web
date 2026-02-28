@@ -44,11 +44,11 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Color(0xFF1F2937),
+          backgroundColor: const Color(0xFF282918),
           title: const Text('Insufficient Credits', style: TextStyle(color: Colors.white)),
           content: Text(
             'You need \u26A110 credits to create an agent. You have \u26A1$_credits.',
-            style: const TextStyle(color: Color(0xFF9CA3AF)),
+            style: const TextStyle(color: Color(0xFF6B5A40)),
           ),
           actions: [
             TextButton(
@@ -127,7 +127,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Agent created with unique AI character!'),
-          backgroundColor: Color(0xFF16A34A),
+          backgroundColor: Color(0xFF4A6A28),
         ),
       );
       await Future.delayed(const Duration(milliseconds: 2000));
@@ -136,7 +136,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Creation failed. Try again or check your connection.'),
-          backgroundColor: Color(0xFFDC2626),
+          backgroundColor: Color(0xFF81231E),
         ),
       );
     }
@@ -149,7 +149,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Title is required to continue.'),
-            backgroundColor: Color(0xFFDC2626),
+            backgroundColor: Color(0xFF81231E),
           ),
         );
         return;
@@ -160,7 +160,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Prompt is required to continue.'),
-            backgroundColor: Color(0xFFDC2626),
+            backgroundColor: Color(0xFF81231E),
           ),
         );
         return;
@@ -188,8 +188,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                   CircleAvatar(
                     radius: 14,
                     backgroundColor: (done || active)
-                        ? const Color(0xFF6366F1)
-                        : const Color(0xFF1F2937),
+                        ? const Color(0xFF81231E)
+                        : const Color(0xFF282918),
                     child: done
                         ? const Icon(Icons.check, size: 14, color: Colors.white)
                         : Text(
@@ -197,7 +197,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                             style: TextStyle(
                               color: (done || active)
                                   ? Colors.white
-                                  : const Color(0xFF6B7280),
+                                  : const Color(0xFF7A6E52),
                               fontSize: 12,
                             ),
                           ),
@@ -207,8 +207,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                       child: Container(
                         height: 2,
                         color: i < _step
-                            ? const Color(0xFF6366F1)
-                            : const Color(0xFF1F2937),
+                            ? const Color(0xFF81231E)
+                            : const Color(0xFF282918),
                       ),
                     ),
                 ],
@@ -230,8 +230,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                   _stepLabels[i],
                   style: TextStyle(
                     color: (done || active)
-                        ? const Color(0xFF6366F1)
-                        : const Color(0xFF6B7280),
+                        ? const Color(0xFF81231E)
+                        : const Color(0xFF7A6E52),
                     fontSize: 11,
                     fontWeight: active
                         ? FontWeight.w600
@@ -271,7 +271,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           onChanged: (_) => _updatePreview(),
           maxLines: 10,
           style: const TextStyle(
-              color: Colors.white, fontFamily: 'monospace', fontSize: 12),
+              color: Color(0xFF2B2C1E), fontFamily: 'monospace', fontSize: 12),
           validator: (v) =>
               (v == null || v.isEmpty) ? 'Prompt is required' : null,
           decoration: const InputDecoration(
@@ -306,13 +306,13 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
               Text(
                 _preview.description,
                 style: const TextStyle(
-                    color: Color(0xFF9CA3AF), fontSize: 12, height: 1.5),
+                    color: Color(0xFF6B5A40), fontSize: 12, height: 1.5),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
               const Text(
                 'AI will generate a unique character after submission',
-                style: TextStyle(color: Color(0xFF4B5563), fontSize: 11),
+                style: TextStyle(color: Color(0xFF5A5038), fontSize: 11),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -324,16 +324,16 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF1F2937),
+            color: const Color(0xFF282918),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFF374151)),
+            border: Border.all(color: const Color(0xFFC0B490)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('Summary',
                   style: TextStyle(
-                      color: Color(0xFF6366F1),
+                      color: Color(0xFF81231E),
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5)),
@@ -365,7 +365,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           width: 110,
           child: Text(label,
               style: const TextStyle(
-                  color: Color(0xFF6B7280), fontSize: 12)),
+                  color: Color(0xFF7A6E52), fontSize: 12)),
         ),
         Expanded(
           child: Text(
@@ -393,8 +393,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
             icon: const Icon(Icons.arrow_back, size: 16),
             label: const Text('Back'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF9CA3AF),
-              side: const BorderSide(color: Color(0xFF374151)),
+              foregroundColor: const Color(0xFF6B5A40),
+              side: const BorderSide(color: Color(0xFFC0B490)),
               padding:
                   const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
@@ -450,17 +450,17 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   }
 
   Widget _buildForm(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF0A0A14),
+    backgroundColor: const Color(0xFFDDD1BB),
     body: Row(children: [
       // ── Left preview panel ─────────────────────────────────────────────
       Container(
         width: 260,
-        color: const Color(0xFF0F0F1E),
+        color: const Color(0xFFC8BA9A),
         child: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             if (_createdAgent != null) ...[
               // Success: show the AI-generated character from the backend response.
-              const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 22),
+              const Icon(Icons.check_circle, color: Color(0xFF4A6A28), size: 22),
               const SizedBox(height: 8),
               PixelCharacterWidget(
                 characterType: _createdAgent!.characterType,
@@ -476,27 +476,27 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
               const Text(
                 'Agent Created!',
                 style: TextStyle(
-                    color: Color(0xFF16A34A),
+                    color: Color(0xFF4A6A28),
                     fontSize: 12,
                     fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               const Text(
                 'Redirecting to detail page…',
-                style: TextStyle(color: Color(0xFF4B5563), fontSize: 10),
+                style: TextStyle(color: Color(0xFF5A5038), fontSize: 10),
               ),
             ] else ...[
               // Pre-submission: show a keyword-predicted preview character.
               const Text('PREVIEW',
                   style: TextStyle(
-                      color: Color(0xFF6B7280),
+                      color: Color(0xFF7A6E52),
                       fontSize: 11,
                       letterSpacing: 1.5)),
               const SizedBox(height: 6),
               const Text(
                 'AI will generate a unique\ncharacter after submission',
                 style: TextStyle(
-                    color: Color(0xFF4B5563), fontSize: 10, height: 1.4),
+                    color: Color(0xFF5A5038), fontSize: 10, height: 1.4),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 14),
@@ -513,7 +513,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                 child: Text(
                   _preview.description,
                   style: const TextStyle(
-                      color: Color(0xFF6B7280), fontSize: 11, height: 1.5),
+                      color: Color(0xFF7A6E52), fontSize: 11, height: 1.5),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -523,14 +523,14 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF6366F1))),
+                        strokeWidth: 2, color: Color(0xFF81231E))),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     _loadingMsg,
                     style: const TextStyle(
-                        color: Color(0xFF6366F1), fontSize: 11),
+                        color: Color(0xFF81231E), fontSize: 11),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -552,14 +552,14 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
                 const Text(
                   'Create Agent',
                   style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 28,
                       fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
                 const Text(
                   'Describe your AI agent — category, tags and character art will be generated automatically.',
-                  style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                  style: TextStyle(color: Color(0xFF6B5A40), fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 // ── Step indicator ───────────────────────────────────────
@@ -609,7 +609,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       TextFormField(
         controller: ctrl,
         maxLines: lines,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Color(0xFF2B2C1E)),
         validator: required
             ? (v) => (v == null || v.isEmpty) ? '$label is required' : null
             : null,

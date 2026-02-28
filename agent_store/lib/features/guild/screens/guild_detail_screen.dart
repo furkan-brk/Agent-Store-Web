@@ -57,21 +57,21 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
+        backgroundColor: const Color(0xFFB8AA88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Wallet Required',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold)),
         content: const Text(
           'Connect your wallet to join or leave guilds.',
-          style: TextStyle(color: Color(0xFF9CA3AF)),
+          style: TextStyle(color: Color(0xFF6B5A40)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF7A6E52))),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF81231E)),
             onPressed: () {
               Navigator.pop(context);
               context.go('/wallet');
@@ -96,7 +96,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Joined guild successfully!'),
-            backgroundColor: const Color(0xFF10B981),
+            backgroundColor: const Color(0xFF5A8A48),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -106,7 +106,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Failed to join guild. Guild may be full.'),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: const Color(0xFF81231E),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -123,21 +123,21 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
+        backgroundColor: const Color(0xFFB8AA88),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Leave Guild?',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold)),
         content: Text(
           'Are you sure you want to leave "${_detail?.guild.name}"?',
-          style: const TextStyle(color: Color(0xFF9CA3AF)),
+          style: const TextStyle(color: Color(0xFF6B5A40)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B7280))),
+            child: const Text('Cancel', style: TextStyle(color: Color(0xFF7A6E52))),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF81231E)),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Leave'),
           ),
@@ -154,7 +154,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Left guild.'),
-            backgroundColor: const Color(0xFF1A1A2E),
+            backgroundColor: const Color(0xFFB8AA88),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -164,7 +164,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Failed to leave guild.'),
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: const Color(0xFF81231E),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -201,10 +201,10 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: const Color(0xFFDDD1BB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F0F1E),
-        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFFC8BA9A),
+        foregroundColor: const Color(0xFF2B2C1E),
         title: Text(_detail?.guild.name ?? 'Guild Detail',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
@@ -215,7 +215,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
               onPressed: _openInGuildMaster,
             ),
             IconButton(
-              icon: const Icon(Icons.account_tree_outlined, color: Color(0xFF6366F1)),
+              icon: const Icon(Icons.account_tree_outlined, color: Color(0xFF81231E)),
               tooltip: 'Team Workflow',
               onPressed: _onTeamWorkflow,
             ),
@@ -230,19 +230,19 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
   Widget _buildBody() {
     if (_loading) {
       return const Center(child: CircularProgressIndicator(
-        color: Color(0xFF6366F1),
+        color: Color(0xFF81231E),
         strokeWidth: 2.5,
       ));
     }
     if (_error != null) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 40),
+        const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 40),
         const SizedBox(height: 12),
-        Text(_error!, style: const TextStyle(color: Color(0xFF9CA3AF))),
+        Text(_error!, style: const TextStyle(color: Color(0xFF6B5A40))),
         TextButton(onPressed: _load, child: const Text('Retry')),
       ]));
     }
-    if (_detail == null) return const Center(child: Text('Guild not found', style: TextStyle(color: Colors.white)));
+    if (_detail == null) return const Center(child: Text('Guild not found', style: TextStyle(color: Color(0xFF2B2C1E))));
 
     final guild = _detail!.guild;
     final rarityColor = _rarityColor(guild.rarity);
@@ -258,7 +258,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
           Text(guild.roleIcon, style: const TextStyle(fontSize: 32)),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(guild.name, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(guild.name, style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             Row(children: [
               Container(
@@ -273,7 +273,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
               ),
               const SizedBox(width: 8),
               Text('${guild.memberCount}/4 members',
-                style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+                style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
             ]),
           ])),
         ]),
@@ -285,15 +285,15 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
           if (_joinLoading)
             const SizedBox(
               height: 38,
-              child: Center(child: CircularProgressIndicator(color: Color(0xFF6366F1), strokeWidth: 2)),
+              child: Center(child: CircularProgressIndicator(color: Color(0xFF81231E), strokeWidth: 2)),
             )
           else if (isMember)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFEF4444),
-                  side: const BorderSide(color: Color(0xFFEF4444), width: 1),
+                  foregroundColor: const Color(0xFF81231E),
+                  side: const BorderSide(color: Color(0xFF81231E), width: 1),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -307,7 +307,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(
-                  backgroundColor: isFull ? const Color(0xFF374151) : const Color(0xFF10B981),
+                  backgroundColor: isFull ? const Color(0xFFC0B490) : const Color(0xFF5A8A48),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -321,14 +321,14 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+              color: const Color(0xFF81231E).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+              border: Border.all(color: const Color(0xFF81231E).withValues(alpha: 0.3)),
             ),
             child: const Row(children: [
-              Icon(Icons.star, color: Color(0xFF6366F1), size: 14),
+              Icon(Icons.star, color: Color(0xFF81231E), size: 14),
               SizedBox(width: 6),
-              Text('You are the Guild Master', style: TextStyle(color: Color(0xFF6366F1), fontSize: 12, fontWeight: FontWeight.w600)),
+              Text('You are the Guild Master', style: TextStyle(color: Color(0xFF81231E), fontSize: 12, fontWeight: FontWeight.w600)),
             ]),
           ),
           const SizedBox(height: 24),
@@ -346,7 +346,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         _Section(
           title: 'Formation',
           child: guild.members.isEmpty
-              ? const Text('No members yet', style: TextStyle(color: Color(0xFF6B7280)))
+              ? const Text('No members yet', style: TextStyle(color: Color(0xFF7A6E52)))
               : TeamFormationWidget(members: guild.members),
         ),
 
@@ -374,7 +374,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
           title: 'Members',
           child: Column(
             children: guild.members.isEmpty
-                ? [const Text('No members yet', style: TextStyle(color: Color(0xFF6B7280)))]
+                ? [const Text('No members yet', style: TextStyle(color: Color(0xFF7A6E52)))]
                 : guild.members.map((m) => _MemberRow(member: m)).toList(),
           ),
         ),
@@ -391,11 +391,11 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
   }
 
   Color _rarityColor(String rarity) => switch (rarity.toLowerCase()) {
-    'legendary' => const Color(0xFFF59E0B),
-    'epic'      => const Color(0xFFA855F7),
-    'rare'      => const Color(0xFF3B82F6),
-    'uncommon'  => const Color(0xFF22C55E),
-    _           => const Color(0xFF6B7280),
+    'legendary' => const Color(0xFF9B7B1A),
+    'epic'      => const Color(0xFF70683B),
+    'rare'      => const Color(0xFF5F6A54),
+    'uncommon'  => const Color(0xFF5A8A48),
+    _           => const Color(0xFF7A6E52),
   };
 }
 
@@ -406,15 +406,15 @@ class _GuildStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isFull = guild.memberCount >= 4;
-    final slotColor = isFull ? const Color(0xFFEF4444) : const Color(0xFF10B981);
+    final slotColor = isFull ? const Color(0xFF81231E) : const Color(0xFF5A8A48);
     final createdFormatted = _formatDate(guild.createdAt);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF13131F),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E1E35)),
+        border: Border.all(color: const Color(0xFFADA07A)),
       ),
       child: Row(children: [
         _StatCell(
@@ -426,14 +426,14 @@ class _GuildStatsRow extends StatelessWidget {
         _VertDivider(),
         _StatCell(
           icon: Icons.calendar_today,
-          iconColor: const Color(0xFF6B7280),
+          iconColor: const Color(0xFF7A6E52),
           label: 'Created',
           value: createdFormatted,
         ),
         _VertDivider(),
         _StatCell(
           icon: Icons.emoji_events,
-          iconColor: const Color(0xFF6366F1),
+          iconColor: const Color(0xFF81231E),
           label: 'Status',
           value: isFull ? 'Full' : 'Recruiting',
           valueColor: slotColor,
@@ -462,12 +462,12 @@ class _StatCell extends StatelessWidget {
       Icon(icon, color: iconColor, size: 18),
       const SizedBox(height: 6),
       Text(value, style: TextStyle(
-        color: valueColor ?? Colors.white,
+        color: valueColor ?? const Color(0xFF2B2C1E),
         fontWeight: FontWeight.bold,
         fontSize: 13,
       )),
       const SizedBox(height: 2),
-      Text(label, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10)),
+      Text(label, style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 10)),
     ]),
   );
 }
@@ -476,7 +476,7 @@ class _VertDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: 1, height: 40,
-    color: const Color(0xFF1E1E35),
+    color: const Color(0xFFADA07A),
     margin: const EdgeInsets.symmetric(horizontal: 8),
   );
 }
@@ -490,7 +490,7 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(title, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11,
+      Text(title, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11,
         fontWeight: FontWeight.w600, letterSpacing: 1)),
       const SizedBox(height: 12),
       child,
@@ -596,7 +596,7 @@ class _MemberRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF13131F),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: typeColor.withValues(alpha: 0.2)),
       ),
@@ -612,25 +612,25 @@ class _MemberRow extends StatelessWidget {
             style: TextStyle(color: typeColor, fontSize: 10)),
           const SizedBox(height: 2),
           Row(children: [
-            const Icon(Icons.account_balance_wallet, size: 10, color: Color(0xFF6B7280)),
+            const Icon(Icons.account_balance_wallet, size: 10, color: Color(0xFF7A6E52)),
             const SizedBox(width: 3),
             Text(_shortWallet(agent.creatorWallet),
-              style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10)),
+              style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 10)),
             const SizedBox(width: 8),
-            const Icon(Icons.schedule, size: 10, color: Color(0xFF4B5563)),
+            const Icon(Icons.schedule, size: 10, color: Color(0xFF5A5038)),
             const SizedBox(width: 3),
             Text(_formatJoined(member.joinedAt),
-              style: const TextStyle(color: Color(0xFF4B5563), fontSize: 10)),
+              style: const TextStyle(color: Color(0xFF5A5038), fontSize: 10)),
           ]),
         ])),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFF1F2937),
+            color: const Color(0xFF282918),
             borderRadius: BorderRadius.circular(6),
           ),
-          child: Text(member.role, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 10)),
+          child: Text(member.role, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10)),
         ),
       ]),
     );

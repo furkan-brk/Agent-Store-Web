@@ -39,9 +39,9 @@ class FilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF13131F),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF374151)),
+        border: Border.all(color: const Color(0xFFC0B490)),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -51,7 +51,7 @@ class FilterPanel extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.monetization_on_outlined,
-                  size: 14, color: Color(0xFF9CA3AF)),
+                  size: 14, color: Color(0xFF6B5A40)),
               const SizedBox(width: 6),
               const Text(
                 'Price Range',
@@ -65,7 +65,7 @@ class FilterPanel extends StatelessWidget {
               Text(
                 '${_priceLabel(currentMin)} — ${_priceLabel(currentMax)}',
                 style: const TextStyle(
-                  color: Color(0xFF6366F1),
+                  color: Color(0xFF81231E),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                 ),
@@ -78,8 +78,8 @@ class FilterPanel extends StatelessWidget {
             min: minPrice,
             max: maxPrice,
             divisions: 20,
-            activeColor: const Color(0xFF6366F1),
-            inactiveColor: const Color(0xFF374151),
+            activeColor: const Color(0xFF81231E),
+            inactiveColor: const Color(0xFFC0B490),
             labels: RangeLabels(
               _priceLabel(currentMin),
               _priceLabel(currentMax),
@@ -90,7 +90,7 @@ class FilterPanel extends StatelessWidget {
           // ── Tags ─────────────────────────────────────────────────────────
           const Row(
             children: [
-              Icon(Icons.label_outline, size: 14, color: Color(0xFF9CA3AF)),
+              Icon(Icons.label_outline, size: 14, color: Color(0xFF6B5A40)),
               SizedBox(width: 6),
               Text(
                 'Tags',
@@ -112,18 +112,18 @@ class FilterPanel extends StatelessWidget {
                 label: Text(tag),
                 selected: selected,
                 onSelected: (_) => onTagToggled(tag),
-                backgroundColor: const Color(0xFF1A1A2E),
-                selectedColor: const Color(0xFF6366F1),
+                backgroundColor: const Color(0xFFB8AA88),
+                selectedColor: const Color(0xFF81231E),
                 checkmarkColor: Colors.white,
                 labelStyle: TextStyle(
-                  color: selected ? Colors.white : const Color(0xFF9CA3AF),
+                  color: selected ? Colors.white : const Color(0xFF6B5A40),
                   fontSize: 11,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                 ),
                 side: BorderSide(
                   color: selected
-                      ? const Color(0xFF6366F1)
-                      : const Color(0xFF374151),
+                      ? const Color(0xFF81231E)
+                      : const Color(0xFFC0B490),
                 ),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
@@ -141,11 +141,11 @@ class FilterPanel extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onReset,
               icon: const Icon(Icons.refresh, size: 13,
-                  color: Color(0xFFEF4444)),
+                  color: Color(0xFF81231E)),
               label: const Text(
                 'Reset Filters',
                 style: TextStyle(
-                  color: Color(0xFFEF4444),
+                  color: Color(0xFF81231E),
                   fontSize: 12,
                 ),
               ),

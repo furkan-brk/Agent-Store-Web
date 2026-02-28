@@ -147,7 +147,7 @@ class _Sidebar extends StatelessWidget {
     final loc = GoRouterState.of(context).uri.toString();
     return Container(
       width: 210,
-      color: const Color(0xFF0F0F1E),
+      color: const Color(0xFFC8BA9A),
       child: Column(children: [
         const SizedBox(height: 32),
         Padding(
@@ -155,11 +155,11 @@ class _Sidebar extends StatelessWidget {
           child: Row(children: [
             Container(
               width: 32, height: 32,
-              decoration: BoxDecoration(color: const Color(0xFF6366F1), borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+              decoration: BoxDecoration(color: const Color(0xFF81231E), borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.auto_awesome, color: Color(0xFFDDD1BB), size: 18),
             ),
             const SizedBox(width: 10),
-            const Text('AgentStore', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+            const Text('AgentStore', style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 15)),
           ]),
         ),
         const SizedBox(height: 28),
@@ -171,11 +171,11 @@ class _Sidebar extends StatelessWidget {
         _NavItem(icon: Icons.emoji_events_outlined,         label: 'Leaderboard', path: '/leaderboard', loc: loc),
         _NavItem(icon: Icons.analytics_outlined,            label: 'Creator',     path: '/creator',      loc: loc),
         const Spacer(),
-        const Divider(color: Color(0xFF1E1E35), height: 1),
+        const Divider(color: Color(0xFFADA07A), height: 1),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
           child: Row(children: [
-            Text('', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+            Text('', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
             Spacer(),
             NotificationBell(),
           ]),
@@ -207,14 +207,14 @@ class _NavItem extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF6366F1).withValues(alpha: 0.15) : Colors.transparent,
+            color: selected ? const Color(0xFF81231E).withValues(alpha: 0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(children: [
-            Icon(icon, color: selected ? const Color(0xFF6366F1) : const Color(0xFF6B7280), size: 20),
+            Icon(icon, color: selected ? const Color(0xFF81231E) : const Color(0xFF7A6E52), size: 20),
             const SizedBox(width: 10),
             Text(label, style: TextStyle(
-              color: selected ? const Color(0xFF6366F1) : const Color(0xFF9CA3AF),
+              color: selected ? const Color(0xFF81231E) : const Color(0xFF6B5A40),
               fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             )),
           ]),

@@ -158,7 +158,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
       width: widget.size + 16,
       height: widget.size + 16,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F1A),
+        color: const Color(0xFFC8BA9A),
         border: Border.all(color: fc, width: 2),
         boxShadow: [BoxShadow(color: fc.withValues(alpha: 0.35), blurRadius: 14, spreadRadius: 2)],
       ),
@@ -252,7 +252,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
         height: widget.size,
         child: Stack(children: [
           // Dark base
-          Container(color: const Color(0xFF0D0D1A)),
+          Container(color: const Color(0xFF141508)),
           // Sweeping shimmer gradient driven by animation value
           Positioned.fill(
             child: DecoratedBox(
@@ -290,7 +290,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   Widget _errorPlaceholder() => Container(
     width: widget.size,
     height: widget.size,
-    color: const Color(0xFF0D0D1A),
+    color: const Color(0xFF141508),
     child: Icon(
       Icons.broken_image_outlined,
       color: widget.characterType.accentColor.withValues(alpha: 0.4),
@@ -363,18 +363,18 @@ class _StatRow extends StatelessWidget {
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(children: [
       SizedBox(width: 78, child: Text(name.toUpperCase(),
-        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 9, letterSpacing: 0.8))),
+        style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 9, letterSpacing: 0.8))),
       Expanded(child: ClipRRect(
         borderRadius: BorderRadius.circular(2),
         child: LinearProgressIndicator(
           value: value / 100,
-          backgroundColor: const Color(0xFF1F2937),
-          valueColor: const AlwaysStoppedAnimation(Color(0xFF6366F1)),
+          backgroundColor: const Color(0xFF282918),
+          valueColor: const AlwaysStoppedAnimation(Color(0xFF81231E)),
           minHeight: 5,
         ),
       )),
       const SizedBox(width: 6),
-      Text('$value', style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 9)),
+      Text('$value', style: const TextStyle(color: Color(0xFF4A4033), fontSize: 9)),
     ]),
   );
 }

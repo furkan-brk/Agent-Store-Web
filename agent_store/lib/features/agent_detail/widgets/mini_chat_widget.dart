@@ -116,6 +116,16 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     });
   }
 
+  void _showTerminalModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => _TerminalModal(
+        agentId: widget.agentId,
+        agentTitle: widget.agentTitle,
+      ),
+    );
+  }
+
   // ── UI ─────────────────────────────────────────────────────────────────────
 
   @override
@@ -123,9 +133,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F1E),
+        color: const Color(0xFFC8BA9A),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF1E1E35)),
+        border: Border.all(color: const Color(0xFFADA07A)),
       ),
       child: Column(
         children: [
@@ -133,14 +143,14 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFF1E1E35))),
+              border: Border(bottom: BorderSide(color: Color(0xFFADA07A))),
             ),
             child: Row(
               children: [
                 const Text(
                   '\u{1F4AC} Test Agent',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF2B2C1E),
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                   ),
@@ -150,7 +160,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   child: Text(
                     widget.agentTitle,
                     style: const TextStyle(
-                        color: Color(0xFF6B7280), fontSize: 12),
+                        color: Color(0xFF7A6E52), fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -159,12 +169,21 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF6366F1)),
+                        strokeWidth: 2, color: Color(0xFF81231E)),
                   ),
+                IconButton(
+                  icon: const Icon(Icons.terminal,
+                      size: 16, color: Color(0xFF6366F1)),
+                  tooltip: 'Terminal\'den çalıştır',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => _showTerminalModal(context),
+                ),
+                const SizedBox(width: 8),
                 if (_messages.isNotEmpty)
                   IconButton(
                     icon: const Icon(Icons.delete_outline,
-                        size: 16, color: Color(0xFF6B7280)),
+                        size: 16, color: Color(0xFF7A6E52)),
                     tooltip: 'Clear chat history',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -181,7 +200,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                     child: Text(
                       'Send a message to test this agent...',
                       style: TextStyle(
-                          color: Color(0xFF4B5563), fontSize: 13),
+                          color: Color(0xFF5A5038), fontSize: 13),
                     ),
                   )
                 : ListView.builder(
@@ -206,9 +225,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                           ),
                           decoration: BoxDecoration(
                             color: isUser
-                                ? const Color(0xFF6366F1)
+                                ? const Color(0xFF81231E)
                                     .withValues(alpha: 0.8)
-                                : const Color(0xFF1F2937),
+                                : const Color(0xFF282918),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -216,7 +235,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                             style: TextStyle(
                               color: isUser
                                   ? Colors.white
-                                  : const Color(0xFFD1D5DB),
+                                  : const Color(0xFF4A4033),
                               fontSize: 13,
                               height: 1.4,
                             ),
@@ -231,7 +250,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFF1E1E35))),
+              border: Border(top: BorderSide(color: Color(0xFFADA07A))),
             ),
             child: Row(
               children: [
@@ -239,28 +258,28 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   child: TextField(
                     controller: _ctrl,
                     style:
-                        const TextStyle(color: Colors.white, fontSize: 13),
+                        const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13),
                     onSubmitted: (_) => _send(),
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
                       hintStyle: TextStyle(
-                          color: Color(0xFF4B5563), fontSize: 13),
+                          color: Color(0xFF5A5038), fontSize: 13),
                       border: InputBorder.none,
                       contentPadding: EdgeInsets.symmetric(
                           horizontal: 12, vertical: 8),
                       filled: true,
-                      fillColor: Color(0xFF111827),
+                      fillColor: Color(0xFFB8AA88),
                       enabledBorder: OutlineInputBorder(
                         borderRadius:
                             BorderRadius.all(Radius.circular(8)),
                         borderSide:
-                            BorderSide(color: Color(0xFF1E1E35)),
+                            BorderSide(color: Color(0xFFADA07A)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius:
                             BorderRadius.all(Radius.circular(8)),
                         borderSide:
-                            BorderSide(color: Color(0xFF6366F1)),
+                            BorderSide(color: Color(0xFF81231E)),
                       ),
                     ),
                   ),
@@ -269,11 +288,11 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 IconButton(
                   onPressed: _sending ? null : _send,
                   icon: const Icon(Icons.send_rounded),
-                  color: const Color(0xFF6366F1),
-                  disabledColor: const Color(0xFF374151),
+                  color: const Color(0xFF81231E),
+                  disabledColor: const Color(0xFFC0B490),
                   style: IconButton.styleFrom(
                     backgroundColor:
-                        const Color(0xFF6366F1).withValues(alpha: 0.1),
+                        const Color(0xFF81231E).withValues(alpha: 0.1),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
@@ -284,5 +303,213 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
         ],
       ),
     );
+  }
+}
+
+class _TerminalModal extends StatelessWidget {
+  final int agentId;
+  final String agentTitle;
+
+  const _TerminalModal({
+    required this.agentId,
+    required this.agentTitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final curlCommand = '''curl 'http://localhost:8080/api/v1/agents/$agentId/chat' \\
+  -X POST \\
+  -H 'Content-Type: application/json' \\
+  -H 'Authorization: Bearer YOUR_JWT_TOKEN' \\
+  --data-raw '{"message":"Merhaba, nasılsın?"}' ''';
+
+    final pythonExample = '''import requests
+
+url = "http://localhost:8080/api/v1/agents/$agentId/chat"
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_JWT_TOKEN"
+}
+data = {"message": "Merhaba, nasılsın?"}
+
+response = requests.post(url, headers=headers, json=data)
+print(response.json())''';
+
+    final nodeExample = '''const axios = require('axios');
+
+async function chatWithAgent() {
+  try {
+    const response = await axios.post(
+      'http://localhost:8080/api/v1/agents/$agentId/chat',
+      { message: 'Merhaba, nasılsın?' },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer YOUR_JWT_TOKEN'
+        }
+      }
+    );
+    console.log(response.data);
+  } catch (error) {
+    console.error(error.response.data);
+  }
+}
+
+chatWithAgent();''';
+
+    return Dialog(
+      backgroundColor: const Color(0xFF1F2937),
+      child: Container(
+        width: 700,
+        height: 600,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.terminal, color: Color(0xFF6366F1), size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Terminal\'den $agentTitle Agent\'ı Kullan',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: DefaultTabController(
+                length: 3,
+                child: Column(
+                  children: [
+                    const TabBar(
+                      labelColor: Color(0xFF6366F1),
+                      unselectedLabelColor: Color(0xFF6B7280),
+                      indicatorColor: Color(0xFF6366F1),
+                      tabs: [
+                        Tab(text: 'cURL'),
+                        Tab(text: 'Python'),
+                        Tab(text: 'Node.js'),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          _buildCodeSection('Bash/Terminal', curlCommand),
+                          _buildCodeSection('Python', pythonExample),
+                          _buildCodeSection('JavaScript', nodeExample),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0F1419),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF374151)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '💡 Authentication',
+                    style: TextStyle(
+                      color: Color(0xFFFBBF24),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'JWT token almanız gerekiyor. Wallet bağlandıktan sonra browser developer tools\'tan Authorization header\'ını kopyalayın.',
+                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCodeSection(String language, String code) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1419),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF374151)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF374151))),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  language,
+                  style: const TextStyle(
+                    color: Color(0xFF6366F1),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _copyToClipboard(code),
+                  icon: const Icon(Icons.copy, size: 14, color: Color(0xFF6B7280)),
+                  label: const Text(
+                    'Kopyala',
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+                  ),
+                  style: TextButton.styleFrom(
+                    minimumSize: Size.zero,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(12),
+              child: SelectableText(
+                code,
+                style: const TextStyle(
+                  color: Color(0xFFD1D5DB),
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _copyToClipboard(String text) {
+    html.window.navigator.clipboard?.writeText(text);
   }
 }

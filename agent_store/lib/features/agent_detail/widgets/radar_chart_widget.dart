@@ -46,7 +46,7 @@ class RadarChartWidget extends StatelessWidget {
           ticksTextStyle: const TextStyle(color: Colors.transparent, fontSize: 8),
           tickBorderData: const BorderSide(color: Colors.transparent),
           gridBorderData: BorderSide(color: color.withValues(alpha: 0.15), width: 1),
-          titleTextStyle: const TextStyle(color: Colors.white, fontSize: 10),
+          titleTextStyle: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 10),
           getTitle: (index, angle) {
             final label = index < _labels.length ? _labels[index] : '';
             return RadarChartTitle(text: label, angle: 0);

@@ -80,7 +80,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: const Color(0xFFDDD1BB),
       body: CustomScrollView(
         slivers: [
           _buildAppBar(context),
@@ -94,16 +94,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, color: Color(0xFF6B7280), size: 56),
+                    const Icon(Icons.error_outline, color: Color(0xFF7A6E52), size: 56),
                     const SizedBox(height: 12),
                     Text(
                       _error!,
-                      style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 16),
+                      style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 16),
                     ),
                     const SizedBox(height: 20),
                     TextButton(
                       onPressed: _load,
-                      child: const Text('Retry', style: TextStyle(color: Color(0xFF6366F1))),
+                      child: const Text('Retry', style: TextStyle(color: Color(0xFF81231E))),
                     ),
                   ],
                 ),
@@ -117,11 +117,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.auto_awesome_outlined, color: Color(0xFF374151), size: 56),
+                      Icon(Icons.auto_awesome_outlined, color: Color(0xFFC0B490), size: 56),
                       SizedBox(height: 12),
                       Text(
                         'No agents created yet',
-                        style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 16),
+                        style: TextStyle(color: Color(0xFF6B5A40), fontSize: 16),
                       ),
                     ],
                   ),
@@ -151,10 +151,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   SliverAppBar _buildAppBar(BuildContext context) {
     return SliverAppBar(
-      backgroundColor: const Color(0xFF0F0F1E),
+      backgroundColor: const Color(0xFFC8BA9A),
       pinned: true,
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+        icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF2B2C1E), size: 18),
         onPressed: () {
           if (context.canPop()) {
             context.pop();
@@ -166,7 +166,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
       title: Text(
         _shortenWallet(widget.wallet),
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF2B2C1E),
           fontSize: 15,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.5,
@@ -178,7 +178,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
 
   Widget _buildProfileHeader() {
     return Container(
-      color: const Color(0xFF0F0F1E),
+      color: const Color(0xFFC8BA9A),
       padding: const EdgeInsets.fromLTRB(32, 24, 32, 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,13 +188,13 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                color: const Color(0xFF81231E).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                  color: const Color(0xFF81231E).withValues(alpha: 0.4),
                 ),
               ),
-              child: const Icon(Icons.person_outline, color: Color(0xFF6366F1), size: 28),
+              child: const Icon(Icons.person_outline, color: Color(0xFF81231E), size: 28),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -202,7 +202,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 Text(
                   _shortenWallet(widget.wallet),
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF2B2C1E),
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -220,12 +220,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             ),
           ]),
           const SizedBox(height: 20),
-          const Divider(color: Color(0xFF1E1E35), height: 1),
+          const Divider(color: Color(0xFFADA07A), height: 1),
           const SizedBox(height: 16),
           const Text(
             'Created Agents',
             style: TextStyle(
-              color: Color(0xFF9CA3AF),
+              color: Color(0xFF6B5A40),
               fontSize: 13,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -250,14 +250,14 @@ class _StatChip extends StatelessWidget {
           TextSpan(
             text: value,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontWeight: FontWeight.bold,
               fontSize: 15,
             ),
           ),
           TextSpan(
             text: '  $label',
-            style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+            style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 13),
           ),
         ],
       ),
@@ -270,6 +270,6 @@ class _VerticalDivider extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: 1,
     height: 14,
-    color: const Color(0xFF374151),
+    color: const Color(0xFFC0B490),
   );
 }

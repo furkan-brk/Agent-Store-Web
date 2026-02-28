@@ -56,11 +56,11 @@ class _SimilarAgentsWidgetState extends State<SimilarAgentsWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, color: Color(0xFF374151), size: 48),
+            Icon(Icons.search_off, color: Color(0xFFC0B490), size: 48),
             SizedBox(height: 12),
             Text(
               'No similar agents found',
-              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15),
+              style: TextStyle(color: Color(0xFF6B5A40), fontSize: 15),
             ),
           ],
         ),
@@ -89,7 +89,7 @@ class _SimilarCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF13131F),
+          color: const Color(0xFFE8DEC9),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: rc.withValues(alpha: 0.25)),
         ),
@@ -111,7 +111,7 @@ class _SimilarCard extends StatelessWidget {
                   Text(
                     agent.title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -121,25 +121,25 @@ class _SimilarCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     agent.description,
-                    style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+                    style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.bookmarks_outlined, size: 11, color: Color(0xFF6B7280)),
+                      const Icon(Icons.bookmarks_outlined, size: 11, color: Color(0xFF7A6E52)),
                       const SizedBox(width: 3),
                       Text(
                         '${agent.saveCount}',
-                        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10),
+                        style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 10),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Color(0xFF4B5563), size: 18),
+            const Icon(Icons.chevron_right, color: Color(0xFF5A5038), size: 18),
           ],
         ),
       ),

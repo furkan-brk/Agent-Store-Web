@@ -56,7 +56,7 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
   Color _lineColor() {
     if (widget.members.isEmpty) return Colors.grey;
     final type = widget.members.first.agent?.characterType;
-    return type?.accentColor ?? const Color(0xFF6366F1);
+    return type?.accentColor ?? const Color(0xFF81231E);
   }
 
   Widget _buildFormation(int n) {
@@ -156,7 +156,7 @@ class _MemberCard extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '${_roleIcon(member.role)} ${member.role}',
-          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 10),
+          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10),
         ),
       ],
     ]);

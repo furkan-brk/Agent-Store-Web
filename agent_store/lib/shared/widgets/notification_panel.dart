@@ -33,7 +33,7 @@ class _NotificationBellState extends State<NotificationBell> {
     clipBehavior: Clip.none,
     children: [
       IconButton(
-        icon: const Icon(Icons.notifications_outlined, color: Color(0xFF9CA3AF), size: 20),
+        icon: const Icon(Icons.notifications_outlined, color: Color(0xFF6B5A40), size: 20),
         onPressed: _openPanel,
         tooltip: 'Notifications',
         padding: EdgeInsets.zero,
@@ -45,7 +45,7 @@ class _NotificationBellState extends State<NotificationBell> {
           child: Container(
             width: 14, height: 14,
             decoration: const BoxDecoration(
-              color: Color(0xFFEF4444),
+              color: Color(0xFF81231E),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -84,22 +84,22 @@ class _NotificationDialogState extends State<_NotificationDialog> {
 
   Color _color(String type) {
     switch (type) {
-      case 'purchase': return const Color(0xFF10B981);
-      case 'save': return const Color(0xFF6366F1);
-      default: return const Color(0xFF9CA3AF);
+      case 'purchase': return const Color(0xFF5A8A48);
+      case 'save': return const Color(0xFF81231E);
+      default: return const Color(0xFF6B5A40);
     }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xFF1A1A2E),
+    backgroundColor: const Color(0xFFB8AA88),
     title: Row(children: [
       const Text('Notifications', style: TextStyle(color: Colors.white, fontSize: 16)),
       const Spacer(),
       if (_notifications.isNotEmpty)
         TextButton(
           onPressed: () { NotificationService.instance.clear(); setState(() => _notifications = []); },
-          child: const Text('Clear all', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12)),
+          child: const Text('Clear all', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
         ),
     ]),
     content: SizedBox(
@@ -107,11 +107,11 @@ class _NotificationDialogState extends State<_NotificationDialog> {
       child: _notifications.isEmpty
           ? const Center(child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text('No notifications yet', style: TextStyle(color: Color(0xFF6B7280)))))
+              child: Text('No notifications yet', style: TextStyle(color: Color(0xFF7A6E52)))))
           : ListView.separated(
               shrinkWrap: true,
               itemCount: _notifications.length,
-              separatorBuilder: (_, __) => const Divider(color: Color(0xFF1E1E35), height: 1),
+              separatorBuilder: (_, __) => const Divider(color: Color(0xFFADA07A), height: 1),
               itemBuilder: (_, i) {
                 final n = _notifications[i];
                 return ListTile(
@@ -119,7 +119,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                   title: Text(n.message, style: const TextStyle(color: Colors.white, fontSize: 13)),
                   subtitle: Text(
                     '${n.createdAt.day}/${n.createdAt.month} ${n.createdAt.hour}:${n.createdAt.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+                    style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
                   ),
                   contentPadding: EdgeInsets.zero,
                   dense: true,
@@ -129,7 +129,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
     ),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context),
-        child: const Text('Close', style: TextStyle(color: Color(0xFF6366F1)))),
+        child: const Text('Close', style: TextStyle(color: Color(0xFF81231E)))),
     ],
   );
 }

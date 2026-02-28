@@ -56,27 +56,27 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A14),
+      backgroundColor: const Color(0xFFDDD1BB),
       body: Column(children: [
         _buildHeader(),
-        const Divider(height: 1, color: Color(0xFF1E1E35)),
+        const Divider(height: 1, color: Color(0xFFADA07A)),
         if (!ApiService.instance.isAuthenticated)
           _buildUnauthState()
         else if (_loading)
           const Expanded(child: Center(
-            child: CircularProgressIndicator(color: Color(0xFF6366F1))))
+            child: CircularProgressIndicator(color: Color(0xFF81231E))))
         else if (_error != null)
           Expanded(child: Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 48),
+              const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 48),
               const SizedBox(height: 12),
               Text(_error!,
-                style: const TextStyle(color: Color(0xFFDC2626), fontSize: 14)),
+                style: const TextStyle(color: Color(0xFF81231E), fontSize: 14)),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _load,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1)),
+                  backgroundColor: const Color(0xFF81231E)),
                 child: const Text('Retry',
                   style: TextStyle(color: Colors.white)),
               ),
@@ -89,20 +89,20 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
 
   Widget _buildHeader() => Container(
     padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-    color: const Color(0xFF0F0F1E),
+    color: const Color(0xFFC8BA9A),
     child: Row(children: [
-      const Icon(Icons.analytics_outlined, color: Color(0xFF6366F1), size: 22),
+      const Icon(Icons.analytics_outlined, color: Color(0xFF81231E), size: 22),
       const SizedBox(width: 10),
       const Text('Creator Dashboard',
         style: TextStyle(
-          color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+          color: Color(0xFF2B2C1E), fontSize: 20, fontWeight: FontWeight.bold)),
       const Spacer(),
       Text('${_agents.length} agents',
-        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+        style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
       const SizedBox(width: 12),
       IconButton(
         onPressed: _load,
-        icon: const Icon(Icons.refresh, color: Color(0xFF6B7280), size: 18),
+        icon: const Icon(Icons.refresh, color: Color(0xFF7A6E52), size: 18),
         tooltip: 'Refresh',
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -113,10 +113,10 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
   Widget _buildUnauthState() => Expanded(
     child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.account_balance_wallet_outlined,
-        color: Color(0xFF374151), size: 64),
+        color: Color(0xFFC0B490), size: 64),
       const SizedBox(height: 16),
       const Text('Connect wallet to view your creator stats',
-        style: TextStyle(color: Color(0xFF6B7280), fontSize: 15)),
+        style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
       const SizedBox(height: 20),
       ElevatedButton.icon(
         onPressed: () => context.go('/wallet'),
@@ -125,7 +125,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
         label: const Text('Connect Wallet',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF6366F1),
+          backgroundColor: const Color(0xFF81231E),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8)),
@@ -138,10 +138,10 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
     if (_agents.isEmpty) {
       return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Icon(Icons.auto_awesome_outlined,
-          color: Color(0xFF374151), size: 64),
+          color: Color(0xFFC0B490), size: 64),
         const SizedBox(height: 16),
         const Text('No agents created yet',
-          style: TextStyle(color: Color(0xFF6B7280), fontSize: 15)),
+          style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
         const SizedBox(height: 20),
         ElevatedButton.icon(
           onPressed: () => context.go('/create'),
@@ -149,7 +149,7 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
           label: const Text('Create Agent',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF6366F1),
+            backgroundColor: const Color(0xFF81231E),
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8)),
@@ -202,35 +202,35 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
 
   Widget _buildAgentsTable() => Container(
     decoration: BoxDecoration(
-      color: const Color(0xFF0F0F1E),
+      color: const Color(0xFFC8BA9A),
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFF1E1E35)),
+      border: Border.all(color: const Color(0xFFADA07A)),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Padding(
         padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
         child: Row(children: [
           Icon(Icons.table_chart_outlined,
-            color: Color(0xFF6366F1), size: 16),
+            color: Color(0xFF81231E), size: 16),
           SizedBox(width: 8),
           Text('Agent Performance',
             style: TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontWeight: FontWeight.w600,
               fontSize: 14)),
         ]),
       ),
-      const Divider(height: 1, color: Color(0xFF1E1E35)),
+      const Divider(height: 1, color: Color(0xFFADA07A)),
       SizedBox(
         width: double.infinity,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
             headingRowColor: WidgetStateProperty.all(
-              const Color(0xFF13131F)),
+              const Color(0xFFE8DEC9)),
             dataRowColor: WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.selected)) {
-                return const Color(0xFF6366F1).withValues(alpha: 0.08);
+                return const Color(0xFF81231E).withValues(alpha: 0.08);
               }
               return Colors.transparent;
             }),
@@ -238,13 +238,13 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
             columnSpacing: 20,
             horizontalMargin: 16,
             headingTextStyle: const TextStyle(
-              color: Color(0xFF6B7280),
+              color: Color(0xFF7A6E52),
               fontSize: 11,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.8,
             ),
             dataTextStyle: const TextStyle(
-              color: Color(0xFFD1D5DB),
+              color: Color(0xFF4A4033),
               fontSize: 13,
             ),
             columns: const [
@@ -278,22 +278,22 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
                       ? '${agent.title.substring(0, 20)}…'
                       : agent.title,
                   style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w500),
+                    color: Color(0xFF2B2C1E), fontWeight: FontWeight.w500),
                 )),
                 DataCell(_CategoryChip(category: agent.category)),
                 DataCell(Row(children: [
                   const Icon(Icons.bookmark_border,
-                    color: Color(0xFF6366F1), size: 14),
+                    color: Color(0xFF81231E), size: 14),
                   const SizedBox(width: 4),
                   Text('${agent.saveCount}',
-                    style: const TextStyle(color: Color(0xFFD1D5DB))),
+                    style: const TextStyle(color: Color(0xFF4A4033))),
                 ])),
                 DataCell(Row(children: [
                   const Icon(Icons.play_circle_outline,
-                    color: Color(0xFF22C55E), size: 14),
+                    color: Color(0xFF5A8A48), size: 14),
                   const SizedBox(width: 4),
                   Text('${agent.useCount}',
-                    style: const TextStyle(color: Color(0xFFD1D5DB))),
+                    style: const TextStyle(color: Color(0xFF4A4033))),
                 ])),
                 DataCell(Text(
                   agent.price == 0
@@ -301,8 +301,8 @@ class _CreatorDashboardScreenState extends State<CreatorDashboardScreen> {
                       : '${agent.price.toStringAsFixed(1)} MON',
                   style: TextStyle(
                     color: agent.price == 0
-                        ? const Color(0xFF6B7280)
-                        : const Color(0xFFFCD34D),
+                        ? const Color(0xFF7A6E52)
+                        : const Color(0xFF9B7B1A),
                     fontWeight: agent.price > 0
                         ? FontWeight.w600
                         : FontWeight.normal,
@@ -334,28 +334,28 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: const Color(0xFF13131F),
+      color: const Color(0xFFE8DEC9),
       borderRadius: BorderRadius.circular(10),
       border: const Border(
-        top: BorderSide(color: Color(0xFF6366F1), width: 2),
-        left: BorderSide(color: Color(0xFF1E1E35)),
-        right: BorderSide(color: Color(0xFF1E1E35)),
-        bottom: BorderSide(color: Color(0xFF1E1E35)),
+        top: BorderSide(color: Color(0xFF81231E), width: 2),
+        left: BorderSide(color: Color(0xFFADA07A)),
+        right: BorderSide(color: Color(0xFFADA07A)),
+        bottom: BorderSide(color: Color(0xFFADA07A)),
       ),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(icon, color: const Color(0xFF6366F1), size: 18),
+      Icon(icon, color: const Color(0xFF81231E), size: 18),
       const SizedBox(height: 8),
       Text(value,
         style: const TextStyle(
-          color: Colors.white,
+          color: Color(0xFF2B2C1E),
           fontWeight: FontWeight.bold,
           fontSize: 22,
         )),
       const SizedBox(height: 2),
       Text(label,
         style: const TextStyle(
-          color: Color(0xFF6B7280),
+          color: Color(0xFF7A6E52),
           fontSize: 11,
         )),
     ]),
@@ -370,13 +370,13 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: const Color(0xFF1E1E35),
+      color: const Color(0xFFADA07A),
       borderRadius: BorderRadius.circular(4),
     ),
     child: Text(
       category.isEmpty ? '—' : category,
       style: const TextStyle(
-        color: Color(0xFF9CA3AF),
+        color: Color(0xFF6B5A40),
         fontSize: 11,
       ),
     ),
