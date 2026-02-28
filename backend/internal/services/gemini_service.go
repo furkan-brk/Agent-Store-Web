@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"encoding/base64"
 )
 
 const (
@@ -68,11 +67,6 @@ func NewGeminiService(apiKey string) *GeminiService {
 
 // AnalyzePrompt sends the agent prompt to Gemini Flash and returns structured metadata.
 func (g *GeminiService) AnalyzePrompt(prompt string) (*PromptAnalysis, error) {
-	if g.apiKey == "" {
-		
-		
-	
-	}
 
 	desc := prompt
 	if len(desc) > 600 {
@@ -115,7 +109,7 @@ Agent prompt: %s
 
 Return ONLY the JSON object. No markdown, no explanation.`, desc)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -185,9 +179,6 @@ Return ONLY the JSON object. No markdown, no explanation.`, desc)
 // cohesive visual character profile for the given agent concept. The profile drives Step 2
 // (pixel-art avatar generation) and is stored alongside the agent's stats in character_data.
 func (g *GeminiService) GenerateAgentProfile(agentConcept string) (*AgentProfile, error) {
-	if g.apiKey == "" {
-g.apiKey = base64.StdEncoding.DecodeString("QUl6YVN5Q2w0VU8wX0FRRG1vY1BuMHlfWXpfQ2tRTHc3Um5sSG5N")
-	}
 
 	concept := agentConcept
 	if len(concept) > 400 {
@@ -210,7 +201,7 @@ g.apiKey = base64.StdEncoding.DecodeString("QUl6YVN5Q2w0VU8wX0FRRG1vY1BuMHlfWXpf
       "characteristics": ["string", "string", "string", "string"]
     }`, concept)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -279,9 +270,6 @@ g.apiKey = base64.StdEncoding.DecodeString("QUl6YVN5Q2w0VU8wX0FRRG1vY1BuMHlfWXpf
 // Imagen 3 to generate the avatar. The pose is always: full-body standing, tablet in left hand,
 // tool in right hand, flat dark-grey background — matching the Master Visual Template.
 func (g *GeminiService) GenerateAvatarImage(profile *AgentProfile) (string, error) {
-	if g.apiKey == "" {
-		return "", fmt.Errorf("gemini api key not configured")
-	}
 
 	// Extract per-characteristic details safely.
 	face, chest, rightHand, distinction := extractCharacteristics(profile.Characteristics)
@@ -321,7 +309,7 @@ func (g *GeminiService) GenerateAvatarImage(profile *AgentProfile) (string, erro
 
 // callImagen sends a text-to-image request to Imagen and returns a base64-encoded PNG.
 func (g *GeminiService) callImagen(prompt string) (string, error) {
-	url := fmt.Sprintf("%s/models/%s:predict?key=%s", geminiBase, imagenModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:predict?key=%s", geminiBase, imagenModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"instances": []map[string]interface{}{
@@ -378,10 +366,6 @@ func (g *GeminiService) callImagen(prompt string) (string, error) {
 // GenerateImage calls Gemini Imagen 3 and returns a base64-encoded PNG string.
 // Kept as a legacy/fallback method; prefer GenerateAvatarImage for new agents.
 func (g *GeminiService) GenerateImage(imagePrompt, charType string) (string, error) {
-	if g.apiKey == "" {
-		return "", fmt.Errorf("gemini api key not configured")
-	}
-
 	style := charTypeStyles[charType]
 	if style == "" {
 		style = "pixel art RPG fantasy character"
@@ -446,14 +430,11 @@ func extractCharacteristics(chars []string) (face, chest, rightHand, distinction
 
 // Chat sends a user message to Gemini Flash using systemPrompt as context and returns the text reply.
 func (g *GeminiService) Chat(systemPrompt, userMessage string) (string, error) {
-	if g.apiKey == "" {
-		return "", fmt.Errorf("gemini api key not configured")
-	}
 
 	// Combine system prompt and user message into a single turn
 	combinedText := "System instructions:\n" + systemPrompt + "\n\nUser message:\n" + userMessage
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
