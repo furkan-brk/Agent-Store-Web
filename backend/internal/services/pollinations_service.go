@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"time"
@@ -14,6 +16,8 @@ import (
 const (
 	pollinationsImageAPI = "https://api.pollinations.ai/v1/images"
 	pollinationsTimeout  = 120 * time.Second
+	maxRetries           = 3
+	initialBackoff       = 2 * time.Second
 )
 
 // PollinationsService handles image generation via the Pollinations API.
@@ -79,8 +83,36 @@ func (p *PollinationsService) GenerateImage(profile *AgentProfile) (string, erro
 	return base64Image, nil
 }
 
-// callPollinationsAPI sends a request to Pollinations API and returns the image URL.
+// callPollinationsAPI sends a request to Pollinations API with retry logic and returns the image URL.
 func (p *PollinationsService) callPollinationsAPI(prompt string) (string, error) {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		imageURL, err := p.attemptPollinationsRequest(prompt)
+		if err == nil {
+			return imageURL, nil
+		}
+
+		lastErr = err
+
+		// Check if the error is retryable (server error, timeout, etc.)
+		if !isRetryable(err) {
+			return "", err
+		}
+
+		// Don't sleep after the last attempt
+		if attempt < maxRetries-1 {
+			backoffDuration := calculateBackoff(attempt)
+			fmt.Printf("[Pollinations] Retry attempt %d/%d after %v (error: %v)\n", attempt+1, maxRetries-1, backoffDuration, err)
+			time.Sleep(backoffDuration)
+		}
+	}
+
+	return "", fmt.Errorf("pollinations failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// attemptPollinationsRequest makes a single request to the Pollinations API.
+func (p *PollinationsService) attemptPollinationsRequest(prompt string) (string, error) {
 	reqBody := map[string]interface{}{
 		"prompt":    prompt,
 		"model":     "flux",
@@ -115,7 +147,7 @@ func (p *PollinationsService) callPollinationsAPI(prompt string) (string, error)
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return "", fmt.Errorf("pollinations error %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("pollinations error code: %d", resp.StatusCode)
 	}
 
 	var apiResp struct {
@@ -132,8 +164,81 @@ func (p *PollinationsService) callPollinationsAPI(prompt string) (string, error)
 	return apiResp.URL, nil
 }
 
-// downloadAndEncodeImage downloads an image from a URL and returns it as base64-encoded PNG.
+// isRetryable determines if an error is transient and should be retried.
+func isRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errStr := err.Error()
+
+	// Retry on specific HTTP status codes (5xx errors, 429 rate limit)
+	retryableErrors := []string{
+		"error code: 5",   // 5xx errors (500, 502, 503, 504, 522, etc.)
+		"error code: 429", // Rate limit
+		"timeout",
+		"connection refused",
+		"connection reset",
+		"no such host",
+	}
+
+	for _, retryErr := range retryableErrors {
+		if stringContains(errStr, retryErr) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// calculateBackoff computes exponential backoff with jitter.
+func calculateBackoff(attempt int) time.Duration {
+	// Exponential backoff: 2s * 2^attempt with random jitter
+	exponential := time.Duration(math.Pow(2, float64(attempt))) * initialBackoff
+	jitter := time.Duration(rand.Intn(1000)) * time.Millisecond
+	return exponential + jitter
+}
+
+// stringContains is a helper to check if a string contains a substring.
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
+// downloadAndEncodeImage downloads an image from a URL with retry logic and returns it as base64-encoded PNG.
 func (p *PollinationsService) downloadAndEncodeImage(imageURL string) (string, error) {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		base64Image, err := p.attemptDownloadImage(imageURL)
+		if err == nil {
+			return base64Image, nil
+		}
+
+		lastErr = err
+
+		// Check if the error is retryable
+		if !isRetryable(err) {
+			return "", err
+		}
+
+		// Don't sleep after the last attempt
+		if attempt < maxRetries-1 {
+			backoffDuration := calculateBackoff(attempt)
+			fmt.Printf("[Pollinations] Image download retry %d/%d after %v (error: %v)\n", attempt+1, maxRetries-1, backoffDuration, err)
+			time.Sleep(backoffDuration)
+		}
+	}
+
+	return "", fmt.Errorf("image download failed after %d retries: %w", maxRetries, lastErr)
+}
+
+// attemptDownloadImage makes a single attempt to download an image from a URL.
+func (p *PollinationsService) attemptDownloadImage(imageURL string) (string, error) {
 	req, err := http.NewRequest("GET", imageURL, nil)
 	if err != nil {
 		return "", err
@@ -146,7 +251,7 @@ func (p *PollinationsService) downloadAndEncodeImage(imageURL string) (string, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("image download error %d", resp.StatusCode)
+		return "", fmt.Errorf("image download error code: %d", resp.StatusCode)
 	}
 
 	imageData, err := io.ReadAll(resp.Body)
