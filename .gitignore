@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Go
+backend/server
+backend/tmp/
+backend/*.test
+
+# Flutter / Dart
+agent_store/.dart_tool/
+agent_store/build/
+agent_store/.flutter-plugins
+agent_store/.flutter-plugins-dependencies
+agent_store/.packages
+
+# Node / Hardhat
+contracts/node_modules/
+contracts/artifacts/
+contracts/cache/
+contracts/deployments.json
+
+# Docker
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+agent_store/build/web/.vercel
+
+# IDE
+.vscode/
+.idea/
+*.swp

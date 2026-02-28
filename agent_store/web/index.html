@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    If you are serving your web app in a path other than the root, change the
+    href value below to reflect the base path you are serving from.
+
+    The path provided below has to start and end with a slash "/" in order for
+    it to work correctly.
+
+    For more details:
+    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
+
+    This is a placeholder for base href that will be replaced by the value of
+    the `--base-href` argument provided to `flutter build`.
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="AI Agent prompt store with pixel art characters and Web3 login.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Agent Store">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Agent Store</title>
+  <link rel="manifest" href="manifest.json">
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       MetaMask / Web3 Bridge — window.agentStoreWallet
+       Exposes three async functions that Flutter calls via dart:js_interop.
+       ══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    window.agentStoreWallet = {
+
+      /**
+       * Requests the user's MetaMask accounts.
+       * Returns the first (active) account address as a lowercase string.
+       */
+      requestAccounts: async function () {
+        if (!window.ethereum) {
+          throw new Error('MetaMask not detected. Please install the MetaMask extension.');
+        }
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (!accounts || accounts.length === 0) {
+          throw new Error('No accounts returned from MetaMask.');
+        }
+        return accounts[0].toLowerCase();
+      },
+
+      /**
+       * Signs an arbitrary message with the user's wallet.
+       * @param {string} message  — the nonce / message to sign
+       * @param {string} address  — the signer's wallet address
+       * Returns the hex signature string.
+       */
+      personalSign: async function (message, address) {
+        if (!window.ethereum) {
+          throw new Error('MetaMask not detected.');
+        }
+        const signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [message, address],
+        });
+        return signature;
+      },
+
+      /**
+       * Attempts to switch MetaMask to Monad Testnet (ChainID 10143 / 0x279F).
+       * If the chain is not yet added it prompts the user to add it.
+       */
+      switchToMonad: async function () {
+        if (!window.ethereum) return;
+
+        const MONAD_CHAIN_ID = '0x279F'; // 10143 decimal
+
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: MONAD_CHAIN_ID }],
+          });
+        } catch (switchError) {
+          // 4902 = chain not added yet
+          if (switchError.code === 4902) {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: MONAD_CHAIN_ID,
+                chainName: 'Monad Testnet',
+                nativeCurrency: {
+                  name: 'MON',
+                  symbol: 'MON',
+                  decimals: 18,
+                },
+                rpcUrls: ['https://testnet-rpc.monad.xyz'],
+                blockExplorerUrls: ['https://explorer.monad.xyz'],
+              }],
+            });
+          } else {
+            // Non-critical: log and continue — login still works without chain switch
+            console.warn('Monad chain switch failed (code ' + switchError.code + '):', switchError.message);
+          }
+        }
+      },
+
+      /**
+       * Sends MON tokens to a recipient address (agent purchase).
+       * @param {string} toAddress   — recipient wallet (agent creator)
+       * @param {string} amountWei   — amount in wei as hex string (e.g. "0xDE0B6B3A7640000" for 1 MON)
+       * Returns the transaction hash string.
+       */
+      sendTransaction: async function (toAddress, amountWei) {
+        if (!window.ethereum) {
+          throw new Error('MetaMask not detected.');
+        }
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const txHash = await window.ethereum.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: accounts[0],
+            to: toAddress,
+            value: amountWei,
+            chainId: '0x279F',
+          }],
+        });
+        return txHash;
+      },
+    };
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
