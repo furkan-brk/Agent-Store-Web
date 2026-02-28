@@ -463,6 +463,58 @@ class _AgentDetailScreenState extends State<AgentDetailScreen>
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(a.description,
                         style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 15, height: 1.6)),
+                      // Character Profile — populated by the v2.6 world-builder + Imagen pipeline.
+                      if (a.profileMood != null || a.profileRolePurpose != null) ...[
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Character Profile',
+                          style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F0F1E),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: a.characterType.primaryColor.withValues(alpha: 0.25)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (a.profileMood != null) ...[
+                                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Icon(Icons.psychology_outlined,
+                                      size: 14, color: a.characterType.accentColor),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      a.profileMood!,
+                                      style: const TextStyle(
+                                          color: Color(0xFFD1D5DB), fontSize: 13, height: 1.5),
+                                    ),
+                                  ),
+                                ]),
+                              ],
+                              if (a.profileMood != null && a.profileRolePurpose != null)
+                                const SizedBox(height: 10),
+                              if (a.profileRolePurpose != null)
+                                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Icon(Icons.auto_awesome_outlined,
+                                      size: 14, color: a.characterType.accentColor),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      a.profileRolePurpose!,
+                                      style: const TextStyle(
+                                          color: Color(0xFF9CA3AF), fontSize: 12, height: 1.6),
+                                    ),
+                                  ),
+                                ]),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       Wrap(spacing: 8, runSpacing: 8, children: a.tags.map((t) => Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
