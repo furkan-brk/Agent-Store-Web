@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../app/theme.dart';
 
 class CategorySidebar extends StatelessWidget {
   final String selectedCategory;
@@ -16,47 +17,78 @@ class CategorySidebar extends StatelessWidget {
   ];
 
   static const _icons = {
-    'all':      Icons.apps,
-    'backend':  Icons.code,
-    'frontend': Icons.brush,
-    'data':     Icons.bar_chart,
-    'security': Icons.shield,
-    'creative': Icons.auto_awesome,
-    'business': Icons.trending_up,
-    'research': Icons.science,
+    'all':      Icons.apps_rounded,
+    'backend':  Icons.code_rounded,
+    'frontend': Icons.brush_rounded,
+    'data':     Icons.bar_chart_rounded,
+    'security': Icons.shield_rounded,
+    'creative': Icons.auto_awesome_rounded,
+    'business': Icons.trending_up_rounded,
+    'research': Icons.science_rounded,
   };
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 180,
-      color: const Color(0xFFC8BA9A),
+      decoration: const BoxDecoration(
+        color: AppTheme.surface,
+        border: Border(right: BorderSide(color: AppTheme.border)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Logo/brand area
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppTheme.border)),
+            ),
+            child: Row(children: [
+              Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
+                ),
+                child: const Icon(Icons.bolt, color: AppTheme.primary, size: 16),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Agent Store',
+                style: TextStyle(
+                  color: AppTheme.textH,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ]),
+          ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+            padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
             child: Text(
               'CATEGORIES',
               style: TextStyle(
-                color: Color(0xFF7A6E52),
+                color: AppTheme.textM,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
+                letterSpacing: 1.5,
               ),
             ),
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 16, left: 8, right: 8),
               itemCount: _categories.length,
               itemBuilder: (_, i) {
                 final cat = _categories[i];
                 final label = cat == 'all'
-                    ? 'All'
+                    ? 'All Agents'
                     : cat[0].toUpperCase() + cat.substring(1);
                 final isSelected = selectedCategory == (cat == 'all' ? '' : cat);
-                final icon = _icons[cat] ?? Icons.apps;
+                final icon = _icons[cat] ?? Icons.apps_rounded;
                 return _CategoryItem(
                   icon: icon,
                   label: label,
@@ -72,7 +104,7 @@ class CategorySidebar extends StatelessWidget {
   }
 }
 
-class _CategoryItem extends StatelessWidget {
+class _CategoryItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
@@ -85,45 +117,70 @@ class _CategoryItem extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _highlight = Color(0xFF81231E);
+  @override
+  State<_CategoryItem> createState() => _CategoryItemState();
+}
+
+class _CategoryItemState extends State<_CategoryItem> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
+    final active = widget.isSelected || _hovered;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? _highlight.withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isSelected
-                  ? _highlight.withValues(alpha: 0.4)
-                  : Colors.transparent,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isSelected ? _highlight : const Color(0xFF7A6E52),
-                size: 18,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? _highlight : const Color(0xFF6B5A40),
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+            decoration: BoxDecoration(
+              color: widget.isSelected
+                  ? AppTheme.primary.withValues(alpha: 0.15)
+                  : _hovered
+                      ? AppTheme.card2.withValues(alpha: 0.8)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(
+                  color: widget.isSelected
+                      ? AppTheme.gold
+                      : Colors.transparent,
+                  width: 2.5,
                 ),
               ),
-            ],
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  color: widget.isSelected
+                      ? AppTheme.gold
+                      : active
+                          ? AppTheme.textB
+                          : AppTheme.textM,
+                  size: 16,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    color: widget.isSelected
+                        ? AppTheme.textH
+                        : active
+                            ? AppTheme.textB
+                            : AppTheme.textM,
+                    fontSize: 12,
+                    fontWeight: widget.isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

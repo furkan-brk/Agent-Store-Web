@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/theme.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/services/api_service.dart';
 
@@ -16,7 +17,6 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
   String? _error;
   int _credits = 0;
 
-  // Profile state
   String _username = '';
   String _bio = '';
 
@@ -107,7 +107,7 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('Profile updated!'),
-                  backgroundColor: const Color(0xFF5A8A48),
+                  backgroundColor: AppTheme.olive,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -120,8 +120,7 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
   }
 
   Future<void> _topUp(double amountMon) async {
-    // treasury wallet'a MON gönder
-    const treasuryWallet = '0x0000000000000000000000000000000000000001'; // placeholder
+    const treasuryWallet = '0x0000000000000000000000000000000000000001';
     setState(() => _buyingCredits = true);
     try {
       final txHash = await WalletService.instance.sendTransaction(treasuryWallet, amountMon);
@@ -144,51 +143,77 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFDDD1BB),
+    backgroundColor: AppTheme.bg,
     body: Center(child: SingleChildScrollView(child: Container(
       width: 480,
       padding: const EdgeInsets.all(36),
+      margin: const EdgeInsets.symmetric(vertical: 32),
       decoration: BoxDecoration(
-        color: const Color(0xFFC8BA9A),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFADA07A)),
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 40,
+            spreadRadius: 4,
+          ),
+          BoxShadow(
+            color: AppTheme.primary.withValues(alpha: 0.06),
+            blurRadius: 60,
+            spreadRadius: 8,
+          ),
+        ],
       ),
       child: _connected ? _connectedView() : _connectView(),
     ))),
   );
 
   Widget _connectView() => Column(mainAxisSize: MainAxisSize.min, children: [
-    _iconCircle(Icons.account_balance_wallet_outlined, const Color(0xFF81231E)),
+    _iconCircle(Icons.account_balance_wallet_outlined, AppTheme.primary),
     const SizedBox(height: 22),
-    const Text('Connect Wallet',
-      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+    ShaderMask(
+      shaderCallback: (b) => const LinearGradient(
+        colors: [AppTheme.textH, AppTheme.gold],
+      ).createShader(b),
+      child: const Text('Connect Wallet',
+        style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+    ),
     const SizedBox(height: 8),
     const Text('Connect your MetaMask wallet to browse and create agents.',
-      style: TextStyle(color: Color(0xFF6B5A40), height: 1.5), textAlign: TextAlign.center),
+      style: TextStyle(color: AppTheme.textM, height: 1.5), textAlign: TextAlign.center),
     const SizedBox(height: 16),
     Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF282918), borderRadius: BorderRadius.circular(8)),
-      child: const Text('Monad Testnet · ChainID 10143',
-        style: TextStyle(color: Color(0xFF81231E), fontSize: 11, fontWeight: FontWeight.w600)),
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border2),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 8, height: 8,
+          decoration: const BoxDecoration(color: AppTheme.gold, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        const Text('Monad Testnet · ChainID 10143',
+          style: TextStyle(color: AppTheme.gold, fontSize: 11, fontWeight: FontWeight.w600)),
+      ]),
     ),
     const SizedBox(height: 20),
     Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8DEC9),
+        color: AppTheme.card,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFADA07A)),
+        border: Border.all(color: AppTheme.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('New users start with 100 free credits',
-          style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
+          style: TextStyle(color: AppTheme.textM, fontSize: 12)),
         const SizedBox(height: 10),
-        _costRow(Icons.add_box_outlined, 'Create Agent', 10, const Color(0xFF81231E)),
+        _costRow(Icons.add_box_outlined, 'Create Agent', 10, AppTheme.primary),
         const SizedBox(height: 6),
-        _costRow(Icons.fork_right, 'Fork Agent', 5, const Color(0xFF81231E)),
+        _costRow(Icons.fork_right, 'Fork Agent', 5, AppTheme.primary),
       ]),
     ),
     const SizedBox(height: 24),
@@ -198,20 +223,42 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
         padding: const EdgeInsets.all(12),
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF81231E).withValues(alpha: 0.1),
+          color: AppTheme.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFF81231E).withValues(alpha: 0.4))),
-        child: Text(_error!, style: const TextStyle(color: Color(0xFFCAB891), fontSize: 12)),
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4))),
+        child: Text(_error!, style: const TextStyle(color: AppTheme.textB, fontSize: 12)),
       ),
     ],
-    SizedBox(width: double.infinity, child: ElevatedButton.icon(
-      onPressed: _connecting ? null : _connect,
-      icon: _connecting
-          ? const SizedBox(width: 14, height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-          : const Icon(Icons.account_balance_wallet),
-      label: Text(_connecting ? 'Connecting...' : 'Connect MetaMask'),
-    )),
+    // Gradient Connect button
+    SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppTheme.primary, Color(0xFF8B1A11)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 4))],
+        ),
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          onPressed: _connecting ? null : _connect,
+          icon: _connecting
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.account_balance_wallet_rounded, size: 18),
+          label: Text(_connecting ? 'Connecting...' : 'Connect MetaMask',
+            style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        ),
+      ),
+    ),
   ]);
 
   Widget _connectedView() {
@@ -220,18 +267,18 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
     final isLow = _credits < 20;
 
     return Column(mainAxisSize: MainAxisSize.min, children: [
-      _iconCircle(Icons.check_circle_outline, const Color(0xFF4A6A28)),
+      _iconCircle(Icons.check_circle_outline, AppTheme.olive),
       const SizedBox(height: 16),
       const Text('Connected',
-        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+        style: TextStyle(color: AppTheme.textH, fontSize: 22, fontWeight: FontWeight.bold)),
       const SizedBox(height: 6),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(
           width: 8, height: 8,
-          decoration: const BoxDecoration(color: Color(0xFF4A6A28), shape: BoxShape.circle),
+          decoration: const BoxDecoration(color: AppTheme.olive, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(short, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 13)),
+        Text(short, style: const TextStyle(color: AppTheme.textM, fontSize: 13, fontFamily: 'monospace')),
       ]),
       const SizedBox(height: 24),
       // Credits balance card
@@ -241,52 +288,50 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isLow
-                ? [const Color(0xFF81231E), const Color(0xFFE8DEC9)]
-                : [const Color(0xFFB8AA88), const Color(0xFFE8DEC9)],
+                ? [const Color(0xFF5A1008), AppTheme.card2]
+                : [const Color(0xFF3A2D10), AppTheme.card2],
             begin: Alignment.topLeft, end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isLow
-                ? const Color(0xFF81231E).withValues(alpha: 0.5)
-                : const Color(0xFF81231E).withValues(alpha: 0.3),
+            color: isLow ? AppTheme.primary.withValues(alpha: 0.5) : AppTheme.gold.withValues(alpha: 0.3),
           ),
         ),
         child: Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             const Text('CREDITS BALANCE',
-              style: TextStyle(color: Color(0xFF6B5A40), fontSize: 11, letterSpacing: 1.2)),
+              style: TextStyle(color: AppTheme.textM, fontSize: 11, letterSpacing: 1.5)),
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               icon: _loadingCredits
                   ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF81231E)))
-                  : const Icon(Icons.refresh, color: Color(0xFF7A6E52), size: 18),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
+                  : const Icon(Icons.refresh_rounded, color: AppTheme.textM, size: 18),
               onPressed: _loadingCredits ? null : _loadCredits,
             ),
           ]),
           const SizedBox(height: 6),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.bolt, color: Color(0xFF9B7B1A), size: 32),
+            const Icon(Icons.bolt_rounded, color: AppTheme.gold, size: 36),
             const SizedBox(width: 8),
             Text('$_credits',
-              style: const TextStyle(color: Colors.white, fontSize: 42,
-                fontWeight: FontWeight.bold, letterSpacing: -1)),
+              style: const TextStyle(color: AppTheme.textH, fontSize: 48,
+                fontWeight: FontWeight.bold, letterSpacing: -2)),
           ]),
           if (isLow) ...[
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0xFF81231E).withValues(alpha: 0.15),
+                color: AppTheme.primary.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.warning_amber_rounded, color: Color(0xFFCAB891), size: 14),
+                Icon(Icons.warning_amber_rounded, color: AppTheme.primary, size: 14),
                 SizedBox(width: 5),
                 Text('Low credits — some actions may be unavailable',
-                  style: TextStyle(color: Color(0xFFCAB891), fontSize: 11)),
+                  style: TextStyle(color: AppTheme.textB, fontSize: 11)),
               ]),
             ),
           ],
@@ -298,28 +343,28 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE8DEC9),
+          color: AppTheme.card,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFADA07A)),
+          border: Border.all(color: AppTheme.border),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             const Text('Profile',
-              style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+              style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.bold)),
             const Spacer(),
             GestureDetector(
               onTap: () => _showEditProfileDialog(),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF81231E).withValues(alpha: 0.12),
+                  color: AppTheme.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFF81231E).withValues(alpha: 0.4)),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
                 ),
                 child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.edit_outlined, color: Color(0xFF81231E), size: 13),
+                  Icon(Icons.edit_outlined, color: AppTheme.primary, size: 13),
                   SizedBox(width: 4),
-                  Text('Edit', style: TextStyle(color: Color(0xFF81231E), fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text('Edit', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600)),
                 ]),
               ),
             ),
@@ -327,16 +372,16 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
           const SizedBox(height: 10),
           if (_username.isNotEmpty) ...[
             Row(children: [
-              const Icon(Icons.person_outline, color: Color(0xFF6B5A40), size: 14),
+              const Icon(Icons.person_outline, color: AppTheme.textM, size: 14),
               const SizedBox(width: 6),
-              Text(_username, style: const TextStyle(color: Colors.white, fontSize: 13)),
+              Text(_username, style: const TextStyle(color: AppTheme.textH, fontSize: 13)),
             ]),
             const SizedBox(height: 6),
           ],
           if (_bio.isNotEmpty)
-            Text(_bio, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis)
+            Text(_bio, style: const TextStyle(color: AppTheme.textM, fontSize: 12, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis)
           else
-            const Text('No bio set.', style: TextStyle(color: Color(0xFF5A5038), fontSize: 12)),
+            const Text('No bio set.', style: TextStyle(color: AppTheme.textM, fontSize: 12)),
         ]),
       ),
       const SizedBox(height: 16),
@@ -345,20 +390,20 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFE8DEC9),
+          color: AppTheme.card,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFADA07A)),
+          border: Border.all(color: AppTheme.border),
         ),
         child: Column(children: [
           const Align(
             alignment: Alignment.centerLeft,
             child: Text('Credit Costs',
-              style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12, fontWeight: FontWeight.w600)),
+              style: TextStyle(color: AppTheme.textM, fontSize: 12, fontWeight: FontWeight.w600)),
           ),
           const SizedBox(height: 10),
-          _costRow(Icons.add_box_outlined, 'Create Agent', 10, const Color(0xFF81231E)),
+          _costRow(Icons.add_box_outlined, 'Create Agent', 10, AppTheme.primary),
           const SizedBox(height: 6),
-          _costRow(Icons.fork_right, 'Fork Agent', 5, const Color(0xFF81231E)),
+          _costRow(Icons.fork_right, 'Fork Agent', 5, AppTheme.primary),
         ]),
       ),
       const SizedBox(height: 14),
@@ -367,16 +412,20 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFB8AA88),
+          color: AppTheme.card2,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFADA07A)),
+          border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Buy Credits',
-            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+          const Row(children: [
+            Icon(Icons.add_card_rounded, color: AppTheme.gold, size: 16),
+            SizedBox(width: 8),
+            Text('Buy Credits',
+              style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.bold)),
+          ]),
           const SizedBox(height: 4),
           const Text('1 MON = 100 credits',
-            style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
+            style: TextStyle(color: AppTheme.textM, fontSize: 12)),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
@@ -384,18 +433,20 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
             children: [0.1, 0.5, 1.0, 5.0].map((amt) =>
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF81231E),
-                  side: const BorderSide(color: Color(0xFF81231E)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  foregroundColor: AppTheme.gold,
+                  side: const BorderSide(color: AppTheme.gold),
+                  backgroundColor: AppTheme.gold.withValues(alpha: 0.08),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 onPressed: _buyingCredits ? null : () => _topUp(amt),
                 child: _buyingCredits
                   ? const SizedBox(
                       width: 14, height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF81231E)))
-                  : Text('$amt MON\n${(amt * 100).toInt()}',
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.gold))
+                  : Text('$amt MON\n${(amt * 100).toInt()} cr',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 11)),
               ),
@@ -408,11 +459,12 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
         width: double.infinity,
         child: OutlinedButton.icon(
           onPressed: () => context.go('/credits/history'),
-          icon: const Icon(Icons.history, size: 16),
+          icon: const Icon(Icons.history_rounded, size: 16),
           label: const Text('View Credit History'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF6B5A40),
-            side: const BorderSide(color: Color(0xFFADA07A)),
+            foregroundColor: AppTheme.textB,
+            side: const BorderSide(color: AppTheme.border2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
       ),
@@ -420,8 +472,9 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
       SizedBox(width: double.infinity, child: OutlinedButton(
         onPressed: _disconnect,
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF81231E),
-          side: const BorderSide(color: Color(0xFF81231E)),
+          foregroundColor: AppTheme.primary,
+          side: const BorderSide(color: AppTheme.primary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         child: const Text('Disconnect'),
       )),
@@ -433,19 +486,23 @@ class _WalletConnectScreenState extends State<WalletConnectScreen> {
       Icon(icon, size: 15, color: color),
       const SizedBox(width: 8),
       Expanded(child: Text(label,
-        style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 12))),
+        style: const TextStyle(color: AppTheme.textB, fontSize: 12))),
       Row(children: [
-        const Icon(Icons.bolt, color: Color(0xFF9B7B1A), size: 13),
+        const Icon(Icons.bolt_rounded, color: AppTheme.gold, size: 13),
         const SizedBox(width: 2),
         Text('$cost', style: const TextStyle(
-          color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          color: AppTheme.gold, fontSize: 12, fontWeight: FontWeight.bold)),
       ]),
     ]);
 
   Widget _iconCircle(IconData icon, Color color) => Container(
-    width: 64, height: 64,
-    decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
-    child: Icon(icon, color: color, size: 30),
+    width: 68, height: 68,
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.12),
+      shape: BoxShape.circle,
+      border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
+    ),
+    child: Icon(icon, color: color, size: 32),
   );
 }
 
@@ -471,63 +528,37 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: const Color(0xFFB8AA88),
-      title: const Text('Edit Profile', style: TextStyle(color: Colors.white)),
+      backgroundColor: AppTheme.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppTheme.border2),
+      ),
+      title: const Text('Edit Profile', style: TextStyle(color: AppTheme.textH)),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         TextField(
           controller: widget.usernameCtrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            labelText: 'Username',
-            labelStyle: const TextStyle(color: Color(0xFF6B5A40)),
-            filled: true,
-            fillColor: const Color(0xFFC8BA9A),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFC0B490)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFC0B490)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF81231E)),
-            ),
-          ),
+          style: const TextStyle(color: AppTheme.textH),
+          decoration: const InputDecoration(labelText: 'Username'),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: widget.bioCtrl,
-          style: const TextStyle(color: Colors.white),
+          style: const TextStyle(color: AppTheme.textH),
           maxLines: 3,
-          decoration: InputDecoration(
-            labelText: 'Bio',
-            labelStyle: const TextStyle(color: Color(0xFF6B5A40)),
-            filled: true,
-            fillColor: const Color(0xFFC8BA9A),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFC0B490)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFC0B490)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFF81231E)),
-            ),
-          ),
+          decoration: const InputDecoration(labelText: 'Bio'),
         ),
       ]),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Color(0xFF6B5A40))),
+          child: const Text('Cancel'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFF81231E)),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
           onPressed: _saving
               ? null
               : () async {
