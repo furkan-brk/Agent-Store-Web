@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/services/api_service.dart';
@@ -177,36 +178,37 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Icon
+              // Icon — vintage crimson seal
               Center(
                 child: Container(
                   width: 64, height: 64,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                      colors: [Color(0xFF9B2828), Color(0xFF5A1515)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFCAB891).withValues(alpha: 0.25), width: 1.5),
                     boxShadow: [BoxShadow(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                      color: const Color(0xFF81231E).withValues(alpha: 0.45),
                       blurRadius: 24, spreadRadius: 4,
                     )],
                   ),
-                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 32),
+                  child: const Icon(Icons.auto_awesome, color: Color(0xFFE8D9B8), size: 32),
                 ),
               ),
               const SizedBox(height: 24),
               const Text(
                 'Guild Master',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Color(0xFFE8D9B8), fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 6),
               const Text(
                 'AI-Powered Team Builder',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+                style: TextStyle(color: Color(0xFF9E8F72), fontSize: 14),
               ),
               const SizedBox(height: 32),
               // Problem input
@@ -217,15 +219,15 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
+                Text(_error!, style: const TextStyle(color: Color(0xFFCAB891), fontSize: 13)),
               ],
               const SizedBox(height: 20),
               SizedBox(
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6366F1),
-                    foregroundColor: Colors.white,
+                    backgroundColor: const Color(0xFF81231E),
+                    foregroundColor: const Color(0xFFE8D9B8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: _findTeam,
@@ -246,9 +248,9 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: Color(0xFF6366F1)),
+          CircularProgressIndicator(color: Color(0xFF81231E)),
           SizedBox(height: 20),
-          Text('Analyzing your challenge...', style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 15)),
+          Text('Analyzing your challenge...', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 15)),
         ],
       ),
     );
@@ -265,8 +267,8 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
           width: 350,
           child: Container(
             decoration: const BoxDecoration(
-              color: Color(0xFF0F0F1E),
-              border: Border(right: BorderSide(color: Color(0xFF1E1E35))),
+              color: Color(0xFF22231A),
+              border: Border(right: BorderSide(color: Color(0xFF3D3E2A))),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -277,21 +279,21 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('YOUR TEAM', style: TextStyle(color: Color(0xFF6366F1), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      const Text('YOUR TEAM', style: TextStyle(color: Color(0xFF81231E), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                       const SizedBox(height: 6),
                       Text(
                         _suggestion?['suggested_name'] as String? ?? 'Custom Squad',
-                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _suggestion?['reasoning'] as String? ?? '',
-                        style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13, height: 1.5),
+                        style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 13, height: 1.5),
                       ),
                     ],
                   ),
                 ),
-                const Divider(color: Color(0xFF1E1E35)),
+                const Divider(color: Color(0xFF3D3E2A)),
                 // Agent cards
                 Expanded(
                   child: ListView.builder(
@@ -318,8 +320,8 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                   padding: const EdgeInsets.all(16),
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF9CA3AF),
-                      side: const BorderSide(color: Color(0xFF1E1E35)),
+                      foregroundColor: const Color(0xFF9E8F72),
+                      side: const BorderSide(color: Color(0xFF3D3E2A)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                     icon: const Icon(Icons.refresh, size: 16),
@@ -339,15 +341,15 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFF1E1E35))),
+                  border: Border(bottom: BorderSide(color: Color(0xFF3D3E2A))),
                 ),
                 child: Row(children: [
-                  const Icon(Icons.chat_bubble_outline, color: Color(0xFF6366F1), size: 18),
+                  const Icon(Icons.chat_bubble_outline, color: Color(0xFF81231E), size: 18),
                   const SizedBox(width: 10),
-                  const Text('GUILD MASTER CHAT', style: TextStyle(color: Color(0xFF6366F1), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  const Text('GUILD MASTER CHAT', style: TextStyle(color: Color(0xFF81231E), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   const Spacer(),
                   Text('${_selectedAgentIds.length} agent${_selectedAgentIds.length == 1 ? '' : 's'} active',
-                    style: const TextStyle(color: Color(0xFF6B7280), fontSize: 12)),
+                    style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
                 ]),
               ),
               // Messages
@@ -357,9 +359,9 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.forum_outlined, color: Color(0xFF374151), size: 48),
+                          Icon(Icons.forum_outlined, color: Color(0xFF4A4A33), size: 48),
                           SizedBox(height: 12),
-                          Text('Ask your team anything!', style: TextStyle(color: Color(0xFF6B7280), fontSize: 14)),
+                          Text('Ask your team anything!', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 14)),
                         ],
                       ),
                     )
@@ -372,7 +374,7 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                           return const Padding(
                             padding: EdgeInsets.only(top: 8),
                             child: Center(child: SizedBox(width: 20, height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF6366F1)))),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF81231E)))),
                           );
                         }
                         final msg = _messages[i];
@@ -387,29 +389,29 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFF1E1E35))),
+                  border: Border(top: BorderSide(color: Color(0xFF3D3E2A))),
                 ),
                 child: Row(children: [
                   Expanded(
                     child: TextField(
                       controller: _chatCtrl,
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Message your team...',
-                        hintStyle: const TextStyle(color: Color(0xFF4B5563)),
+                        hintStyle: const TextStyle(color: Color(0xFF5A5038)),
                         filled: true,
-                        fillColor: const Color(0xFF111827),
+                        fillColor: const Color(0xFF1E1F14),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF1E1E35)),
+                          borderSide: const BorderSide(color: Color(0xFF3D3E2A)),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF1E1E35)),
+                          borderSide: const BorderSide(color: Color(0xFF3D3E2A)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                          borderSide: const BorderSide(color: Color(0xFF81231E)),
                         ),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
@@ -421,8 +423,8 @@ class _GuildMasterScreenState extends State<GuildMasterScreen> {
                     height: 46,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6366F1),
-                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(0xFF81231E),
+                        foregroundColor: const Color(0xFFE8D9B8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                       ),
@@ -462,7 +464,7 @@ class _GlowTextFieldState extends State<_GlowTextField> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         boxShadow: _focused
-          ? [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.3), blurRadius: 16, spreadRadius: 2)]
+          ? [BoxShadow(color: const Color(0xFF81231E).withValues(alpha: 0.3), blurRadius: 16, spreadRadius: 2)]
           : [],
       ),
       child: Focus(
@@ -470,23 +472,23 @@ class _GlowTextFieldState extends State<_GlowTextField> {
         child: TextField(
           controller: widget.controller,
           maxLines: widget.maxLines,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 14),
           decoration: InputDecoration(
             hintText: widget.hintText,
-            hintStyle: const TextStyle(color: Color(0xFF4B5563), fontSize: 13),
+            hintStyle: const TextStyle(color: Color(0xFF5A5038), fontSize: 13),
             filled: true,
-            fillColor: const Color(0xFF111827),
+            fillColor: const Color(0xFF1E1F14),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF1E1E35)),
+              borderSide: const BorderSide(color: Color(0xFF3D3E2A)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF1E1E35)),
+              borderSide: const BorderSide(color: Color(0xFF3D3E2A)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5),
+              borderSide: const BorderSide(color: Color(0xFF81231E), width: 1.5),
             ),
             contentPadding: const EdgeInsets.all(16),
           ),
@@ -517,10 +519,10 @@ class _AgentMiniCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF111827),
+          color: const Color(0xFF2A2B1E),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: selected ? color : const Color(0xFF1E1E35),
+            color: selected ? color : const Color(0xFF3D3E2A),
             width: selected ? 1.5 : 1,
           ),
           boxShadow: selected
@@ -546,7 +548,7 @@ class _AgentMiniCard extends StatelessWidget {
               children: [
                 Text(
                   agent['title'] as String? ?? 'Unknown Agent',
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                  style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 13, fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -567,7 +569,7 @@ class _AgentMiniCard extends StatelessWidget {
           ),
           Icon(
             selected ? Icons.check_circle : Icons.circle_outlined,
-            color: selected ? color : const Color(0xFF374151),
+            color: selected ? color : const Color(0xFF4A4A33),
             size: 18,
           ),
         ]),
@@ -601,10 +603,10 @@ class _UserBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12, left: 60),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF6366F1),
+          color: const Color(0xFF81231E),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14)),
+        child: Text(text, style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 14)),
       ),
     );
   }
@@ -661,7 +663,7 @@ class _TeamResponseCardState extends State<_TeamResponseCard>
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFF111827),
+          color: const Color(0xFF2A2B1E),
           borderRadius: BorderRadius.circular(10),
           border: Border(left: BorderSide(color: color, width: 3)),
         ),
@@ -680,7 +682,7 @@ class _TeamResponseCardState extends State<_TeamResponseCard>
                   child: Icon(_charTypeIcon(charType), color: color, size: 14),
                 ),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(title, style: const TextStyle(color: Color(0xFFE8D9B8), fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -692,7 +694,7 @@ class _TeamResponseCardState extends State<_TeamResponseCard>
                 ),
               ]),
               const SizedBox(height: 10),
-              Text(reply, style: const TextStyle(color: Color(0xFFD1D5DB), fontSize: 13, height: 1.55)),
+              Text(reply, style: const TextStyle(color: Color(0xFFD0BF98), fontSize: 13, height: 1.55)),
             ],
           ),
         ),
