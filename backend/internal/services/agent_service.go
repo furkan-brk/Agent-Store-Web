@@ -101,11 +101,10 @@ func (s *AgentService) deductCredits(wallet string, amount int64, txType string,
 }
 
 func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error) {
-	// ── Step 1: Analyze prompt with Gemini (category, tags, character type, etc.)
+	// ── Step 1: Analyze prompt with Gemini (category, tags, character type, rarity)
 	analysis, err := s.geminiSvc.AnalyzePrompt(input.Prompt)
 	if err != nil {
 		log.Printf("[Gemini] analysis failed, falling back to keywords: %v", err)
-		// Keyword fallback
 		charType := DetermineCharacterType(input.Prompt)
 		subclass := DetermineSubclass(charType, input.Prompt)
 		rarity := DetermineRarity(input.Prompt)
@@ -121,27 +120,34 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 
 	rarity := models.CharacterRarity(analysis.Rarity)
 
-	// ── Step 2: Generate unique image — Replicate first, Gemini Imagen as fallback
-	generatedImage, err := s.replicateSvc.GeneratePixelArt(analysis.ImagePrompt, analysis.CharacterType)
-	if err != nil {
-		log.Printf("[Replicate] failed, trying Gemini: %v", err)
-		// Fallback: Gemini Imagen
-		generatedImage, err = s.geminiSvc.GenerateImage(analysis.ImagePrompt, analysis.CharacterType)
-		if err != nil {
-			log.Printf("[Gemini] image generation also failed: %v", err)
-			generatedImage = "" // frontend will show pixel art fallback
-		} else {
-			log.Printf("[Gemini] image generated successfully for agent (type=%s)", analysis.CharacterType)
-		}
+	// ── Step 2: Generate rich visual profile via world-builder LLM call
+	agentConcept := input.Title
+	if input.Description != "" {
+		agentConcept += ": " + input.Description
+	}
+	profile, profileErr := s.geminiSvc.GenerateAgentProfile(agentConcept)
+	if profileErr != nil {
+		log.Printf("[Gemini] profile generation failed, using fallback: %v", profileErr)
+		profile = buildFallbackProfile(agentConcept, analysis.CharacterType)
 	} else {
-		log.Printf("[Replicate] image generated successfully for agent (type=%s)", analysis.CharacterType)
+		log.Printf("[Gemini] agent profile generated: name=%q type=%s", profile.Name, analysis.CharacterType)
 	}
 
-	// ── Step 3: Build stats / traits / colors
+	// ── Step 3: Generate 16-bit pixel-art avatar via GenerateAvatarImage (sole image source)
+	generatedImage, imgErr := s.geminiSvc.GenerateAvatarImage(profile)
+	if imgErr != nil {
+		log.Printf("[Gemini] avatar image generation failed, agent will have no image: %v", imgErr)
+		generatedImage = "" // frontend shows shimmer skeleton placeholder
+	} else {
+		log.Printf("[Gemini] 16-bit avatar generated (type=%s)", analysis.CharacterType)
+	}
+
+	// ── Step 4: Build stats / traits / colors, then merge visual profile into character_data
 	charData, err := BuildCharacterData(analysis.CharacterType, analysis.Subclass, rarity, input.Prompt)
 	if err != nil {
 		charData = "{}"
 	}
+	charData = MergeProfileIntoCharacterData(charData, profile)
 
 	// ── Step 3.5: Score prompt and generate service description
 	scoreResult := s.scoreSvc.ScoreAndDescribe(input.Prompt)
@@ -153,7 +159,7 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		}
 	}
 
-	// ── Step 4: Persist
+	// ── Step 6: Persist
 	agent := &models.Agent{
 		Title:              input.Title,
 		Description:        input.Description,
@@ -260,28 +266,25 @@ func (s *AgentService) GetTrending() ([]models.Agent, error) {
 	return agents, err
 }
 
-// ForkAgent creates a new agent based on an existing one, with Replicate image generation.
+// ForkAgent creates a new agent based on an existing one with a fresh GenerateAvatarImage avatar.
 func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models.Agent, error) {
 	var original models.Agent
 	if err := database.DB.First(&original, originalID).Error; err != nil {
 		return nil, fmt.Errorf("original agent not found: %w", err)
 	}
 
-	// Generate a new image for the fork
-	forkedImage, err := s.replicateSvc.GeneratePixelArt(
-		"A forked variant of "+original.CharacterType+" character with unique traits",
-		original.CharacterType,
-	)
-	if err != nil {
-		log.Printf("[Replicate] fork image failed, trying Gemini: %v", err)
-		forkedImage, err = s.geminiSvc.GenerateImage(
-			"A forked variant of "+original.CharacterType+" character with unique traits",
-			original.CharacterType,
-		)
-		if err != nil {
-			log.Printf("[Gemini] fork image also failed: %v", err)
-			forkedImage = original.GeneratedImage // reuse original image as last resort
-		}
+	// Generate a fresh visual profile + 16-bit avatar for the fork (sole image source)
+	forkConcept := original.Title + " (forked variant)"
+	forkProfile, profileErr := s.geminiSvc.GenerateAgentProfile(forkConcept)
+	if profileErr != nil {
+		log.Printf("[Gemini] fork profile failed, using fallback: %v", profileErr)
+		forkProfile = buildFallbackProfile(forkConcept, original.CharacterType)
+	}
+
+	forkedImage, imgErr := s.geminiSvc.GenerateAvatarImage(forkProfile)
+	if imgErr != nil {
+		log.Printf("[Gemini] fork avatar image failed, fork will have no image: %v", imgErr)
+		forkedImage = "" // frontend shows shimmer skeleton placeholder
 	}
 
 	// Deduct 5 credits for forking
@@ -430,6 +433,43 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 func (s *AgentService) IsPurchased(buyerWallet string, agentID uint) bool {
 	var p models.PurchasedAgent
 	return database.DB.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&p).Error == nil
+}
+
+// buildFallbackProfile creates a sensible AgentProfile when the LLM call fails,
+// using the character type to determine default colors and visual details.
+func buildFallbackProfile(concept, charType string) *AgentProfile {
+	type defaults struct {
+		primary, secondary, glow string
+		face, chest, tool, dist  string
+	}
+	d := map[string]defaults{
+		"wizard":     {"Violet", "Midnight Blue", "Purple", "a glowing purple visor", "an arcane rune emblem", "a magical energy wand", "subtle glowing rune etchings on the shoulder plates"},
+		"strategist": {"Crimson", "Gold", "Red", "a sharp tactical visor", "a command-star emblem", "a holographic baton", "integrated command chevrons along the chest"},
+		"oracle":     {"Amber", "Deep Orange", "Yellow", "glowing all-seeing eyes behind a glass visor", "a third-eye emblem", "a crystal data probe", "flowing light-ribbon accents along the arms"},
+		"guardian":   {"Cobalt Blue", "Steel Grey", "Cyan", "a fortress-slit visor", "a shield emblem", "a scanning lance probe", "reinforced angular shoulder armor vents"},
+		"artisan":    {"Rose Pink", "Teal", "Magenta", "a creative lens visor", "a palette emblem", "a precision stylus pen", "color-gradient panel accents on the torso"},
+		"bard":       {"Emerald Green", "Lime", "Green", "an expressive mirrored visor", "a musical note emblem", "a resonance rod stylus", "harmonic wave patterns etched into the chest plate"},
+		"scholar":    {"Warm Beige", "Brown", "Amber", "round academic glass spectacles over a calm face", "an open-book emblem", "a calibration pointer rod", "subtle gear-and-cog filigree on the pauldrons"},
+		"merchant":   {"Gold", "Navy Blue", "Orange", "a confident half-mirrored visor", "a coin-stack emblem", "a deal-sealing signet stylus", "thin gold trim lines running along the suit edges"},
+	}
+	def, ok := d[charType]
+	if !ok {
+		def = d["wizard"]
+	}
+	return &AgentProfile{
+		Name:            concept,
+		Mood:            "Focused and ready to assist.",
+		RolePurpose:     "An AI agent designed to excel in its specialized domain. Provides expert assistance with precision and efficiency.",
+		PrimaryColor:    def.primary,
+		SecondaryColor:  def.secondary,
+		TabletGlowColor: def.glow,
+		Characteristics: []string{
+			def.face,
+			def.chest,
+			def.tool,
+			def.dist,
+		},
+	}
 }
 
 // SetAgentPrice allows a creator to set the price of their agent (in MON).

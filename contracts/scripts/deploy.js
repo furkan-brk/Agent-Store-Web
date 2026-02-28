@@ -42,7 +42,13 @@ async function main() {
   console.log("\n--- Add to backend .env ---");
   console.log(`CREDITS_CONTRACT_ADDRESS=${creditsAddr}`);
   console.log(`REGISTRY_CONTRACT_ADDRESS=${registryAddr}`);
-  console.log("---------------------------\n");
+  console.log("---------------------------");
+  console.log("\n--- AgentRegistry.registerAgent() usage ---");
+  console.log("  registerAgent(agentId, contentHash, imageHash)");
+  console.log("  contentHash : ethers.keccak256(ethers.toUtf8Bytes(prompt))");
+  console.log("  imageHash   : ethers.keccak256(generatedImageBytes)  // from GenerateAvatarImage");
+  console.log("  Pass bytes32(0) for imageHash if image generation failed");
+  console.log("-------------------------------------------\n");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

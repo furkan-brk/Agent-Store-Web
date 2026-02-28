@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../features/character/character_types.dart';
-import '../../features/character/pixel_art_painter.dart';
 
 class PixelCharacterWidget extends StatefulWidget {
   final CharacterType characterType;
@@ -17,7 +16,8 @@ class PixelCharacterWidget extends StatefulWidget {
   final bool teamLink;
   final Map<String, int>? stats;
   final int agentId;
-  /// Base64-encoded PNG from Gemini Imagen. When present, shown instead of pixel art.
+  /// Base64-encoded PNG from Gemini Imagen. When present, shown as the agent's avatar.
+  /// When null, a shimmer loading skeleton is displayed instead.
   final String? generatedImage;
 
   const PixelCharacterWidget({
@@ -46,7 +46,6 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   late final Animation<double> _anim;
   Uint8List? _imageBytes;
 
-  // OPT-1: Choose animation duration based on rarity
   static Duration _animDuration(CharacterRarity r) {
     switch (r) {
       case CharacterRarity.legendary:
@@ -56,11 +55,10 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
       case CharacterRarity.rare:
         return const Duration(seconds: 8);
       default:
-        return const Duration(seconds: 3); // unused for static rarities
+        return const Duration(seconds: 3);
     }
   }
 
-  // OPT-1: Only legendary, epic, rare get a running animation
   static bool _shouldAnimate(CharacterRarity r) =>
       r == CharacterRarity.legendary ||
       r == CharacterRarity.epic ||
@@ -69,35 +67,21 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   @override
   void initState() {
     super.initState();
-    // OPT-1: Set duration per rarity; only call repeat() when needed
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: _animDuration(widget.rarity),
-    );
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200));
     _anim = Tween<double>(begin: 0, end: 1).animate(_ctrl);
-    if (_shouldAnimate(widget.rarity)) {
-      _ctrl.repeat();
-    } else {
-      _ctrl.value = 0; // static — show first frame, no loop
-    }
     _decodeImage();
+    _refreshAnimation();
   }
 
-  // OPT-2: React to rarity or image changes at runtime
   @override
   void didUpdateWidget(PixelCharacterWidget old) {
     super.didUpdateWidget(old);
     if (old.generatedImage != widget.generatedImage) {
       _decodeImage();
+      _refreshAnimation();
     }
     if (old.rarity != widget.rarity) {
-      _ctrl.stop();
-      _ctrl.duration = _animDuration(widget.rarity);
-      if (_shouldAnimate(widget.rarity)) {
-        _ctrl.repeat();
-      } else {
-        _ctrl.value = 0;
-      }
+      _refreshAnimation();
     }
   }
 
@@ -110,6 +94,26 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
       }
     } else {
       _imageBytes = null;
+    }
+  }
+
+  /// Manages the animation controller lifecycle:
+  /// - No image: always loop (drives shimmer skeleton).
+  /// - Image loaded + rare+: loop with rarity-specific duration (drives effects).
+  /// - Image loaded + common/uncommon: stop (static, no wasted CPU).
+  void _refreshAnimation() {
+    if (_imageBytes == null) {
+      // Shimmer mode — fast loop regardless of rarity
+      _ctrl.duration = const Duration(milliseconds: 1200);
+      if (!_ctrl.isAnimating) _ctrl.repeat();
+    } else if (_shouldAnimate(widget.rarity)) {
+      // Image + animated rarity — switch to rarity timing
+      _ctrl.duration = _animDuration(widget.rarity);
+      _ctrl.repeat();
+    } else {
+      // Image + static rarity — freeze at 0
+      _ctrl.stop();
+      _ctrl.value = 0;
     }
   }
 
@@ -150,9 +154,6 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
 
   Widget _frame() {
     final fc = widget.rarity.color;
-    // OPT-4: Skip AnimatedBuilder for static rarities with no generated image
-    final isStatic = !_shouldAnimate(widget.rarity) && (_imageBytes == null);
-
     return Container(
       width: widget.size + 16,
       height: widget.size + 16,
@@ -162,15 +163,13 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
         boxShadow: [BoxShadow(color: fc.withValues(alpha: 0.35), blurRadius: 14, spreadRadius: 2)],
       ),
       child: Center(
-        child: isStatic
-            ? _pixelArtPainter(0) // static: fixed animation value
-            : AnimatedBuilder(
-                animation: _anim,
-                builder: (_, __) {
-                  if (_imageBytes != null) return _buildImageWithEffects(_anim.value);
-                  return _pixelArtPainter(_anim.value);
-                },
-              ),
+        child: AnimatedBuilder(
+          animation: _anim,
+          builder: (_, __) {
+            if (_imageBytes != null) return _buildImageWithEffects(_anim.value);
+            return _loadingShimmer(_anim.value);
+          },
+        ),
       ),
     );
   }
@@ -191,7 +190,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
         width: widget.size,
         height: widget.size,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _placeholder(),
+        errorBuilder: (_, __, ___) => _errorPlaceholder(),
       ),
     );
 
@@ -242,42 +241,60 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
     return Transform.translate(offset: Offset(0, floatY), child: img);
   }
 
-  Widget _placeholder() {
-    return Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            widget.characterType.secondaryColor,
-            widget.characterType.primaryColor,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Icon(
-        Icons.auto_awesome,
-        color: widget.characterType.accentColor,
-        size: widget.size * 0.4,
+  // ── Shimmer skeleton (shown when generatedImage is null/pending) ──────────
+
+  Widget _loadingShimmer(double v) {
+    final rarityColor = widget.rarity.color;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: Stack(children: [
+          // Dark base
+          Container(color: const Color(0xFF0D0D1A)),
+          // Sweeping shimmer gradient driven by animation value
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.transparent,
+                    rarityColor.withValues(alpha: 0.13),
+                    Colors.transparent,
+                  ],
+                  begin: Alignment(-2.0 + v * 4, 0),
+                  end: Alignment(-1.0 + v * 4, 0),
+                ),
+              ),
+            ),
+          ),
+          // Centered spinner
+          Center(
+            child: SizedBox(
+              width: widget.size * 0.30,
+              height: widget.size * 0.30,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: rarityColor.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
+        ]),
       ),
     );
   }
 
-  // ── Pixel art fallback path ──────────────────────────────────────────────
+  // ── Error placeholder (image bytes invalid after decode) ─────────────────
 
-  // OPT-3: RepaintBoundary isolates repaints from parent widget tree
-  Widget _pixelArtPainter(double v) => RepaintBoundary(
-    child: CustomPaint(
-      size: Size(widget.size, widget.size),
-      painter: PixelArtPainter(
-        characterType: widget.characterType,
-        rarity: widget.rarity,
-        subclass: widget.subclass,
-        animationValue: v,
-        agentId: widget.agentId,
-        teamLink: widget.teamLink,
-      ),
+  Widget _errorPlaceholder() => Container(
+    width: widget.size,
+    height: widget.size,
+    color: const Color(0xFF0D0D1A),
+    child: Icon(
+      Icons.broken_image_outlined,
+      color: widget.characterType.accentColor.withValues(alpha: 0.4),
+      size: widget.size * 0.35,
     ),
   );
 }

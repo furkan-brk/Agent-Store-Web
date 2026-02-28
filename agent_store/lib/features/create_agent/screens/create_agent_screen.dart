@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
@@ -17,8 +18,9 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   final _descCtrl   = TextEditingController();
   final _promptCtrl = TextEditingController();
   bool _loading     = false;
-  String _loadingMsg = 'Creating…';
+  String _loadingMsg = 'Analyzing prompt…';
   CharacterType _preview = CharacterType.wizard;
+  AgentModel? _createdAgent; // holds the response after successful creation
   int _credits = 100;
   int _step = 0; // 0 = Basic Info, 1 = Prompt, 2 = Preview
 
@@ -98,9 +100,17 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
 
     setState(() { _loading = true; _loadingMsg = 'Analyzing prompt…'; });
 
-    // Slight delay so the first message is visible before the heavy API call
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (mounted) setState(() => _loadingMsg = 'Generating unique character image…');
+    // Progressive messages reflecting the new 3-step backend pipeline:
+    // Step 1 — AnalyzePrompt (~2s), Step 2 — GenerateAgentProfile (~5s), Step 3 — Imagen 3 (~30s)
+    Future.delayed(const Duration(seconds: 4)).then((_) {
+      if (mounted && _loading) setState(() => _loadingMsg = 'Building character profile…');
+    });
+    Future.delayed(const Duration(seconds: 14)).then((_) {
+      if (mounted && _loading) setState(() => _loadingMsg = 'Generating avatar image…');
+    });
+    Future.delayed(const Duration(seconds: 55)).then((_) {
+      if (mounted && _loading) setState(() => _loadingMsg = 'Almost there…');
+    });
 
     final agent = await ApiService.instance.createAgent(
       title:       _titleCtrl.text,
@@ -112,13 +122,16 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
     setState(() => _loading = false);
 
     if (agent != null) {
+      // Show the AI-generated image in the left panel before navigating.
+      setState(() => _createdAgent = agent);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Agent created with unique AI character!'),
           backgroundColor: Color(0xFF16A34A),
         ),
       );
-      context.go('/agent/${agent.id}');
+      await Future.delayed(const Duration(milliseconds: 2000));
+      if (mounted) context.go('/agent/${agent.id}');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -445,53 +458,83 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
         color: const Color(0xFF0F0F1E),
         child: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('PREVIEW',
+            if (_createdAgent != null) ...[
+              // Success: show the AI-generated character from the backend response.
+              const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 22),
+              const SizedBox(height: 8),
+              PixelCharacterWidget(
+                characterType: _createdAgent!.characterType,
+                rarity: _createdAgent!.rarity,
+                subclass: _createdAgent!.subclass,
+                size: 120,
+                showName: true,
+                showRarity: true,
+                agentId: _createdAgent!.id,
+                generatedImage: _createdAgent!.generatedImage,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Agent Created!',
                 style: TextStyle(
-                    color: Color(0xFF6B7280),
-                    fontSize: 11,
-                    letterSpacing: 1.5)),
-            const SizedBox(height: 6),
-            const Text(
-              'AI will generate a unique\ncharacter after submission',
-              style: TextStyle(
-                  color: Color(0xFF4B5563), fontSize: 10, height: 1.4),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            PixelCharacterWidget(
-              characterType: _preview,
-              rarity: CharacterRarity.common,
-              size: 120,
-              showName: true,
-              showRarity: true,
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                _preview.description,
-                style: const TextStyle(
-                    color: Color(0xFF6B7280), fontSize: 11, height: 1.5),
+                    color: Color(0xFF16A34A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Redirecting to detail page…',
+                style: TextStyle(color: Color(0xFF4B5563), fontSize: 10),
+              ),
+            ] else ...[
+              // Pre-submission: show a keyword-predicted preview character.
+              const Text('PREVIEW',
+                  style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontSize: 11,
+                      letterSpacing: 1.5)),
+              const SizedBox(height: 6),
+              const Text(
+                'AI will generate a unique\ncharacter after submission',
+                style: TextStyle(
+                    color: Color(0xFF4B5563), fontSize: 10, height: 1.4),
                 textAlign: TextAlign.center,
               ),
-            ),
-            if (_loading) ...[
-              const SizedBox(height: 20),
-              const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Color(0xFF6366F1))),
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
+              PixelCharacterWidget(
+                characterType: _preview,
+                rarity: CharacterRarity.common,
+                size: 120,
+                showName: true,
+                showRarity: true,
+              ),
+              const SizedBox(height: 12),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  _loadingMsg,
+                  _preview.description,
                   style: const TextStyle(
-                      color: Color(0xFF6366F1), fontSize: 11),
+                      color: Color(0xFF6B7280), fontSize: 11, height: 1.5),
                   textAlign: TextAlign.center,
                 ),
               ),
+              if (_loading) ...[
+                const SizedBox(height: 20),
+                const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Color(0xFF6366F1))),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    _loadingMsg,
+                    style: const TextStyle(
+                        color: Color(0xFF6366F1), fontSize: 11),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ],
           ]),
         ),

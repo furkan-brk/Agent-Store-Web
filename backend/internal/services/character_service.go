@@ -201,6 +201,25 @@ func DetermineRarity(prompt string) models.CharacterRarity {
 	}
 }
 
+// MergeProfileIntoCharacterData merges an AgentProfile into an existing character_data JSON string.
+// The profile is stored under the "profile" key, preserving all existing stat/color fields.
+// If charDataJSON is empty or invalid, a fresh object is created.
+func MergeProfileIntoCharacterData(charDataJSON string, profile *AgentProfile) string {
+	if profile == nil {
+		return charDataJSON
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal([]byte(charDataJSON), &data); err != nil {
+		data = map[string]interface{}{}
+	}
+	data["profile"] = profile
+	result, err := json.Marshal(data)
+	if err != nil {
+		return charDataJSON
+	}
+	return string(result)
+}
+
 func BuildCharacterData(charType, subclass string, rarity models.CharacterRarity, prompt string) (string, error) {
 	base, ok := characterMap[charType]
 	if !ok {
