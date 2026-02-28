@@ -58,12 +58,12 @@ class TeamWorkflowModal extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 520),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF0F0F1E),
+            color: const Color(0xFF22231A),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF1E1E35), width: 1.5),
+            border: Border.all(color: const Color(0xFF3D3E2A), width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                color: const Color(0xFF81231E).withValues(alpha: 0.12),
                 blurRadius: 30,
                 spreadRadius: 2,
               ),
@@ -87,12 +87,12 @@ class TeamWorkflowModal extends StatelessWidget {
                       ),
                       Text(
                         '${guild.name} · ${guild.memberCount} agent${guild.memberCount == 1 ? '' : 's'}',
-                        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+                        style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
                       ),
                     ]),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF6B7280), size: 20),
+                    icon: const Icon(Icons.close, color: Color(0xFF7A6E52), size: 20),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ]),
@@ -104,7 +104,7 @@ class TeamWorkflowModal extends StatelessWidget {
                 const SizedBox(height: 10),
                 if (guild.members.isEmpty)
                   const Text('No members yet.',
-                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 12))
+                    style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12))
                 else
                   ...guild.members
                       .where((m) => m.agent != null)
@@ -117,7 +117,7 @@ class TeamWorkflowModal extends StatelessWidget {
                 const SizedBox(height: 10),
                 if (activePipeline.isEmpty)
                   const Text('Add agents to generate a pipeline.',
-                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 12))
+                    style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12))
                 else
                   _PipelineFlow(types: activePipeline),
 
@@ -134,7 +134,7 @@ class TeamWorkflowModal extends StatelessWidget {
                   width: double.infinity,
                   child: FilledButton(
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: const Color(0xFF81231E),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -161,7 +161,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     title.toUpperCase(),
     style: const TextStyle(
-      color: Color(0xFF9CA3AF),
+      color: Color(0xFF9E8F72),
       fontSize: 10,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.2,
@@ -186,7 +186,7 @@ class _MemberRoleCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF13131F),
+        color: const Color(0xFF2A2B1E),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
@@ -213,7 +213,7 @@ class _MemberRoleCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             '${type.displayName} → ${step.label}: ${step.description}',
-            style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 10),
+            style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 10),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -281,7 +281,7 @@ class _PipelineFlow extends StatelessWidget {
             ]),
             if (!isLast) ...[
               const SizedBox(width: 4),
-              const Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF4B5563)),
+              const Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF5A5038)),
               const SizedBox(width: 4),
             ],
           ]);
@@ -313,37 +313,37 @@ class _CoverageBar extends StatelessWidget {
             child: LinearProgressIndicator(
               value: pct,
               minHeight: 6,
-              backgroundColor: const Color(0xFF1E1E35),
+              backgroundColor: const Color(0xFF3D3E2A),
               color: pct >= 0.75
-                  ? const Color(0xFF10B981)
+                  ? const Color(0xFF5A8A48)
                   : pct >= 0.5
-                      ? const Color(0xFFF59E0B)
-                      : const Color(0xFF6366F1),
+                      ? const Color(0xFF9B7B1A)
+                      : const Color(0xFF81231E),
             ),
           ),
         ),
         const SizedBox(width: 10),
         Text(
           '${covered.length}/${_kPipelineOrder.length} phases',
-          style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+          style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 11),
         ),
       ]),
       if (missing.isNotEmpty) ...[
         const SizedBox(height: 10),
         Text(
           'Gaps: ${missing.map((t) => _kSteps[t]!.label).join(', ')}',
-          style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+          style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
         ),
         const SizedBox(height: 4),
         Text(
           'Add ${missing.map((t) => t.displayName).join(' / ')} agents to complete the pipeline.',
-          style: const TextStyle(color: Color(0xFF4B5563), fontSize: 10),
+          style: const TextStyle(color: Color(0xFF5A5038), fontSize: 10),
         ),
       ] else if (covered.isNotEmpty) ...[
         const SizedBox(height: 6),
         const Text(
           '✅ Full pipeline covered — your team handles every phase!',
-          style: TextStyle(color: Color(0xFF10B981), fontSize: 11),
+          style: TextStyle(color: Color(0xFF5A8A48), fontSize: 11),
         ),
       ],
     ]);

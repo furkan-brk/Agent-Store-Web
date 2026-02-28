@@ -25,25 +25,25 @@ class _OnboardingModalState extends State<OnboardingModal> {
   static const _steps = [
     _Step(
       icon: Icons.auto_awesome,
-      color: Color(0xFF6366F1),
+      color: Color(0xFF81231E),
       title: 'Welcome to AgentStore',
       body: 'Discover, create and trade AI agents powered by Monad blockchain. Each agent is a unique pixel-art character with special abilities.',
     ),
     _Step(
       icon: Icons.account_balance_wallet_outlined,
-      color: Color(0xFF10B981),
+      color: Color(0xFF5A8A48),
       title: 'Connect Your Wallet',
       body: 'Use MetaMask with Monad Testnet (Chain ID: 10143) to sign in, earn credits and purchase agents.',
     ),
     _Step(
       icon: Icons.bolt,
-      color: Color(0xFFF59E0B),
+      color: Color(0xFF9B7B1A),
       title: 'Credits System',
       body: 'You start with free credits. Create an agent costs ⚡10, fork costs ⚡5. Buy more credits with MON tokens.',
     ),
     _Step(
       icon: Icons.auto_fix_high,
-      color: Color(0xFFEC4899),
+      color: Color(0xFFCAB891),
       title: 'Create Your Agent',
       body: 'Write a prompt describing your AI agent. Our AI analyzes it, generates a unique pixel-art character and assigns traits.',
     ),
@@ -55,7 +55,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
     final isLast = _step == _steps.length - 1;
 
     return Dialog(
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: const Color(0xFF1E1F14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SizedBox(
         width: 400,
@@ -71,7 +71,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
                 width: i == _step ? 20 : 6,
                 height: 6,
                 decoration: BoxDecoration(
-                  color: i == _step ? const Color(0xFF6366F1) : const Color(0xFF374151),
+                  color: i == _step ? const Color(0xFF81231E) : const Color(0xFF4A4A33),
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -96,19 +96,19 @@ class _OnboardingModalState extends State<OnboardingModal> {
             // Body
             Text(step.body,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14, height: 1.5)),
+              style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 14, height: 1.5)),
             const SizedBox(height: 32),
             // Buttons
             Row(children: [
               if (_step > 0)
                 TextButton(
                   onPressed: () => setState(() => _step--),
-                  child: const Text('Back', style: TextStyle(color: Color(0xFF6B7280))),
+                  child: const Text('Back', style: TextStyle(color: Color(0xFF7A6E52))),
                 ),
               const Spacer(),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1),
+                  backgroundColor: const Color(0xFF81231E),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
                 onPressed: () {
@@ -132,7 +132,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
                 OnboardingModal.markDone();
                 Navigator.of(context).pop();
               },
-              child: const Text('Skip', style: TextStyle(color: Color(0xFF4B5563), fontSize: 12)),
+              child: const Text('Skip', style: TextStyle(color: Color(0xFF5A5038), fontSize: 12)),
             ),
           ]),
         ),

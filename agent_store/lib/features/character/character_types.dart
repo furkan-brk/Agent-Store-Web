@@ -43,37 +43,38 @@ extension CharacterTypeExt on CharacterType {
     CharacterType.merchant:   'Dealer of growth and strategy',
   }[this]!;
 
+  // Vintage / Fairy Tales character palette — saturated enough to stay distinct
   Color get primaryColor => const {
-    CharacterType.wizard:     Color(0xFF7C3AED),
-    CharacterType.strategist: Color(0xFFDC2626),
-    CharacterType.oracle:     Color(0xFFD97706),
-    CharacterType.guardian:   Color(0xFF1D4ED8),
-    CharacterType.artisan:    Color(0xFFEC4899),
-    CharacterType.bard:       Color(0xFF16A34A),
-    CharacterType.scholar:    Color(0xFF92400E),
-    CharacterType.merchant:   Color(0xFFB45309),
+    CharacterType.wizard:     Color(0xFF6B3A8C), // muted violet
+    CharacterType.strategist: Color(0xFF81231E), // crimson (matches app primary)
+    CharacterType.oracle:     Color(0xFF9B7B1A), // antique gold
+    CharacterType.guardian:   Color(0xFF2A4A5A), // steel teal
+    CharacterType.artisan:    Color(0xFF8A3D62), // dusty rose
+    CharacterType.bard:       Color(0xFF4A6A28), // forest green
+    CharacterType.scholar:    Color(0xFF7A5028), // warm brown
+    CharacterType.merchant:   Color(0xFF8B6A14), // antique amber
   }[this]!;
 
   Color get secondaryColor => const {
-    CharacterType.wizard:     Color(0xFF1E1B4B),
-    CharacterType.strategist: Color(0xFF78350F),
-    CharacterType.oracle:     Color(0xFF7C2D12),
-    CharacterType.guardian:   Color(0xFF1E3A5F),
-    CharacterType.artisan:    Color(0xFF0E7490),
-    CharacterType.bard:       Color(0xFF713F12),
-    CharacterType.scholar:    Color(0xFF44403C),
-    CharacterType.merchant:   Color(0xFF1E3A5F),
+    CharacterType.wizard:     Color(0xFF2A1A3A), // deep purple-black
+    CharacterType.strategist: Color(0xFF3A1010), // deep crimson-black
+    CharacterType.oracle:     Color(0xFF2A1A08), // deep amber-black
+    CharacterType.guardian:   Color(0xFF0E2028), // deep teal-black
+    CharacterType.artisan:    Color(0xFF2A1020), // deep rose-black
+    CharacterType.bard:       Color(0xFF1A2A08), // deep forest-black
+    CharacterType.scholar:    Color(0xFF2A1E0E), // deep brown-black
+    CharacterType.merchant:   Color(0xFF1E1808), // deep gold-black
   }[this]!;
 
   Color get accentColor => const {
-    CharacterType.wizard:     Color(0xFFA78BFA),
-    CharacterType.strategist: Color(0xFFFCD34D),
-    CharacterType.oracle:     Color(0xFFFDE68A),
-    CharacterType.guardian:   Color(0xFF93C5FD),
-    CharacterType.artisan:    Color(0xFF67E8F9),
-    CharacterType.bard:       Color(0xFFBEF264),
-    CharacterType.scholar:    Color(0xFFFEF3C7),
-    CharacterType.merchant:   Color(0xFFFCD34D),
+    CharacterType.wizard:     Color(0xFFB09AC0), // muted lavender
+    CharacterType.strategist: Color(0xFFD4A87A), // dusty warm gold
+    CharacterType.oracle:     Color(0xFFD4B870), // antique yellow
+    CharacterType.guardian:   Color(0xFF8AB0C0), // steel blue-grey
+    CharacterType.artisan:    Color(0xFFC490A0), // blush rose
+    CharacterType.bard:       Color(0xFF8AB068), // sage olive
+    CharacterType.scholar:    Color(0xFFD8C090), // warm parchment
+    CharacterType.merchant:   Color(0xFFCAB891), // parchment gold
   }[this]!;
 
   /// Subclasses belonging to this type
@@ -180,20 +181,21 @@ extension CharacterRarityExt on CharacterRarity {
     CharacterRarity.legendary: 'Legendary',
   }[this]!;
 
+  // Vintage rarity colors
   Color get color => const {
-    CharacterRarity.common:    Color(0xFF9CA3AF),
-    CharacterRarity.uncommon:  Color(0xFF22C55E),
-    CharacterRarity.rare:      Color(0xFF3B82F6),
-    CharacterRarity.epic:      Color(0xFFA855F7),
-    CharacterRarity.legendary: Color(0xFFF59E0B),
+    CharacterRarity.common:    Color(0xFF8B8070), // warm parchment-grey
+    CharacterRarity.uncommon:  Color(0xFF5F6A54), // sage green
+    CharacterRarity.rare:      Color(0xFF4A6080), // steel blue
+    CharacterRarity.epic:      Color(0xFF6B3A7A), // deep violet
+    CharacterRarity.legendary: Color(0xFF9B7B1A), // antique gold
   }[this]!;
 
   List<Color> get gradientColors => {
-    CharacterRarity.common:    [const Color(0xFF6B7280), const Color(0xFF374151)],
-    CharacterRarity.uncommon:  [const Color(0xFF16A34A), const Color(0xFF065F46)],
-    CharacterRarity.rare:      [const Color(0xFF2563EB), const Color(0xFF1E1B4B)],
-    CharacterRarity.epic:      [const Color(0xFF9333EA), const Color(0xFF4C1D95)],
-    CharacterRarity.legendary: [const Color(0xFFD97706), const Color(0xFF92400E)],
+    CharacterRarity.common:    [const Color(0xFF6B5E4A), const Color(0xFF3A3020)],
+    CharacterRarity.uncommon:  [const Color(0xFF4A6A28), const Color(0xFF1E3010)],
+    CharacterRarity.rare:      [const Color(0xFF2A4A6A), const Color(0xFF0E1E2A)],
+    CharacterRarity.epic:      [const Color(0xFF5A2A6A), const Color(0xFF220C34)],
+    CharacterRarity.legendary: [const Color(0xFF9B7B1A), const Color(0xFF3A2808)],
   }[this]!;
 
   static CharacterRarity fromString(String s) => switch (s.toLowerCase()) {

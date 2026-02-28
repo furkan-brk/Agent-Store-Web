@@ -17,7 +17,7 @@ class AgentCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF13131F),
+          color: const Color(0xFF2A2B1E),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: rc.withValues(alpha: 0.3)),
           boxShadow: [BoxShadow(color: rc.withValues(alpha: 0.06), blurRadius: 10)],
@@ -48,37 +48,37 @@ class AgentCard extends StatelessWidget {
               ]),
               const SizedBox(height: 4),
               Text(agent.title,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                style: const TextStyle(color: Color(0xFFE8D9B8), fontWeight: FontWeight.bold, fontSize: 13),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 4),
               Text(agent.description,
-                style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
+                style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 11),
                 maxLines: 2, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 8),
               // Mini stat bars
               if (agent.stats.isNotEmpty) _MiniStatBars(stats: agent.stats, color: agent.characterType.primaryColor),
               const SizedBox(height: 8),
               Row(children: [
-                const Icon(Icons.bookmarks_outlined, size: 11, color: Color(0xFF6B7280)),
+                const Icon(Icons.bookmarks_outlined, size: 11, color: Color(0xFF7A6E52)),
                 const SizedBox(width: 3),
-                Text('${agent.saveCount}', style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10)),
+                Text('${agent.saveCount}', style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 10)),
                 const SizedBox(width: 10),
-                const Icon(Icons.play_circle_outline, size: 11, color: Color(0xFF6B7280)),
+                const Icon(Icons.play_circle_outline, size: 11, color: Color(0xFF7A6E52)),
                 const SizedBox(width: 3),
-                Text('${agent.useCount}', style: const TextStyle(color: Color(0xFF6B7280), fontSize: 10)),
+                Text('${agent.useCount}', style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 10)),
                 const Spacer(),
                 if (agent.price > 0)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                      color: const Color(0xFF9B7B1A).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.6)),
+                      border: Border.all(color: const Color(0xFF9B7B1A).withValues(alpha: 0.6)),
                     ),
                     child: Text(
                       '${agent.price.toStringAsFixed(2)} MON',
                       style: const TextStyle(
-                        color: Color(0xFFF59E0B),
+                        color: Color(0xFF9B7B1A),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -88,14 +88,14 @@ class AgentCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      color: const Color(0xFF5A8A48).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                      border: Border.all(color: const Color(0xFF5A8A48).withValues(alpha: 0.4)),
                     ),
                     child: const Text(
                       'Free',
                       style: TextStyle(
-                        color: Color(0xFF10B981),
+                        color: Color(0xFF5A8A48),
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -104,8 +104,8 @@ class AgentCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFF1F2937), borderRadius: BorderRadius.circular(4)),
-                  child: Text(agent.category, style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 9)),
+                  decoration: BoxDecoration(color: const Color(0xFF282918), borderRadius: BorderRadius.circular(4)),
+                  child: Text(agent.category, style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 9)),
                 ),
               ]),
             ]),
@@ -117,10 +117,10 @@ class AgentCard extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1),
+                  color: const Color(0xFF81231E),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Text('MINE', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                child: const Text('MINE', style: TextStyle(color: Color(0xFFE8D9B8), fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
               ),
             ),
         ]),
@@ -147,14 +147,14 @@ class _MiniStatBars extends StatelessWidget {
                 borderRadius: BorderRadius.circular(1),
                 child: LinearProgressIndicator(
                   value: e.value / 100,
-                  backgroundColor: const Color(0xFF1F2937),
+                  backgroundColor: const Color(0xFF282918),
                   valueColor: AlwaysStoppedAnimation(color.withValues(alpha: 0.8)),
                   minHeight: 3,
                 ),
               ),
               const SizedBox(height: 2),
               Text(e.key.substring(0, 3).toUpperCase(),
-                style: const TextStyle(color: Color(0xFF4B5563), fontSize: 7, letterSpacing: 0.3)),
+                style: const TextStyle(color: Color(0xFF5A5038), fontSize: 7, letterSpacing: 0.3)),
             ]),
           ),
         );
@@ -174,7 +174,7 @@ class _CharacterBanner extends StatelessWidget {
       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
       gradient: LinearGradient(
         begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        colors: [agent.characterType.secondaryColor.withValues(alpha: 0.4), const Color(0xFF0A0A14)],
+        colors: [agent.characterType.secondaryColor.withValues(alpha: 0.4), const Color(0xFF181910)],
       ),
     ),
     child: Center(

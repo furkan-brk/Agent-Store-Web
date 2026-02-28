@@ -36,13 +36,13 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF0A0A14),
+    backgroundColor: const Color(0xFF181910),
     body: Column(children: [
       Container(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-        color: const Color(0xFF0F0F1E),
+        color: const Color(0xFF22231A),
         child: Row(children: [
-          const Icon(Icons.history, color: Color(0xFF6366F1), size: 22),
+          const Icon(Icons.history, color: Color(0xFF81231E), size: 22),
           const SizedBox(width: 10),
           const Text('Credit History',
             style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
@@ -50,11 +50,11 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1B4B),
+              color: const Color(0xFF2A2B1E),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.bolt, color: Color(0xFFFCD34D), size: 16),
+              const Icon(Icons.bolt, color: Color(0xFF9B7B1A), size: 16),
               const SizedBox(width: 4),
               Text('$_balance', style: const TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
@@ -62,23 +62,23 @@ class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
           ),
         ]),
       ),
-      const Divider(height: 1, color: Color(0xFF1E1E35)),
+      const Divider(height: 1, color: Color(0xFF3D3E2A)),
       if (_loading)
         const Expanded(child: Center(
-          child: CircularProgressIndicator(color: Color(0xFF6366F1))))
+          child: CircularProgressIndicator(color: Color(0xFF81231E))))
       else if (_error != null)
         Expanded(child: Center(
-          child: Text(_error!, style: const TextStyle(color: Color(0xFFDC2626)))))
+          child: Text(_error!, style: const TextStyle(color: Color(0xFF81231E)))))
       else if (_transactions.isEmpty)
         const Expanded(child: Center(child: Column(
           mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.receipt_long_outlined, color: Color(0xFF374151), size: 56),
+            Icon(Icons.receipt_long_outlined, color: Color(0xFF4A4A33), size: 56),
             SizedBox(height: 14),
             Text('No transactions yet',
-              style: TextStyle(color: Color(0xFF6B7280), fontSize: 15)),
+              style: TextStyle(color: Color(0xFF7A6E52), fontSize: 15)),
             SizedBox(height: 6),
             Text('Create or fork an agent to see your credit history.',
-              style: TextStyle(color: Color(0xFF4B5563), fontSize: 12)),
+              style: TextStyle(color: Color(0xFF5A5038), fontSize: 12)),
           ],
         )))
       else
@@ -109,19 +109,19 @@ class _TxCard extends StatelessWidget {
     switch (type) {
       case 'create':
         icon = Icons.add_box_outlined;
-        iconColor = const Color(0xFF6366F1);
+        iconColor = const Color(0xFF81231E);
         label = 'Agent Created';
       case 'fork':
         icon = Icons.fork_right;
-        iconColor = const Color(0xFF8B5CF6);
+        iconColor = const Color(0xFF9B7B1A);
         label = 'Agent Forked';
       case 'initial':
         icon = Icons.card_giftcard;
-        iconColor = const Color(0xFF16A34A);
+        iconColor = const Color(0xFF5A8A48);
         label = 'Welcome Bonus';
       default:
         icon = Icons.bolt;
-        iconColor = const Color(0xFF6B7280);
+        iconColor = const Color(0xFF7A6E52);
         label = type;
     }
 
@@ -129,9 +129,9 @@ class _TxCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F1E),
+        color: const Color(0xFF22231A),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFF1E1E35)),
+        border: Border.all(color: const Color(0xFF3D3E2A)),
       ),
       child: Row(children: [
         Container(
@@ -146,19 +146,19 @@ class _TxCard extends StatelessWidget {
             color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
           if (agentTitle != null && agentTitle.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Text(agentTitle, style: const TextStyle(color: Color(0xFF6B7280), fontSize: 11),
+            Text(agentTitle, style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
               maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
           const SizedBox(height: 2),
           Text(_formatDate(createdAt),
-            style: const TextStyle(color: Color(0xFF4B5563), fontSize: 11)),
+            style: const TextStyle(color: Color(0xFF5A5038), fontSize: 11)),
         ])),
         Row(children: [
-          const Icon(Icons.bolt, color: Color(0xFFFCD34D), size: 14),
+          const Icon(Icons.bolt, color: Color(0xFF9B7B1A), size: 14),
           const SizedBox(width: 2),
           Text(isDeduction ? '$amount' : '+$amount',
             style: TextStyle(
-              color: isDeduction ? const Color(0xFFEF4444) : const Color(0xFF22C55E),
+              color: isDeduction ? const Color(0xFF81231E) : const Color(0xFF5A8A48),
               fontWeight: FontWeight.bold, fontSize: 15,
             )),
         ]),

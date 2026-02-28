@@ -30,7 +30,7 @@ class CategorySidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 180,
-      color: const Color(0xFF0F0F1E),
+      color: const Color(0xFF22231A),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -39,7 +39,7 @@ class CategorySidebar extends StatelessWidget {
             child: Text(
               'CATEGORIES',
               style: TextStyle(
-                color: Color(0xFF6B7280),
+                color: Color(0xFF7A6E52),
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -85,7 +85,7 @@ class _CategoryItem extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _highlight = Color(0xFF6366F1);
+  static const _highlight = Color(0xFF81231E);
 
   @override
   Widget build(BuildContext context) {
@@ -111,14 +111,14 @@ class _CategoryItem extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                color: isSelected ? _highlight : const Color(0xFF6B7280),
+                color: isSelected ? _highlight : const Color(0xFF7A6E52),
                 size: 18,
               ),
               const SizedBox(width: 10),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected ? _highlight : const Color(0xFF9CA3AF),
+                  color: isSelected ? _highlight : const Color(0xFF9E8F72),
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                 ),
