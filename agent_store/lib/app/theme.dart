@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// Deep Vintage Dark — a rich, moody dark mode with warm amber/crimson accents.
 /// Background: #1E1A14  Surface: #2A2318  Card: #2E2820
@@ -17,15 +18,16 @@ class AppTheme {
   static const gold    = Color(0xFFD4A843); // warm gold
   static const olive   = Color(0xFF8A9A4A); // muted olive green
 
-  // Text ramp
+  // Text ramp — WCAG AA-friendly on dark bg
   static const textH  = Color(0xFFF0E8D4); // warm white headings
-  static const textB  = Color(0xFFA89070); // warm tan body
-  static const textM  = Color(0xFF7A6A50); // muted text
+  static const textB  = Color(0xFFCCB48A); // warm tan body  (was #A89070 — lifted for contrast)
+  static const textM  = Color(0xFF9E8B68); // muted text      (was #7A6A50 — lifted for contrast)
 
   static ThemeData get dark => ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     scaffoldBackgroundColor: bg,
+    fontFamily: GoogleFonts.inter().fontFamily,
     colorScheme: const ColorScheme.dark(
       primary: primary,
       onPrimary: textH,
@@ -87,7 +89,7 @@ class AppTheme {
       dividerColor: border,
     ),
     dividerTheme: const DividerThemeData(color: border, thickness: 1),
-    textTheme: const TextTheme(
+    textTheme: GoogleFonts.interTextTheme(const TextTheme(
       displayLarge:   TextStyle(color: textH, fontWeight: FontWeight.bold),
       headlineLarge:  TextStyle(color: textH, fontWeight: FontWeight.bold),
       headlineMedium: TextStyle(color: textH, fontWeight: FontWeight.w600),
@@ -96,7 +98,7 @@ class AppTheme {
       bodyLarge:      TextStyle(color: textB),
       bodyMedium:     TextStyle(color: textM),
       bodySmall:      TextStyle(color: textM),
-    ),
+    )),
     chipTheme: ChipThemeData(
       backgroundColor: card2,
       side: const BorderSide(color: border),

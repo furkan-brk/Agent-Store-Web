@@ -96,14 +96,14 @@ class _OnboardingModalState extends State<OnboardingModal> {
             // Body
             Text(step.body,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 14, height: 1.5)),
+              style: const TextStyle(color: Color(0xFF4A3826), fontSize: 14, height: 1.5)),
             const SizedBox(height: 32),
             // Buttons
             Row(children: [
               if (_step > 0)
                 TextButton(
                   onPressed: () => setState(() => _step--),
-                  child: const Text('Back', style: TextStyle(color: Color(0xFF7A6E52))),
+                  child: const Text('Back', style: TextStyle(color: Color(0xFF4A3826))),
                 ),
               const Spacer(),
               FilledButton(
@@ -132,7 +132,7 @@ class _OnboardingModalState extends State<OnboardingModal> {
                 OnboardingModal.markDone();
                 Navigator.of(context).pop();
               },
-              child: const Text('Skip', style: TextStyle(color: Color(0xFF5A5038), fontSize: 12)),
+              child: const Text('Skip', style: TextStyle(color: Color(0xFF4A3826), fontSize: 12)),
             ),
           ]),
         ),
