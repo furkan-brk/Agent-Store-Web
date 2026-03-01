@@ -13,6 +13,28 @@ class ApiService {
   static ApiService get instance => _instance ??= ApiService._();
   ApiService._();
 
+  // ── In-memory TTL cache ──────────────────────────────────────────────────
+  final Map<String, ({dynamic data, DateTime expiry})> _cache = {};
+
+  T? _getCache<T>(String key) {
+    final entry = _cache[key];
+    if (entry == null || DateTime.now().isAfter(entry.expiry)) return null;
+    return entry.data as T;
+  }
+
+  void _setCache(String key, dynamic data, {Duration ttl = const Duration(seconds: 60)}) {
+    _cache[key] = (data: data, expiry: DateTime.now().add(ttl));
+  }
+
+  void invalidateCache([String? prefix]) {
+    if (prefix == null) {
+      _cache.clear();
+    } else {
+      _cache.removeWhere((k, _) => k.startsWith(prefix));
+    }
+  }
+  // ────────────────────────────────────────────────────────────────────────
+
   String? _token;
   void setToken(String t) {
     _token = t;
@@ -22,6 +44,7 @@ class ApiService {
   void clearToken() {
     _token = null;
     SharedPreferences.getInstance().then((p) => p.remove(_kTokenKey));
+    invalidateCache(); // wipe all caches on logout
   }
 
   bool get isAuthenticated => _token != null;
@@ -72,6 +95,9 @@ class ApiService {
     double? maxPrice,
     List<String>? tags,
   }) async {
+    final cacheKey = 'agents_${category ?? ''}_${search ?? ''}_${sort}_${page}_${limit}_${minPrice ?? 0}_${maxPrice ?? 0}_${tags?.join(',') ?? ''}';
+    final cached = _getCache<({List<AgentModel> agents, int total})>(cacheKey);
+    if (cached != null) return cached;
     try {
       final uri = Uri.parse(ApiConstants.agents).replace(queryParameters: {
         if (category != null && category.isNotEmpty) 'category': category,
@@ -82,12 +108,14 @@ class ApiService {
         if (maxPrice != null) 'max_price': maxPrice.toStringAsFixed(2),
         if (tags != null && tags.isNotEmpty) 'tags': tags.join(','),
       });
-      final res = await http.get(uri, headers: _headers);
+      final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final list = (data['agents'] as List<dynamic>)
             .map((e) => AgentModel.fromJson(e as Map<String, dynamic>)).toList();
-        return (agents: list, total: data['total'] as int? ?? 0);
+        final result = (agents: list, total: data['total'] as int? ?? 0);
+        _setCache(cacheKey, result);
+        return result;
       }
     } catch (e) { debugPrint('listAgents: $e'); }
     return (agents: <AgentModel>[], total: 0);
@@ -115,7 +143,10 @@ class ApiService {
             body: jsonEncode({'title': title, 'description': description, 'prompt': prompt}),
           )
           .timeout(const Duration(seconds: 120));
-      if (res.statusCode == 201) return AgentModel.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      if (res.statusCode == 201) {
+        invalidateCache('agents');
+        return AgentModel.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
       debugPrint('createAgent: HTTP ${res.statusCode} — ${res.body}');
     } catch (e) { debugPrint('createAgent: $e'); }
     return null;
@@ -124,12 +155,17 @@ class ApiService {
   // ── Library ───────────────────────────────────────────────────────────────
 
   Future<List<AgentModel>> getLibrary() async {
+    const cacheKey = 'library';
+    final cached = _getCache<List<AgentModel>>(cacheKey);
+    if (cached != null) return cached;
     try {
-      final res = await http.get(Uri.parse(ApiConstants.userLibrary), headers: _headers);
+      final res = await http.get(Uri.parse(ApiConstants.userLibrary), headers: _headers).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final entries = (jsonDecode(res.body) as Map<String, dynamic>)['entries'] as List<dynamic>;
-        return entries.map((e) =>
+        final result = entries.map((e) =>
           AgentModel.fromJson((e as Map<String, dynamic>)['agent'] as Map<String, dynamic>)).toList();
+        _setCache(cacheKey, result);
+        return result;
       }
     } catch (e) { debugPrint('getLibrary: $e'); }
     return [];
@@ -138,14 +174,16 @@ class ApiService {
   Future<bool> addToLibrary(int id) async {
     try {
       final res = await http.post(Uri.parse('${ApiConstants.userLibrary}/$id'), headers: _headers);
-      return res.statusCode == 200;
+      if (res.statusCode == 200) { invalidateCache('library'); return true; }
+      return false;
     } catch (e) { debugPrint('addToLibrary: $e'); return false; }
   }
 
   Future<bool> removeFromLibrary(int id) async {
     try {
       final res = await http.delete(Uri.parse('${ApiConstants.userLibrary}/$id'), headers: _headers);
-      return res.statusCode == 200;
+      if (res.statusCode == 200) { invalidateCache('library'); return true; }
+      return false;
     } catch (e) { debugPrint('removeFromLibrary: $e'); return false; }
   }
 
@@ -162,12 +200,16 @@ class ApiService {
   // ── Trending / Fork / Chat / Profile ─────────────────────────────────────
 
   Future<List<AgentModel>> getTrending() async {
+    const cacheKey = 'trending';
+    final cached = _getCache<List<AgentModel>>(cacheKey);
+    if (cached != null) return cached;
     try {
-      final res = await http.get(Uri.parse('${ApiConstants.agents}/trending'), headers: _headers);
+      final res = await http.get(Uri.parse('${ApiConstants.agents}/trending'), headers: _headers).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final list = (data['agents'] as List<dynamic>)
             .map((e) => AgentModel.fromJson(e as Map<String, dynamic>)).toList();
+        _setCache(cacheKey, list, ttl: const Duration(seconds: 120));
         return list;
       }
     } catch (e) { debugPrint('getTrending: $e'); }
@@ -322,16 +364,21 @@ class ApiService {
   // ── Guilds ────────────────────────────────────────────────────────────────
 
   Future<({List<GuildModel> guilds, int total})> listGuilds({int page = 1, int limit = 20}) async {
+    final cacheKey = 'guilds_${page}_$limit';
+    final cached = _getCache<({List<GuildModel> guilds, int total})>(cacheKey);
+    if (cached != null) return cached;
     try {
       final uri = Uri.parse(ApiConstants.guilds).replace(queryParameters: {
         'page': '$page', 'limit': '$limit',
       });
-      final res = await http.get(uri, headers: _headers);
+      final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final list = (data['guilds'] as List<dynamic>)
             .map((e) => GuildModel.fromJson(e as Map<String, dynamic>)).toList();
-        return (guilds: list, total: data['total'] as int? ?? 0);
+        final result = (guilds: list, total: data['total'] as int? ?? 0);
+        _setCache(cacheKey, result);
+        return result;
       }
     } catch (e) { debugPrint('listGuilds: $e'); }
     return (guilds: <GuildModel>[], total: 0);

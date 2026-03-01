@@ -40,7 +40,8 @@ class StoreController extends GetxController {
   }
 
   Future<void> load() async {
-    isLoading.value = true;
+    // Show spinner only on first load; silently refresh when stale data exists
+    if (agents.isEmpty) isLoading.value = true;
     hasError.value = false;
     try {
       final r = await ApiService.instance.listAgents(
@@ -54,7 +55,7 @@ class StoreController extends GetxController {
       agents.value = r.agents;
       total.value = r.total;
     } catch (_) {
-      hasError.value = true;
+      if (agents.isEmpty) hasError.value = true;
     }
     isLoading.value = false;
   }

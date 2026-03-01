@@ -32,7 +32,8 @@ class LibraryController extends GetxController {
   }
 
   Future<void> load() async {
-    isLoading.value = true;
+    // Show spinner only on first load; silently refresh when stale data exists
+    if (saved.isEmpty && created.isEmpty) isLoading.value = true;
     final wallet = WalletService.instance.connectedWallet ?? '';
     final results = await Future.wait([
       ApiService.instance.getLibrary(),

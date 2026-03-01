@@ -14,13 +14,14 @@ class GuildController extends GetxController {
   }
 
   Future<void> load() async {
-    isLoading.value = true;
+    // Show spinner only on first load; silently refresh when stale data exists
+    if (guilds.isEmpty) isLoading.value = true;
     error.value = null;
     try {
       final result = await ApiService.instance.listGuilds();
       guilds.value = result.guilds;
     } catch (e) {
-      error.value = e.toString();
+      if (guilds.isEmpty) error.value = e.toString();
     }
     isLoading.value = false;
   }
