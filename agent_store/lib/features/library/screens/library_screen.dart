@@ -8,6 +8,7 @@ import '../../../shared/services/api_service.dart';
 import '../../../shared/services/collection_service.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/widgets/achievement_badge.dart';
+import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../store/widgets/agent_card.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -44,7 +45,9 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         child: Column(children: [
           _buildHeader(),
           Expanded(child: _ctrl.isLoading.value
-            ? const Center(child: CircularProgressIndicator(color: Color(0xFF81231E)))
+            ? const SingleChildScrollView(
+                child: SkeletonAgentGrid(count: 8, padding: EdgeInsets.fromLTRB(20, 8, 20, 20)),
+              )
             : TabBarView(controller: _tabCtrl, children: [
                 _buildSavedTab(),
                 _buildCreatedTab(),
@@ -311,8 +314,11 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
 
   void _toggle(AgentCollection col) {
     final alreadyIn = col.agentIds.contains(widget.agent.id);
-    if (alreadyIn) CollectionService.instance.removeAgent(col.id, widget.agent.id);
-    else CollectionService.instance.addAgent(col.id, widget.agent.id);
+    if (alreadyIn) {
+      CollectionService.instance.removeAgent(col.id, widget.agent.id);
+    } else {
+      CollectionService.instance.addAgent(col.id, widget.agent.id);
+    }
     setState(() => _collections = CollectionService.instance.getAll());
     widget.onChanged();
   }

@@ -15,6 +15,7 @@ import '../widgets/category_sidebar.dart';
 import '../widgets/filter_panel.dart';
 import '../widgets/trending_row.dart';
 import '../../../shared/widgets/onboarding_modal.dart';
+import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../character/character_types.dart';
 
 class StoreScreen extends StatefulWidget {
@@ -115,41 +116,65 @@ class _StoreScreenState extends State<StoreScreen> {
           _ctrl.load();
         },
       )),
-      Expanded(child: Obx(() => RefreshIndicator(
+      // ShimmerScope provides a shared AnimationController for all AgentCardSkeleton children.
+    Expanded(child: ShimmerScope(
+      child: RefreshIndicator(
         onRefresh: _ctrl.load,
         color: AppTheme.primary,
-        child: CustomScrollView(cacheExtent: 800, slivers: [
+        child: CustomScrollView(cacheExtent: 1200, slivers: [
+          // Header is purely driven by TextEditingController + inner Obx calls → no outer Obx needed.
           SliverToBoxAdapter(child: _buildHeader()),
-          if (_ctrl.search.value.isEmpty)
-            const SliverToBoxAdapter(child: TrendingRow()),
-          if (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
-            SliverToBoxAdapter(child: _buildDiscovery()),
+          // TrendingRow: only hide/show when search changes.
+          Obx(() => _ctrl.search.value.isEmpty
+            ? const SliverToBoxAdapter(child: TrendingRow())
+            : const SliverToBoxAdapter(child: SizedBox.shrink())),
+          // Discovery: only visible with empty search + no category + not loading.
+          Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
+            ? SliverToBoxAdapter(child: _buildDiscovery())
+            : const SliverToBoxAdapter(child: SizedBox.shrink())),
+          // Section heading has its own inner Obx → no outer wrapper needed.
           SliverToBoxAdapter(child: _buildSectionHeader()),
-          if (_ctrl.isLoading.value)
-            const SliverFillRemaining(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(color: AppTheme.primary),
-              SizedBox(height: 12),
-              Text('Loading agents...', style: TextStyle(color: AppTheme.textM, fontSize: 12)),
-            ])))
-          else if (_ctrl.hasError.value)
-            SliverFillRemaining(child: _buildErrorView())
-          else if (_ctrl.agents.isEmpty)
-            SliverFillRemaining(child: _buildEmpty())
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 300, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.72),
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => RepaintBoundary(key: ValueKey(_ctrl.agents[i].id), child: _AgentCardWithSave(agent: _ctrl.agents[i], onSave: () => _onSaveAgent(_ctrl.agents[i]))),
-                  childCount: _ctrl.agents.length,
-                ),
-              ),
-            ),
+          // Main content sliver: rebuilds ONLY when isLoading/agents/hasError change.
+          Obx(() => _buildContentSliver()),
         ]),
-      ))),
+      ),
+    )),
     ]),
   );
+
+  // Returns a sliver based on current controller state.
+  Widget _buildContentSliver() {
+    // Skeleton: loading AND no stale data to show
+    if (_ctrl.isLoading.value && _ctrl.agents.isEmpty) {
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 300, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.72),
+          delegate: SliverChildBuilderDelegate(
+            (_, __) => const AgentCardSkeleton(),
+            childCount: 12,
+          ),
+        ),
+      );
+    }
+    if (_ctrl.hasError.value) return SliverFillRemaining(child: _buildErrorView());
+    if (_ctrl.agents.isEmpty) return SliverFillRemaining(child: _buildEmpty());
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      sliver: SliverGrid(
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 300, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.72),
+        delegate: SliverChildBuilderDelegate(
+          (_, i) => RepaintBoundary(
+            key: ValueKey(_ctrl.agents[i].id),
+            child: _AgentCardWithSave(agent: _ctrl.agents[i], onSave: () => _onSaveAgent(_ctrl.agents[i])),
+          ),
+          childCount: _ctrl.agents.length,
+        ),
+      ),
+    );
+  }
 
   Widget _buildHeader() => Padding(
     padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),

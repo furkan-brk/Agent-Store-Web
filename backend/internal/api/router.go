@@ -18,10 +18,13 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false, // Must be false when AllowAllOrigins is true
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}
 	r.Use(cors.New(corsConfig))
+
+	// Single shared in-process cache for all services.
+	cache := services.NewCacheStore()
 
 	authSvc := services.NewAuthService(jwtSecret)
 	aiSvc := services.NewAIService(claudeAPIKey)
@@ -29,8 +32,8 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
 	scoreSvc := services.NewScoreService(geminiAPIKey)
 	pollinationsSvc := services.NewPollinationsService()
-	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc)
-	guildSvc := services.NewGuildService(scoreSvc)
+	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache)
+	guildSvc := services.NewGuildService(scoreSvc, cache)
 	gmSvc := services.NewGuildMasterService(aiSvc)
 
 	authH := handlers.NewAuthHandler(authSvc)

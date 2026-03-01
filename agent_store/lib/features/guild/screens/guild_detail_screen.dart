@@ -39,11 +39,13 @@ class GuildDetailScreen extends StatelessWidget {
 
   Widget _buildBody(_GuildDetailCtrl ctrl, BuildContext context) {
     if (ctrl.isLoading.value) return const Center(child: CircularProgressIndicator(color: Color(0xFF81231E), strokeWidth: 2.5));
-    if (ctrl.error.value != null) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+    if (ctrl.error.value != null) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 40), const SizedBox(height: 12),
       Text(ctrl.error.value!, style: const TextStyle(color: Color(0xFF6B5A40))),
       TextButton(onPressed: ctrl.load, child: const Text('Retry')),
     ]));
+    }
     final d = ctrl.detail.value;
     if (d == null) return const Center(child: Text('Guild not found', style: TextStyle(color: Color(0xFF2B2C1E))));
 

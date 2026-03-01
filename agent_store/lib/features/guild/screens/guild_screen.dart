@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../controllers/guild_controller.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../character/character_types.dart';
 
 class GuildScreen extends StatelessWidget {
@@ -32,7 +33,18 @@ class GuildScreen extends StatelessWidget {
           const Text('2–4 agents united for synergy bonuses', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
           const SizedBox(height: 24),
           if (ctrl.isLoading.value)
-            const Expanded(child: Center(child: CircularProgressIndicator(color: Color(0xFF81231E), strokeWidth: 2.5)))
+            Expanded(
+              child: ShimmerScope(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(0),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 280, mainAxisExtent: 172,
+                    crossAxisSpacing: 12, mainAxisSpacing: 12),
+                  itemCount: 8,
+                  itemBuilder: (_, __) => const GuildCardSkeleton(),
+                ),
+              ),
+            )
           else if (ctrl.error.value != null)
             Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 40),

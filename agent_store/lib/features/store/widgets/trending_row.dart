@@ -37,12 +37,12 @@ class _TrendingRowState extends State<TrendingRow> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 20, 24, 12),
           child: Row(children: [
-            const Icon(Icons.local_fire_department_rounded, color: AppTheme.primary, size: 16),
-            const SizedBox(width: 6),
-            const Text(
+            Icon(Icons.local_fire_department_rounded, color: AppTheme.primary, size: 16),
+            SizedBox(width: 6),
+            Text(
               'TRENDING',
               style: TextStyle(
                 color: AppTheme.textH,

@@ -27,8 +27,11 @@ class LibraryController extends GetxController {
   void onInit() {
     super.onInit();
     collections.value = CollectionService.instance.getAll();
-    if (ApiService.instance.isAuthenticated) load();
-    else isLoading.value = false;
+    if (ApiService.instance.isAuthenticated) {
+      load();
+    } else {
+      isLoading.value = false;
+    }
   }
 
   Future<void> load() async {

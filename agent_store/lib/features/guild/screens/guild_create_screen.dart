@@ -104,8 +104,9 @@ class _GuildCreateController extends GetxController {
   }
 
   void toggleAgent(int id) {
-    if (selectedIds.contains(id)) selectedIds.remove(id);
-    else if (selectedIds.length < 4) selectedIds.add(id);
+    if (selectedIds.contains(id)) {
+      selectedIds.remove(id);
+    } else if (selectedIds.length < 4) selectedIds.add(id);
   }
 
   Future<void> create(String name, BuildContext ctx) async {

@@ -99,10 +99,10 @@ class AppTheme {
       bodyMedium:     TextStyle(color: textM),
       bodySmall:      TextStyle(color: textM),
     )),
-    chipTheme: ChipThemeData(
+    chipTheme: const ChipThemeData(
       backgroundColor: card2,
-      side: const BorderSide(color: border),
-      labelStyle: const TextStyle(color: textB, fontSize: 11),
+      side: BorderSide(color: border),
+      labelStyle: TextStyle(color: textB, fontSize: 11),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: card2,

@@ -1,10 +1,12 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/models"
@@ -27,10 +29,11 @@ type AgentService struct {
 	replicateSvc    *ReplicateService
 	scoreSvc        *ScoreService
 	pollinationsSvc *PollinationsService
+	cache           *CacheStore
 }
 
-func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService) *AgentService {
-	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc}
+func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService, cache *CacheStore) *AgentService {
+	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc, cache: cache}
 }
 
 type CreateAgentInput struct {
@@ -41,6 +44,18 @@ type CreateAgentInput struct {
 }
 
 func (s *AgentService) ListAgents(category, search, sort string, page, limit int) ([]models.Agent, int64, error) {
+	type cachedResult struct {
+		Agents []models.Agent `json:"agents"`
+		Total  int64          `json:"total"`
+	}
+	cacheKey := fmt.Sprintf("agents|%s|%s|%s|%d|%d", category, search, sort, page, limit)
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var r cachedResult
+		if err := json.Unmarshal(data, &r); err == nil {
+			return r.Agents, r.Total, nil
+		}
+	}
+
 	var agents []models.Agent
 	var total int64
 	query := database.DB.Model(&models.Agent{})
@@ -52,7 +67,7 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 	}
 	query.Count(&total)
 	offset := (page - 1) * limit
-	orderClause := "created_at DESC" // default: newest
+	orderClause := "created_at DESC"
 	switch sort {
 	case "popular":
 		orderClause = "(save_count * 3 + use_count * 2) DESC"
@@ -65,10 +80,14 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 	case "oldest":
 		orderClause = "created_at ASC"
 	}
-	// Select only list-view fields, skip heavy prompt and character_data
 	err := query.
 		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, created_at").
 		Offset(offset).Limit(limit).Order(orderClause).Find(&agents).Error
+	if err == nil {
+		if b, jerr := json.Marshal(cachedResult{Agents: agents, Total: total}); jerr == nil {
+			s.cache.Set(cacheKey, b, 60*time.Second)
+		}
+	}
 	return agents, total, err
 }
 
@@ -182,6 +201,9 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		database.DB.Create(&entry)
 		database.DB.Model(&models.Agent{}).Where("id = ?", agent.ID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	}
+	// Invalidate agent list + trending caches so new agent appears immediately.
+	s.cache.DeletePrefix("agents|")
+	s.cache.Delete("trending")
 	return agent, err
 }
 
@@ -257,6 +279,13 @@ func extractKeywordTags(prompt string) []string {
 
 // GetTrending returns the top 6 agents ranked by save_count*3 + use_count*2.
 func (s *AgentService) GetTrending() ([]models.Agent, error) {
+	const cacheKey = "trending"
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var agents []models.Agent
+		if err := json.Unmarshal(data, &agents); err == nil {
+			return agents, nil
+		}
+	}
 	var agents []models.Agent
 	// Select only list-view fields, skip heavy prompt and character_data
 	err := database.DB.
@@ -264,6 +293,11 @@ func (s *AgentService) GetTrending() ([]models.Agent, error) {
 		Order("(save_count * 3 + use_count * 2) DESC").
 		Limit(6).
 		Find(&agents).Error
+	if err == nil {
+		if b, jerr := json.Marshal(agents); jerr == nil {
+			s.cache.Set(cacheKey, b, 120*time.Second)
+		}
+	}
 	return agents, err
 }
 
@@ -305,6 +339,9 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	if err := database.DB.Create(fork).Error; err != nil {
 		return nil, err
 	}
+	// Invalidate caches
+	s.cache.DeletePrefix("agents|")
+	s.cache.Delete("trending")
 
 	// Auto-add fork to creator's library
 	if creatorWallet != "" {
