@@ -1,127 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
-import '../../character/character_types.dart';
+import '../../../controllers/guild_controller.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/skeleton_widgets.dart';
+import '../../character/character_types.dart';
 
-class GuildScreen extends StatefulWidget {
+class GuildScreen extends StatelessWidget {
   const GuildScreen({super.key});
 
   @override
-  State<GuildScreen> createState() => _GuildScreenState();
-}
-
-class _GuildScreenState extends State<GuildScreen> {
-  List<GuildModel> _guilds = [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final result = await ApiService.instance.listGuilds();
-      if (mounted) setState(() { _guilds = result.guilds; _loading = false; });
-    } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
-    }
-  }
-
-  void _onCreateGuild() {
-    if (!ApiService.instance.isAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Connect your wallet to create a guild'),
-          backgroundColor: const Color(0xFF1E1F14),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          action: SnackBarAction(
-            label: 'Connect',
-            textColor: const Color(0xFF81231E),
-            onPressed: () => context.go('/wallet'),
-          ),
-        ),
-      );
-      return;
-    }
-    context.go('/guild/create');
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF181910),
+    final ctrl = Get.put(GuildController());
+
+    return Obx(() => Scaffold(
+      backgroundColor: const Color(0xFFDDD1BB),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Text('Guilds', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text('Guilds', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 24, fontWeight: FontWeight.bold)),
             const Spacer(),
             FilledButton.icon(
               style: FilledButton.styleFrom(backgroundColor: const Color(0xFF81231E)),
-              onPressed: _onCreateGuild,
+              onPressed: () => _onCreateGuild(context),
               icon: const Icon(Icons.add, size: 16),
               label: const Text('Create Guild'),
             ),
           ]),
           const SizedBox(height: 8),
-          const Text('2–4 agents united for synergy bonuses',
-            style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
+          const Text('2–4 agents united for synergy bonuses', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
           const SizedBox(height: 24),
-          if (_loading)
-            const Expanded(child: Center(child: CircularProgressIndicator(
-              color: Color(0xFF81231E),
-              strokeWidth: 2.5,
-            )))
-          else if (_error != null)
+          if (ctrl.isLoading.value)
+            Expanded(
+              child: ShimmerScope(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(0),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 280, mainAxisExtent: 172,
+                    crossAxisSpacing: 12, mainAxisSpacing: 12),
+                  itemCount: 8,
+                  itemBuilder: (_, __) => const GuildCardSkeleton(),
+                ),
+              ),
+            )
+          else if (ctrl.error.value != null)
             Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Icon(Icons.error_outline, color: Color(0xFF81231E), size: 40),
               const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: Color(0xFF9E8F72))),
+              Text(ctrl.error.value!, style: const TextStyle(color: Color(0xFF6B5A40))),
               const SizedBox(height: 16),
-              TextButton(onPressed: _load, child: const Text('Retry')),
+              TextButton(onPressed: ctrl.load, child: const Text('Retry')),
             ])))
-          else if (_guilds.isEmpty)
+          else if (ctrl.guilds.isEmpty)
             Expanded(child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.groups_outlined, color: Color(0xFF4A4A33), size: 64),
+              const Icon(Icons.groups_outlined, color: Color(0xFFC0B490), size: 64),
               const SizedBox(height: 16),
-              const Text('No guilds yet', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('No guilds yet', style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text('Be the first to create one!',
-                style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
+              const Text('Be the first to create one!', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 13)),
               const SizedBox(height: 24),
               FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xFF81231E)),
-                onPressed: _onCreateGuild,
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('Create Guild'),
+                onPressed: () => _onCreateGuild(context),
+                icon: const Icon(Icons.add, size: 16), label: const Text('Create Guild'),
               ),
             ])))
           else
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _load,
-                color: const Color(0xFF81231E),
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 280,
-                    mainAxisExtent: 172,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: _guilds.length,
-                  itemBuilder: (_, i) => _GuildCard(guild: _guilds[i]),
-                ),
+            Expanded(child: RefreshIndicator(
+              onRefresh: ctrl.load,
+              color: const Color(0xFF81231E),
+              child: GridView.builder(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 280, mainAxisExtent: 172, crossAxisSpacing: 12, mainAxisSpacing: 12),
+                itemCount: ctrl.guilds.length,
+                itemBuilder: (_, i) => _GuildCard(guild: ctrl.guilds[i]),
               ),
-            ),
+            )),
         ]),
       ),
-    );
+    ));
+  }
+
+  void _onCreateGuild(BuildContext context) {
+    if (!ApiService.instance.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Connect your wallet to create a guild'),
+        backgroundColor: const Color(0xFFB8AA88),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(label: 'Connect', textColor: const Color(0xFF81231E), onPressed: () => context.go('/wallet')),
+      ));
+      return;
+    }
+    context.go('/guild/create');
   }
 }
 
@@ -133,10 +106,7 @@ class _GuildCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final rarityColor = _rarityColor(guild.rarity);
     final statusLabel = guild.memberCount >= 4 ? 'Full' : 'Recruiting';
-    final statusColor = guild.memberCount >= 4
-        ? const Color(0xFF81231E)
-        : const Color(0xFF5A8A48);
-
+    final statusColor = guild.memberCount >= 4 ? const Color(0xFF81231E) : const Color(0xFF5A8A48);
     final categoryLabel = _categoryLabel(guild);
 
     return InkWell(
@@ -145,8 +115,7 @@ class _GuildCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2B1E),
-          borderRadius: BorderRadius.circular(12),
+          color: const Color(0xFFE8DEC9), borderRadius: BorderRadius.circular(12),
           border: Border.all(color: rarityColor.withValues(alpha: 0.35)),
           boxShadow: [BoxShadow(color: rarityColor.withValues(alpha: 0.06), blurRadius: 8)],
         ),
@@ -155,47 +124,27 @@ class _GuildCard extends StatelessWidget {
             Text(guild.roleIcon, style: const TextStyle(fontSize: 20)),
             const SizedBox(width: 8),
             Expanded(child: Text(guild.name,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              style: const TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 14),
               maxLines: 1, overflow: TextOverflow.ellipsis)),
           ]),
           const SizedBox(height: 8),
-          // Rarity badge + category badge row
           Wrap(spacing: 6, runSpacing: 4, children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: rarityColor.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(guild.rarity.toUpperCase(),
-                style: TextStyle(color: rarityColor, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: const Color(0xFF282918),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(categoryLabel,
-                style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 9, fontWeight: FontWeight.w500)),
-            ),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: rarityColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)),
+              child: Text(guild.rarity.toUpperCase(), style: TextStyle(color: rarityColor, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1))),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: const Color(0xFF282918), borderRadius: BorderRadius.circular(6)),
+              child: Text(categoryLabel, style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 9, fontWeight: FontWeight.w500))),
           ]),
           const Spacer(),
           Row(children: [
             const Icon(Icons.group, size: 14, color: Color(0xFF7A6E52)),
             const SizedBox(width: 4),
-            Text('${guild.memberCount}/4 members',
-              style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11)),
+            Text('${guild.memberCount}/4 members', style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11)),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(statusLabel,
-                style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold)),
-            ),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)),
+              child: Text(statusLabel, style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold))),
             const Spacer(),
             const Icon(Icons.chevron_right, size: 16, color: Color(0xFF5A5038)),
           ]),
@@ -204,15 +153,9 @@ class _GuildCard extends StatelessWidget {
     );
   }
 
-  /// Derive a display category from available member data.
   String _categoryLabel(GuildModel guild) {
     if (guild.members.isEmpty) return 'Open Roster';
-    // Collect distinct character types from member agents
-    final types = guild.members
-        .map((m) => m.agent?.characterType.displayName)
-        .whereType<String>()
-        .toSet()
-        .toList();
+    final types = guild.members.map((m) => m.agent?.characterType.displayName).whereType<String>().toSet().toList();
     if (types.isEmpty) return 'Mixed';
     if (types.length == 1) return types.first;
     return '${types.length} Types';

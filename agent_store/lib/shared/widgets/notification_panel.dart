@@ -33,7 +33,7 @@ class _NotificationBellState extends State<NotificationBell> {
     clipBehavior: Clip.none,
     children: [
       IconButton(
-        icon: const Icon(Icons.notifications_outlined, color: Color(0xFF9E8F72), size: 20),
+        icon: const Icon(Icons.notifications_outlined, color: Color(0xFF8A7550), size: 20),
         onPressed: _openPanel,
         tooltip: 'Notifications',
         padding: EdgeInsets.zero,
@@ -86,20 +86,20 @@ class _NotificationDialogState extends State<_NotificationDialog> {
     switch (type) {
       case 'purchase': return const Color(0xFF5A8A48);
       case 'save': return const Color(0xFF81231E);
-      default: return const Color(0xFF9E8F72);
+      default: return const Color(0xFF8A7550);
     }
   }
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: const Color(0xFF1E1F14),
+    backgroundColor: const Color(0xFFB8AA88),
     title: Row(children: [
       const Text('Notifications', style: TextStyle(color: Colors.white, fontSize: 16)),
       const Spacer(),
       if (_notifications.isNotEmpty)
         TextButton(
           onPressed: () { NotificationService.instance.clear(); setState(() => _notifications = []); },
-          child: const Text('Clear all', style: TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
+          child: const Text('Clear all', style: TextStyle(color: Color(0xFF4A3826), fontSize: 12)),
         ),
     ]),
     content: SizedBox(
@@ -107,11 +107,11 @@ class _NotificationDialogState extends State<_NotificationDialog> {
       child: _notifications.isEmpty
           ? const Center(child: Padding(
               padding: EdgeInsets.all(24),
-              child: Text('No notifications yet', style: TextStyle(color: Color(0xFF7A6E52)))))
+              child: Text('No notifications yet', style: TextStyle(color: Color(0xFF4A3826)))))
           : ListView.separated(
               shrinkWrap: true,
               itemCount: _notifications.length,
-              separatorBuilder: (_, __) => const Divider(color: Color(0xFF3D3E2A), height: 1),
+              separatorBuilder: (_, __) => const Divider(color: Color(0xFFADA07A), height: 1),
               itemBuilder: (_, i) {
                 final n = _notifications[i];
                 return ListTile(
@@ -119,7 +119,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                   title: Text(n.message, style: const TextStyle(color: Colors.white, fontSize: 13)),
                   subtitle: Text(
                     '${n.createdAt.day}/${n.createdAt.month} ${n.createdAt.hour}:${n.createdAt.minute.toString().padLeft(2, '0')}',
-                    style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
+                    style: const TextStyle(color: Color(0xFF4A3826), fontSize: 11),
                   ),
                   contentPadding: EdgeInsets.zero,
                   dense: true,

@@ -156,7 +156,7 @@ class _MemberCard extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '${_roleIcon(member.role)} ${member.role}',
-          style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 10),
+          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10),
         ),
       ],
     ]);

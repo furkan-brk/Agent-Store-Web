@@ -3,14 +3,21 @@ package services
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/models"
 )
 
-type GuildService struct{}
+type GuildService struct {
+	scoreSvc *ScoreService
+	cache    *CacheStore
+}
 
-func NewGuildService() *GuildService { return &GuildService{} }
+func NewGuildService(scoreSvc *ScoreService, cache *CacheStore) *GuildService {
+	return &GuildService{scoreSvc: scoreSvc, cache: cache}
+}
 
 type CreateGuildInput struct {
 	Name          string `json:"name" binding:"required"`
@@ -46,12 +53,28 @@ func determineMemberRole(agent models.Agent) string {
 }
 
 func (s *GuildService) ListGuilds(page, limit int) ([]models.Guild, int64, error) {
+	cacheKey := fmt.Sprintf("guilds|%d|%d", page, limit)
+	type cachedResult struct {
+		Guilds []models.Guild `json:"guilds"`
+		Total  int64          `json:"total"`
+	}
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var r cachedResult
+		if err := json.Unmarshal(data, &r); err == nil {
+			return r.Guilds, r.Total, nil
+		}
+	}
 	var guilds []models.Guild
 	var total int64
 	database.DB.Model(&models.Guild{}).Count(&total)
 	offset := (page - 1) * limit
 	err := database.DB.Preload("Members.Agent").
 		Offset(offset).Limit(limit).Order("created_at DESC").Find(&guilds).Error
+	if err == nil {
+		if b, jerr := json.Marshal(cachedResult{Guilds: guilds, Total: total}); jerr == nil {
+			s.cache.Set(cacheKey, b, 60*time.Second)
+		}
+	}
 	return guilds, total, err
 }
 
@@ -62,6 +85,9 @@ func (s *GuildService) CreateGuild(input CreateGuildInput) (*models.Guild, error
 		Rarity:        "common",
 	}
 	err := database.DB.Create(guild).Error
+	if err == nil {
+		s.cache.DeletePrefix("guilds|")
+	}
 	return guild, err
 }
 
@@ -109,7 +135,11 @@ func (s *GuildService) AddMember(guildID uint, agentID uint, wallet string) erro
 		AgentID: agentID,
 		Role:    role,
 	}
-	return database.DB.Create(member).Error
+	err := database.DB.Create(member).Error
+	if err == nil {
+		s.cache.DeletePrefix("guilds|")
+	}
+	return err
 }
 
 // JoinGuild lets any authenticated user add their first agent to a guild.
@@ -134,7 +164,11 @@ func (s *GuildService) JoinGuild(guildID uint, wallet string) error {
 	}
 	role := determineMemberRole(agent)
 	member := &models.GuildMember{GuildID: guildID, AgentID: agent.ID, Role: role}
-	return database.DB.Create(member).Error
+	err := database.DB.Create(member).Error
+	if err == nil {
+		s.cache.DeletePrefix("guilds|")
+	}
+	return err
 }
 
 // LeaveGuild removes the authenticated user's agent from a guild.
@@ -143,8 +177,12 @@ func (s *GuildService) LeaveGuild(guildID uint, wallet string) error {
 	if err := database.DB.Where("creator_wallet = ?", wallet).Order("created_at ASC").First(&agent).Error; err != nil {
 		return errors.New("no agent found")
 	}
-	return database.DB.Where("guild_id = ? AND agent_id = ?", guildID, agent.ID).
+	err := database.DB.Where("guild_id = ? AND agent_id = ?", guildID, agent.ID).
 		Delete(&models.GuildMember{}).Error
+	if err == nil {
+		s.cache.DeletePrefix("guilds|")
+	}
+	return err
 }
 
 func (s *GuildService) RemoveMember(guildID, agentID uint, wallet string) error {
@@ -155,8 +193,33 @@ func (s *GuildService) RemoveMember(guildID, agentID uint, wallet string) error 
 	if guild.CreatorWallet != wallet {
 		return errors.New("unauthorized")
 	}
-	return database.DB.Where("guild_id = ? AND agent_id = ?", guildID, agentID).
+	err := database.DB.Where("guild_id = ? AND agent_id = ?", guildID, agentID).
 		Delete(&models.GuildMember{}).Error
+	if err == nil {
+		s.cache.DeletePrefix("guilds|")
+	}
+	return err
+}
+
+// CheckCompatibility analyzes how well the agents in a guild complement each other.
+func (s *GuildService) CheckCompatibility(guildID uint) (*GuildCompatibilityResult, error) {
+	var guild models.Guild
+	if err := database.DB.Preload("Members.Agent").First(&guild, guildID).Error; err != nil {
+		return nil, errors.New("guild not found")
+	}
+
+	summaries := make([]guildMemberSummary, 0, len(guild.Members))
+	for _, m := range guild.Members {
+		summaries = append(summaries, guildMemberSummary{
+			AgentID:     m.AgentID,
+			Title:       m.Agent.Title,
+			CharType:    m.Agent.CharacterType,
+			Category:    m.Agent.Category,
+			ServiceDesc: m.Agent.ServiceDescription,
+		})
+	}
+
+	return s.scoreSvc.AnalyzeGuildCompatibility(guildID, summaries), nil
 }
 
 func calculateGuildRarity(members []models.GuildMember) string {

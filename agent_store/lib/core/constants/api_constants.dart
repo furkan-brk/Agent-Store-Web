@@ -13,4 +13,5 @@ class ApiConstants {
   static const String guilds            = '$apiV1/guilds';
   static const String userCreditHistory = '$apiV1/user/credits/history';
   static const String leaderboard       = '$apiV1/leaderboard';
+  static const String guildMaster       = '$apiV1/guild-master';
 }

@@ -1,10 +1,12 @@
 package services
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/models"
@@ -22,13 +24,16 @@ type UserProfile struct {
 }
 
 type AgentService struct {
-	aiSvc        *AIService
-	geminiSvc    *GeminiService
-	replicateSvc *ReplicateService
+	aiSvc           *AIService
+	geminiSvc       *GeminiService
+	replicateSvc    *ReplicateService
+	scoreSvc        *ScoreService
+	pollinationsSvc *PollinationsService
+	cache           *CacheStore
 }
 
-func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService) *AgentService {
-	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc}
+func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService, cache *CacheStore) *AgentService {
+	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc, cache: cache}
 }
 
 type CreateAgentInput struct {
@@ -39,6 +44,18 @@ type CreateAgentInput struct {
 }
 
 func (s *AgentService) ListAgents(category, search, sort string, page, limit int) ([]models.Agent, int64, error) {
+	type cachedResult struct {
+		Agents []models.Agent `json:"agents"`
+		Total  int64          `json:"total"`
+	}
+	cacheKey := fmt.Sprintf("agents|%s|%s|%s|%d|%d", category, search, sort, page, limit)
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var r cachedResult
+		if err := json.Unmarshal(data, &r); err == nil {
+			return r.Agents, r.Total, nil
+		}
+	}
+
 	var agents []models.Agent
 	var total int64
 	query := database.DB.Model(&models.Agent{})
@@ -50,7 +67,7 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 	}
 	query.Count(&total)
 	offset := (page - 1) * limit
-	orderClause := "created_at DESC" // default: newest
+	orderClause := "created_at DESC"
 	switch sort {
 	case "popular":
 		orderClause = "(save_count * 3 + use_count * 2) DESC"
@@ -63,10 +80,14 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 	case "oldest":
 		orderClause = "created_at ASC"
 	}
-	// Select only list-view fields, skip heavy prompt and character_data
 	err := query.
-		Select("id, title, description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, created_at").
 		Offset(offset).Limit(limit).Order(orderClause).Find(&agents).Error
+	if err == nil {
+		if b, jerr := json.Marshal(cachedResult{Agents: agents, Total: total}); jerr == nil {
+			s.cache.Set(cacheKey, b, 60*time.Second)
+		}
+	}
 	return agents, total, err
 }
 
@@ -132,8 +153,8 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		log.Printf("[Gemini] agent profile generated: name=%q type=%s", profile.Name, analysis.CharacterType)
 	}
 
-	// ── Step 3: Generate 16-bit pixel-art avatar via GenerateAvatarImage (sole image source)
-	generatedImage, imgErr := s.geminiSvc.GenerateAvatarImage(profile)
+	// ── Step 3: Generate 16-bit pixel-art avatar via Gemini Imagen
+	generatedImage, imgErr := s.geminiSvc.GenerateImage(analysis.ImagePrompt, analysis.CharacterType)
 	if imgErr != nil {
 		log.Printf("[Gemini] avatar image generation failed, agent will have no image: %v", imgErr)
 		generatedImage = "" // frontend shows shimmer skeleton placeholder
@@ -148,7 +169,10 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	}
 	charData = MergeProfileIntoCharacterData(charData, profile)
 
-	// ── Step 5: Deduct 10 credits for agent creation
+	// ── Step 3.5: Score prompt and generate service description
+	scoreResult := s.scoreSvc.ScoreAndDescribe(input.Prompt)
+
+	// ── Step 3.6: Deduct 10 credits for agent creation
 	if input.CreatorWallet != "" {
 		if err := s.deductCredits(input.CreatorWallet, 10, "create", nil); err != nil {
 			return nil, fmt.Errorf("credit check failed: %w", err)
@@ -157,17 +181,19 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 
 	// ── Step 6: Persist
 	agent := &models.Agent{
-		Title:          input.Title,
-		Description:    input.Description,
-		Prompt:         input.Prompt,
-		Category:       analysis.Category,
-		CreatorWallet:  input.CreatorWallet,
-		CharacterType:  analysis.CharacterType,
-		Subclass:       analysis.Subclass,
-		CharacterData:  charData,
-		Rarity:         rarity,
-		Tags:           analysis.Tags,
-		GeneratedImage: generatedImage,
+		Title:              input.Title,
+		Description:        input.Description,
+		Prompt:             input.Prompt,
+		Category:           analysis.Category,
+		CreatorWallet:      input.CreatorWallet,
+		CharacterType:      analysis.CharacterType,
+		Subclass:           analysis.Subclass,
+		CharacterData:      charData,
+		Rarity:             rarity,
+		Tags:               analysis.Tags,
+		GeneratedImage:     generatedImage,
+		PromptScore:        scoreResult.TotalScore,
+		ServiceDescription: scoreResult.ServiceDescription,
 	}
 	err = database.DB.Create(agent).Error
 	if err == nil && input.CreatorWallet != "" {
@@ -175,6 +201,9 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		database.DB.Create(&entry)
 		database.DB.Model(&models.Agent{}).Where("id = ?", agent.ID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	}
+	// Invalidate agent list + trending caches so new agent appears immediately.
+	s.cache.DeletePrefix("agents|")
+	s.cache.Delete("trending")
 	return agent, err
 }
 
@@ -250,13 +279,25 @@ func extractKeywordTags(prompt string) []string {
 
 // GetTrending returns the top 6 agents ranked by save_count*3 + use_count*2.
 func (s *AgentService) GetTrending() ([]models.Agent, error) {
+	const cacheKey = "trending"
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var agents []models.Agent
+		if err := json.Unmarshal(data, &agents); err == nil {
+			return agents, nil
+		}
+	}
 	var agents []models.Agent
 	// Select only list-view fields, skip heavy prompt and character_data
 	err := database.DB.
-		Select("id, title, description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, created_at").
 		Order("(save_count * 3 + use_count * 2) DESC").
 		Limit(6).
 		Find(&agents).Error
+	if err == nil {
+		if b, jerr := json.Marshal(agents); jerr == nil {
+			s.cache.Set(cacheKey, b, 120*time.Second)
+		}
+	}
 	return agents, err
 }
 
@@ -267,17 +308,10 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		return nil, fmt.Errorf("original agent not found: %w", err)
 	}
 
-	// Generate a fresh visual profile + 16-bit avatar for the fork (sole image source)
-	forkConcept := original.Title + " (forked variant)"
-	forkProfile, profileErr := s.geminiSvc.GenerateAgentProfile(forkConcept)
-	if profileErr != nil {
-		log.Printf("[Gemini] fork profile failed, using fallback: %v", profileErr)
-		forkProfile = buildFallbackProfile(forkConcept, original.CharacterType)
-	}
-
-	forkedImage, imgErr := s.geminiSvc.GenerateAvatarImage(forkProfile)
+	// Generate a fresh 16-bit avatar for the fork via Gemini Imagen
+	forkedImage, imgErr := s.geminiSvc.GenerateImage("A variant of "+original.CharacterType, original.CharacterType)
 	if imgErr != nil {
-		log.Printf("[Gemini] fork avatar image failed, fork will have no image: %v", imgErr)
+		log.Printf("[Gemini] fork avatar generation failed, fork will have no image: %v", imgErr)
 		forkedImage = "" // frontend shows shimmer skeleton placeholder
 	}
 
@@ -305,6 +339,9 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	if err := database.DB.Create(fork).Error; err != nil {
 		return nil, err
 	}
+	// Invalidate caches
+	s.cache.DeletePrefix("agents|")
+	s.cache.Delete("trending")
 
 	// Auto-add fork to creator's library
 	if creatorWallet != "" {

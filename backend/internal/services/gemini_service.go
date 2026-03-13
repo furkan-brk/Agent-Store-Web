@@ -12,8 +12,8 @@ import (
 
 const (
 	geminiBase  = "https://generativelanguage.googleapis.com/v1beta"
-	flashModel  = "gemini-2.0-flash"
-	imagenModel = "imagen-3.0-generate-001"
+	flashModel  = "gemini-2.5-flash"
+	imagenModel = "imagen-4.0-fast-generate-001"
 )
 
 // PromptAnalysis holds the structured result of Gemini's prompt analysis.
@@ -67,9 +67,6 @@ func NewGeminiService(apiKey string) *GeminiService {
 
 // AnalyzePrompt sends the agent prompt to Gemini Flash and returns structured metadata.
 func (g *GeminiService) AnalyzePrompt(prompt string) (*PromptAnalysis, error) {
-	if g.apiKey == "" {
-		return nil, fmt.Errorf("gemini api key not configured")
-	}
 
 	desc := prompt
 	if len(desc) > 600 {
@@ -112,15 +109,14 @@ Agent prompt: %s
 
 Return ONLY the JSON object. No markdown, no explanation.`, desc)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
 			{"parts": []map[string]string{{"text": instruction}}},
 		},
 		"generationConfig": map[string]interface{}{
-			"responseMimeType": "application/json",
-			"temperature":      0.4,
+			"temperature": 0.4,
 		},
 	}
 
@@ -183,48 +179,38 @@ Return ONLY the JSON object. No markdown, no explanation.`, desc)
 // cohesive visual character profile for the given agent concept. The profile drives Step 2
 // (pixel-art avatar generation) and is stored alongside the agent's stats in character_data.
 func (g *GeminiService) GenerateAgentProfile(agentConcept string) (*AgentProfile, error) {
-	if g.apiKey == "" {
-		return nil, fmt.Errorf("gemini api key not configured")
-	}
 
 	concept := agentConcept
 	if len(concept) > 400 {
 		concept = concept[:400]
 	}
 
-	instruction := fmt.Sprintf(`You are an expert world-builder. I will provide a brief concept for a new AI agent. Generate a unique, cohesive, and compelling character profile strictly in valid JSON format.
+	// Not: v1beta kullandığından emin ol (geminiBase değişkenini kontrol et)
+	// apiEndpoint := "[https://generativelanguage.googleapis.com/v1beta](https://generativelanguage.googleapis.com/v1beta)"
 
-The character is for a digital marketplace and will be an avatar that must have a human-like, non-human, or robot face, a different color-coded suit, and unique tools, all while maintaining the core "suit holding a tablet in the left hand, a stylus/tool in the right" pose.
+	instruction := fmt.Sprintf(`You are an expert world-builder. Generate a unique character profile in JSON.
+    Concept: %s
+    Format:
+    {
+      "name": "string",
+      "mood": "string",
+      "role_purpose": "string",
+      "primary_color": "string",
+      "secondary_color": "string",
+      "tablet_glow_color": "string",
+      "characteristics": ["string", "string", "string", "string"]
+    }`, concept)
 
-Agent Concept: %s
-
-Generate a response in this JSON format:
-{
-  "name": "A unique, creative title",
-  "mood": "A single-sentence description of the agent's general attitude.",
-  "role_purpose": "A 2-sentence summary of the agent's primary function.",
-  "primary_color": "The dominant color for their main suit/armor plating (e.g., Crimson, Emerald, Charcoal, Gold) based on their role.",
-  "secondary_color": "An accent color (e.g., for wires, symbols, internal gears) that complements the primary.",
-  "tablet_glow_color": "The vibrant neon color of the tablet's glow (e.g., Cyan, Green, Red, Purple).",
-  "characteristics": [
-    "1. Unique face (human, non-human, or robot) seen from visor.",
-    "2. Unique chest symbol (e.g., a shield, a graph, a magnifying glass).",
-    "3. Unique shape/type of probe or stylus tool held in the right hand.",
-    "4. A description of one other unique visual distinction that replaces heavy pouches (e.g., integrated wires, sleek vents, subtle power gear pattern)."
-  ]
-}
-
-Return ONLY the JSON object. No markdown, no explanation.`, concept)
-
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
 			{"parts": []map[string]string{{"text": instruction}}},
 		},
 		"generationConfig": map[string]interface{}{
-			"responseMimeType": "application/json",
-			"temperature":      0.7,
+			"temperature": 0.7,
+			// 2. KRİTİK EKLEME: Gemini'nin doğrudan JSON dönmesini sağlar
+			"response_mime_type": "application/json",
 		},
 	}
 
@@ -237,7 +223,7 @@ Return ONLY the JSON object. No markdown, no explanation.`, concept)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
@@ -250,6 +236,7 @@ Return ONLY the JSON object. No markdown, no explanation.`, concept)
 		return nil, fmt.Errorf("gemini profile error %d: %s", resp.StatusCode, string(b))
 	}
 
+	// Response parsing kısmı aynı kalabilir, ancak artık markdown temizlemeye gerek kalmayacak
 	var apiResp struct {
 		Candidates []struct {
 			Content struct {
@@ -259,25 +246,23 @@ Return ONLY the JSON object. No markdown, no explanation.`, concept)
 			} `json:"content"`
 		} `json:"candidates"`
 	}
+
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return nil, fmt.Errorf("decode profile response: %w", err)
 	}
+
 	if len(apiResp.Candidates) == 0 || len(apiResp.Candidates[0].Content.Parts) == 0 {
 		return nil, fmt.Errorf("empty profile response from gemini")
 	}
 
-	text := strings.TrimSpace(apiResp.Candidates[0].Content.Parts[0].Text)
-	text = strings.TrimPrefix(text, "```json")
-	text = strings.TrimPrefix(text, "```")
-	text = strings.TrimSuffix(text, "```")
-	text = strings.TrimSpace(text)
+	// JSON modu açık olduğu için direkt parse edebiliriz
+	rawJSON := apiResp.Candidates[0].Content.Parts[0].Text
 
 	var profile AgentProfile
-	if err := json.Unmarshal([]byte(text), &profile); err != nil {
-		return nil, fmt.Errorf("parse profile JSON: %w — raw: %s", err, text)
+	if err := json.Unmarshal([]byte(rawJSON), &profile); err != nil {
+		return nil, fmt.Errorf("parse profile JSON: %w", err)
 	}
 
-	profile = sanitizeProfile(profile)
 	return &profile, nil
 }
 
@@ -285,9 +270,6 @@ Return ONLY the JSON object. No markdown, no explanation.`, concept)
 // Imagen 3 to generate the avatar. The pose is always: full-body standing, tablet in left hand,
 // tool in right hand, flat dark-grey background — matching the Master Visual Template.
 func (g *GeminiService) GenerateAvatarImage(profile *AgentProfile) (string, error) {
-	if g.apiKey == "" {
-		return "", fmt.Errorf("gemini api key not configured")
-	}
 
 	// Extract per-characteristic details safely.
 	face, chest, rightHand, distinction := extractCharacteristics(profile.Characteristics)
@@ -325,19 +307,19 @@ func (g *GeminiService) GenerateAvatarImage(profile *AgentProfile) (string, erro
 	return g.callImagen(fullPrompt)
 }
 
-// callImagen sends a text-to-image request to Imagen 3 and returns a base64-encoded PNG.
+// callImagen sends a text-to-image request to Imagen and returns a base64-encoded PNG.
 func (g *GeminiService) callImagen(prompt string) (string, error) {
-	url := fmt.Sprintf("%s/models/%s:predict?key=%s", geminiBase, imagenModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:predict?key=%s", geminiBase, imagenModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"instances": []map[string]interface{}{
 			{"prompt": prompt},
 		},
 		"parameters": map[string]interface{}{
-			"sampleCount":       1,
-			"aspectRatio":       "1:1",
-			"safetyFilterLevel": "block_few",
-			"personGeneration":  "dont_allow",
+			"sampleCount": 1,
+			"aspectRatio": "1:1",
+			// 1. FIXED: Changed from "dont_allow" to "ALLOW_ADULT"
+			"personGeneration": "ALLOW_ADULT",
 		},
 	}
 
@@ -372,8 +354,10 @@ func (g *GeminiService) callImagen(prompt string) (string, error) {
 	if err := json.Unmarshal(respBody, &imgResp); err != nil {
 		return "", fmt.Errorf("parse imagen response: %w", err)
 	}
+
+	// Better error handling: print the raw response if predictions are empty
 	if len(imgResp.Predictions) == 0 || imgResp.Predictions[0].BytesBase64Encoded == "" {
-		return "", fmt.Errorf("no image in imagen response: %s", string(respBody))
+		return "", fmt.Errorf("no image in imagen response (likely safety filter triggered). Raw response: %s", string(respBody))
 	}
 
 	return imgResp.Predictions[0].BytesBase64Encoded, nil
@@ -382,10 +366,6 @@ func (g *GeminiService) callImagen(prompt string) (string, error) {
 // GenerateImage calls Gemini Imagen 3 and returns a base64-encoded PNG string.
 // Kept as a legacy/fallback method; prefer GenerateAvatarImage for new agents.
 func (g *GeminiService) GenerateImage(imagePrompt, charType string) (string, error) {
-	if g.apiKey == "" {
-		return "", fmt.Errorf("gemini api key not configured")
-	}
-
 	style := charTypeStyles[charType]
 	if style == "" {
 		style = "pixel art RPG fantasy character"
@@ -450,14 +430,10 @@ func extractCharacteristics(chars []string) (face, chest, rightHand, distinction
 
 // Chat sends a user message to Gemini Flash using systemPrompt as context and returns the text reply.
 func (g *GeminiService) Chat(systemPrompt, userMessage string) (string, error) {
-	if g.apiKey == "" {
-		return "", fmt.Errorf("gemini api key not configured")
-	}
-
 	// Combine system prompt and user message into a single turn
 	combinedText := "System instructions:\n" + systemPrompt + "\n\nUser message:\n" + userMessage
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{

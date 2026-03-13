@@ -39,9 +39,9 @@ class FilterPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2B1E),
+        color: const Color(0xFFE8DEC9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF4A4A33)),
+        border: Border.all(color: const Color(0xFFC0B490)),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -51,7 +51,7 @@ class FilterPanel extends StatelessWidget {
           Row(
             children: [
               const Icon(Icons.monetization_on_outlined,
-                  size: 14, color: Color(0xFF9E8F72)),
+                  size: 14, color: Color(0xFF6B5A40)),
               const SizedBox(width: 6),
               const Text(
                 'Price Range',
@@ -79,7 +79,7 @@ class FilterPanel extends StatelessWidget {
             max: maxPrice,
             divisions: 20,
             activeColor: const Color(0xFF81231E),
-            inactiveColor: const Color(0xFF4A4A33),
+            inactiveColor: const Color(0xFFC0B490),
             labels: RangeLabels(
               _priceLabel(currentMin),
               _priceLabel(currentMax),
@@ -90,7 +90,7 @@ class FilterPanel extends StatelessWidget {
           // ── Tags ─────────────────────────────────────────────────────────
           const Row(
             children: [
-              Icon(Icons.label_outline, size: 14, color: Color(0xFF9E8F72)),
+              Icon(Icons.label_outline, size: 14, color: Color(0xFF6B5A40)),
               SizedBox(width: 6),
               Text(
                 'Tags',
@@ -112,18 +112,18 @@ class FilterPanel extends StatelessWidget {
                 label: Text(tag),
                 selected: selected,
                 onSelected: (_) => onTagToggled(tag),
-                backgroundColor: const Color(0xFF1E1F14),
+                backgroundColor: const Color(0xFFB8AA88),
                 selectedColor: const Color(0xFF81231E),
                 checkmarkColor: Colors.white,
                 labelStyle: TextStyle(
-                  color: selected ? Colors.white : const Color(0xFF9E8F72),
+                  color: selected ? Colors.white : const Color(0xFF6B5A40),
                   fontSize: 11,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
                 ),
                 side: BorderSide(
                   color: selected
                       ? const Color(0xFF81231E)
-                      : const Color(0xFF4A4A33),
+                      : const Color(0xFFC0B490),
                 ),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 4, vertical: 0),

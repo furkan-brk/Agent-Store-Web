@@ -33,9 +33,8 @@
       "Bash(tasklist /FI \"PID eq 22412\" 2>&1 && tasklist /FI \"PID eq 8780\" 2>&1)",
       "Bash(powershell:*)",
       "Bash(git:*)",
-      "Bash(go build:*)",
-      "Bash(go vet:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(go vet:*)"
     ]
   }
 }

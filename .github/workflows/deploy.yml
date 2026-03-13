@@ -22,6 +22,7 @@ jobs:
         run: railway up --service Agent_Store --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
   # -------------------------------------------------------
   # Frontend → Vercel (Flutter Web static build)

@@ -18,21 +18,28 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: false, // Must be false when AllowAllOrigins is true
+		AllowCredentials: false,
 		MaxAge:           12 * time.Hour,
 	}
 	r.Use(cors.New(corsConfig))
+
+	// Single shared in-process cache for all services.
+	cache := services.NewCacheStore()
 
 	authSvc := services.NewAuthService(jwtSecret)
 	aiSvc := services.NewAIService(claudeAPIKey)
 	geminiSvc := services.NewGeminiService(geminiAPIKey)
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
-	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc)
-	guildSvc := services.NewGuildService()
+	scoreSvc := services.NewScoreService(geminiAPIKey)
+	pollinationsSvc := services.NewPollinationsService()
+	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache)
+	guildSvc := services.NewGuildService(scoreSvc, cache)
+	gmSvc := services.NewGuildMasterService(aiSvc)
 
 	authH := handlers.NewAuthHandler(authSvc)
 	agentH := handlers.NewAgentHandler(agentSvc)
 	guildH := handlers.NewGuildHandler(guildSvc)
+	gmH := handlers.NewGuildMasterHandler(gmSvc)
 
 	v1 := r.Group("/api/v1")
 	{
@@ -74,6 +81,11 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 		guilds.DELETE("/:id/members/:agentId", middleware.AuthMiddleware(authSvc), guildH.RemoveMember)
 		guilds.POST("/:id/join", middleware.AuthMiddleware(authSvc), guildH.JoinGuild)
 		guilds.DELETE("/:id/join", middleware.AuthMiddleware(authSvc), guildH.LeaveGuild)
+		guilds.GET("/:id/compatibility", guildH.GetCompatibility)
+
+		gm := v1.Group("/guild-master")
+		gm.POST("/suggest", gmH.Suggest)
+		gm.POST("/chat", gmH.TeamChat)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

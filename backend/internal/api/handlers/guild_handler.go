@@ -125,3 +125,17 @@ func (h *GuildHandler) RemoveMember(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
 }
+
+func (h *GuildHandler) GetCompatibility(c *gin.Context) {
+	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+		return
+	}
+	result, err := h.guildSvc.CheckCompatibility(uint(guildID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}

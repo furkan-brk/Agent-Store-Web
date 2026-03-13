@@ -66,7 +66,7 @@ class _CompareModalState extends State<CompareModal> {
             child: Text(
               label.toUpperCase(),
               style: const TextStyle(
-                color: Color(0xFF9E8F72),
+                color: Color(0xFF6B5A40),
                 fontSize: 10,
                 letterSpacing: 0.8,
               ),
@@ -135,7 +135,7 @@ class _CompareModalState extends State<CompareModal> {
             child: Text(
               label,
               style: const TextStyle(
-                color: Color(0xFF9E8F72),
+                color: Color(0xFF6B5A40),
                 fontSize: 11,
               ),
             ),
@@ -224,7 +224,7 @@ class _CompareModalState extends State<CompareModal> {
           Text(
             agent.title,
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF2B2C1E),
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -248,10 +248,10 @@ class _CompareModalState extends State<CompareModal> {
     final base = widget.baseAgent;
 
     return Dialog(
-      backgroundColor: const Color(0xFF22231A),
+      backgroundColor: const Color(0xFFC8BA9A),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFF3D3E2A)),
+        side: const BorderSide(color: Color(0xFFADA07A)),
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 700),
@@ -263,7 +263,7 @@ class _CompareModalState extends State<CompareModal> {
               padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
               decoration: const BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0xFF3D3E2A)),
+                  bottom: BorderSide(color: Color(0xFFADA07A)),
                 ),
               ),
               child: Row(
@@ -273,7 +273,7 @@ class _CompareModalState extends State<CompareModal> {
                   const Text(
                     'Compare Agents',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -281,7 +281,7 @@ class _CompareModalState extends State<CompareModal> {
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, color: Color(0xFF9E8F72)),
+                    icon: const Icon(Icons.close, color: Color(0xFF6B5A40)),
                     splashRadius: 18,
                   ),
                 ],
@@ -362,9 +362,9 @@ class _CompareModalState extends State<CompareModal> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF2A2B1E),
+                                      color: const Color(0xFFE8DEC9),
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: const Color(0xFF3D3E2A)),
+                                      border: Border.all(color: const Color(0xFFADA07A)),
                                     ),
                                     child: DropdownButton<AgentModel>(
                                       value: _compareAgent,
@@ -374,8 +374,8 @@ class _CompareModalState extends State<CompareModal> {
                                       ),
                                       isExpanded: true,
                                       underline: const SizedBox.shrink(),
-                                      dropdownColor: const Color(0xFF2A2B1E),
-                                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                                      dropdownColor: const Color(0xFFE8DEC9),
+                                      style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13),
                                       icon: const Icon(
                                         Icons.keyboard_arrow_down,
                                         color: Color(0xFF7A6E52),
@@ -411,7 +411,7 @@ class _CompareModalState extends State<CompareModal> {
                                   Text(
                                     _compareAgent!.title,
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      color: Color(0xFF2B2C1E),
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -436,7 +436,7 @@ class _CompareModalState extends State<CompareModal> {
                     // ── Stats & meta comparison (only when both selected) ───
                     if (_compareAgent != null) ...[
                       const SizedBox(height: 28),
-                      const Divider(color: Color(0xFF3D3E2A)),
+                      const Divider(color: Color(0xFFADA07A)),
                       const SizedBox(height: 16),
 
                       const Text(

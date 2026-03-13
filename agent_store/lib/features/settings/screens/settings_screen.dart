@@ -9,8 +9,8 @@ class SettingsScreen extends StatelessWidget {
 
   // ── helpers ────────────────────────────────────────────────────────────────
 
-  static const _bg = Color(0xFF181910);
-  static const _cardBg = Color(0xFF2A2B1E);
+  static const _bg = Color(0xFFDDD1BB);
+  static const _cardBg = Color(0xFFE8DEC9);
   static const _accent = Color(0xFF81231E);
 
   Widget _sectionHeader(String title) => Padding(
@@ -36,20 +36,20 @@ class SettingsScreen extends StatelessWidget {
   Widget _infoTile(String title, String subtitle, {IconData? leading}) =>
       ListTile(
         leading: leading != null
-            ? Icon(leading, color: const Color(0xFF9E8F72), size: 20)
+            ? Icon(leading, color: const Color(0xFF6B5A40), size: 20)
             : null,
         title: Text(title,
-            style: const TextStyle(color: Colors.white, fontSize: 14)),
+            style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
         trailing: Text(subtitle,
             style:
-                const TextStyle(color: Color(0xFF9E8F72), fontSize: 13)),
+                const TextStyle(color: Color(0xFF6B5A40), fontSize: 13)),
         dense: true,
       );
 
   Widget _iconTile(String title, IconData icon) => ListTile(
-        leading: Icon(icon, color: const Color(0xFF9E8F72), size: 20),
+        leading: Icon(icon, color: const Color(0xFF6B5A40), size: 20),
         title: Text(title,
-            style: const TextStyle(color: Colors.white, fontSize: 14)),
+            style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
         dense: true,
       );
 
@@ -61,17 +61,17 @@ class SettingsScreen extends StatelessWidget {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Clear All Data',
-            style: TextStyle(color: Colors.white)),
+            style: TextStyle(color: Color(0xFF2B2C1E))),
         content: const Text(
           'This will clear all locally stored preferences and cached data. '
           'Your on-chain data will not be affected.',
-          style: TextStyle(color: Color(0xFF9E8F72)),
+          style: TextStyle(color: Color(0xFF6B5A40)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF9E8F72))),
+                style: TextStyle(color: Color(0xFF6B5A40))),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -114,9 +114,9 @@ class SettingsScreen extends StatelessWidget {
         title: const Text(
           'Settings',
           style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+              color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 20),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Color(0xFF2B2C1E)),
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -125,9 +125,9 @@ class SettingsScreen extends StatelessWidget {
           _sectionHeader('APP INFO'),
           _card([
             _infoTile('App Name', 'Agent Store'),
-            const Divider(color: Color(0xFF3D3E2A), height: 1, indent: 16),
+            const Divider(color: Color(0xFFADA07A), height: 1, indent: 16),
             _infoTile('Version', '1.0.0'),
-            const Divider(color: Color(0xFF3D3E2A), height: 1, indent: 16),
+            const Divider(color: Color(0xFFADA07A), height: 1, indent: 16),
             _infoTile('Network', 'Monad Testnet (ChainID: 10143)',
                 leading: Icons.wifi_outlined),
           ]),
@@ -140,10 +140,10 @@ class SettingsScreen extends StatelessWidget {
               onChanged: null, // coming soon — always dark
               activeThumbColor: _accent,
               title: Text('Dark Mode',
-                  style: TextStyle(color: Colors.white, fontSize: 14)),
+                  style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
               subtitle: Text('Coming soon',
                   style:
-                      TextStyle(color: Color(0xFF9E8F72), fontSize: 12)),
+                      TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
               dense: true,
             ),
           ]),
@@ -152,9 +152,9 @@ class SettingsScreen extends StatelessWidget {
           _sectionHeader('ABOUT'),
           _card([
             _iconTile('Built with Flutter & Go', Icons.code),
-            const Divider(color: Color(0xFF3D3E2A), height: 1, indent: 16),
+            const Divider(color: Color(0xFFADA07A), height: 1, indent: 16),
             _iconTile('Powered by Claude AI & Gemini', Icons.auto_awesome),
-            const Divider(color: Color(0xFF3D3E2A), height: 1, indent: 16),
+            const Divider(color: Color(0xFFADA07A), height: 1, indent: 16),
             _iconTile('Blockchain: Monad Testnet', Icons.link),
           ]),
 

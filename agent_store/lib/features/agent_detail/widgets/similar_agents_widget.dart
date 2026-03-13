@@ -56,11 +56,11 @@ class _SimilarAgentsWidgetState extends State<SimilarAgentsWidget> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, color: Color(0xFF4A4A33), size: 48),
+            Icon(Icons.search_off, color: Color(0xFFC0B490), size: 48),
             SizedBox(height: 12),
             Text(
               'No similar agents found',
-              style: TextStyle(color: Color(0xFF9E8F72), fontSize: 15),
+              style: TextStyle(color: Color(0xFF6B5A40), fontSize: 15),
             ),
           ],
         ),
@@ -89,7 +89,7 @@ class _SimilarCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2B1E),
+          color: const Color(0xFFE8DEC9),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: rc.withValues(alpha: 0.25)),
         ),
@@ -111,7 +111,7 @@ class _SimilarCard extends StatelessWidget {
                   Text(
                     agent.title,
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: Color(0xFF2B2C1E),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -121,7 +121,7 @@ class _SimilarCard extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     agent.description,
-                    style: const TextStyle(color: Color(0xFF9E8F72), fontSize: 11),
+                    style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),

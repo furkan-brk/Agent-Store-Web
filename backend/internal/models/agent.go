@@ -28,10 +28,12 @@ type Agent struct {
 	CharacterData  string          `gorm:"column:character_data;type:jsonb" json:"character_data"`
 	Rarity         CharacterRarity `gorm:"column:rarity;default:'common'" json:"rarity"`
 	Tags           pq.StringArray  `gorm:"column:tags;type:text[]" json:"tags"`
-	GeneratedImage string          `gorm:"column:generated_image;type:text" json:"generated_image"`
-	UseCount       int64           `gorm:"column:use_count;default:0" json:"use_count"`
-	SaveCount      int64           `gorm:"column:save_count;index;default:0" json:"save_count"`
-	Price          float64         `gorm:"column:price;default:0" json:"price"`
+	GeneratedImage     string          `gorm:"column:generated_image;type:text" json:"generated_image"`
+	UseCount           int64           `gorm:"column:use_count;default:0" json:"use_count"`
+	SaveCount          int64           `gorm:"column:save_count;index;default:0" json:"save_count"`
+	Price              float64         `gorm:"column:price;default:0" json:"price"`
+	PromptScore        int             `gorm:"column:prompt_score;default:0" json:"prompt_score"`
+	ServiceDescription string          `gorm:"column:service_description;type:text" json:"service_description"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
