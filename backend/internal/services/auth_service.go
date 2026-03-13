@@ -43,7 +43,9 @@ func (s *AuthService) GetNonce(wallet string) (string, error) {
 		return "", err
 	}
 	nonce, _ := generateNonce()
-	database.DB.Model(user).Update("nonce", nonce)
+	if err := database.DB.Model(user).Update("nonce", nonce).Error; err != nil {
+		return "", fmt.Errorf("failed to save nonce: %w", err)
+	}
 	return nonce, nil
 }
 

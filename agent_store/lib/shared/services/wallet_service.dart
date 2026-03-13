@@ -70,8 +70,13 @@ class WalletService {
     if (_wallet == null || !kIsWeb) return null;
     try {
       // Convert MON to wei: 1 MON = 10^18 wei
-      // Use BigInt to avoid floating point issues
-      final amountWei = BigInt.from((amountMon * 1e18).round());
+      // Avoid floating-point precision loss by splitting into integer + fraction parts
+      final monStr = amountMon.toStringAsFixed(18);
+      final parts = monStr.split('.');
+      final intPart = BigInt.parse(parts[0]);
+      final fracStr = parts.length > 1 ? parts[1].padRight(18, '0').substring(0, 18) : '0' * 18;
+      final fracPart = BigInt.parse(fracStr);
+      final amountWei = intPart * BigInt.from(10).pow(18) + fracPart;
       final hexWei = '0x${amountWei.toRadixString(16)}';
       final result = await _nativeSendTransaction(toAddress.toJS, hexWei.toJS).toDart;
       return result.toDart;

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"strings"
 	"time"
 
 	"github.com/agentstore/backend/internal/api/handlers"
@@ -10,11 +11,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicateAPIKey string) *gin.Engine {
+func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string) *gin.Engine {
 	r := gin.Default()
 
+	// Parse comma-separated origins from config; fall back to localhost only if empty
+	origins := strings.Split(allowedOrigins, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
 	corsConfig := cors.Config{
-		AllowAllOrigins:  true,
+		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -27,7 +33,7 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	cache := services.NewCacheStore()
 
 	authSvc := services.NewAuthService(jwtSecret)
-	aiSvc := services.NewAIService(claudeAPIKey)
+	aiSvc := services.NewAIService("")
 	geminiSvc := services.NewGeminiService(geminiAPIKey)
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
 	scoreSvc := services.NewScoreService(geminiAPIKey)
@@ -35,6 +41,9 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache)
 	guildSvc := services.NewGuildService(scoreSvc, cache)
 	gmSvc := services.NewGuildMasterService(aiSvc)
+
+	// Rate limiter: 20 requests per minute on auth endpoints to mitigate brute-force
+	authRL := middleware.NewRateLimiter(20, 1*time.Minute)
 
 	authH := handlers.NewAuthHandler(authSvc)
 	agentH := handlers.NewAgentHandler(agentSvc)
@@ -44,6 +53,7 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	v1 := r.Group("/api/v1")
 	{
 		auth := v1.Group("/auth")
+		auth.Use(authRL.Middleware())
 		auth.GET("/nonce/:wallet", authH.GetNonce)
 		auth.POST("/verify", authH.VerifySignature)
 

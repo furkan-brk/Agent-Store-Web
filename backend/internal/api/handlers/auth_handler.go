@@ -2,10 +2,14 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 
 	"github.com/agentstore/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
+
+// walletRegex validates Ethereum-style wallet addresses (0x followed by 40 hex chars).
+var walletRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{40}$`)
 
 type AuthHandler struct{ authSvc *services.AuthService }
 
@@ -13,8 +17,8 @@ func NewAuthHandler(authSvc *services.AuthService) *AuthHandler { return &AuthHa
 
 func (h *AuthHandler) GetNonce(c *gin.Context) {
 	wallet := c.Param("wallet")
-	if wallet == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "wallet required"})
+	if !walletRegex.MatchString(wallet) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid wallet address format"})
 		return
 	}
 	nonce, err := h.authSvc.GetNonce(wallet)
@@ -35,6 +39,10 @@ func (h *AuthHandler) VerifySignature(c *gin.Context) {
 	var req verifyReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !walletRegex.MatchString(req.Wallet) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid wallet address format"})
 		return
 	}
 	valid, err := h.authSvc.VerifySignature(req.Wallet, req.Nonce, req.Signature)

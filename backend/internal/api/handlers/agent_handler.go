@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/agentstore/backend/internal/services"
 	"github.com/gin-gonic/gin"
 )
+
+// txHashRegex validates Ethereum transaction hash format (0x followed by 64 hex chars).
+var txHashRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 
 type AgentHandler struct{ agentSvc *services.AgentService }
 
@@ -18,11 +22,19 @@ func (h *AgentHandler) ListAgents(c *gin.Context) {
 	if page < 1 {
 		page = 1
 	}
+	if limit < 1 {
+		limit = 20
+	}
 	if limit > 50 {
 		limit = 50
 	}
+	// Cap search length to prevent excessively long ILIKE queries
+	search := c.Query("search")
+	if len(search) > 200 {
+		search = search[:200]
+	}
 	sort := c.DefaultQuery("sort", "newest")
-	agents, total, err := h.agentSvc.ListAgents(c.Query("category"), c.Query("search"), sort, page, limit)
+	agents, total, err := h.agentSvc.ListAgents(c.Query("category"), search, sort, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -48,6 +60,18 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 	var input services.CreateAgentInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(input.Title) > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title too long (max 100 characters)"})
+		return
+	}
+	if len(input.Description) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "description too long (max 500 characters)"})
+		return
+	}
+	if len(input.Prompt) > 10000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "prompt too long (max 10000 characters)"})
 		return
 	}
 	input.CreatorWallet = c.GetString("wallet")
@@ -142,6 +166,10 @@ func (h *AgentHandler) ChatWithAgent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if len(body.Message) > 4000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "message too long (max 4000 characters)"})
+		return
+	}
 	reply, err := h.agentSvc.ChatWithAgent(uint(id), body.Message)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -177,8 +205,8 @@ func (h *AgentHandler) GetUserProfile(c *gin.Context) {
 // GetPublicProfile returns a public profile for any wallet address.
 func (h *AgentHandler) GetPublicProfile(c *gin.Context) {
 	wallet := c.Param("wallet")
-	if wallet == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "wallet address required"})
+	if wallet == "" || len(wallet) != 42 || wallet[:2] != "0x" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid wallet address"})
 		return
 	}
 	profile, err := h.agentSvc.GetUserProfile(wallet)
@@ -226,6 +254,10 @@ func (h *AgentHandler) RecordPurchase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if !txHashRegex.MatchString(body.TxHash) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid transaction hash format"})
+		return
+	}
 	if err := h.agentSvc.RecordPurchase(c.GetString("wallet"), uint(id), body.TxHash, body.AmountMon); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -257,6 +289,10 @@ func (h *AgentHandler) RateAgent(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(body.Comment) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "comment too long (max 500 characters)"})
 		return
 	}
 	if err := h.agentSvc.RateAgent(uint(id), c.GetString("wallet"), body.Rating, body.Comment); err != nil {
@@ -296,6 +332,14 @@ func (h *AgentHandler) TopUpCredits(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if !txHashRegex.MatchString(body.TxHash) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid transaction hash format"})
+		return
+	}
+	if body.AmountMon <= 0 || body.AmountMon > 10000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "amount must be between 0 and 10000 MON"})
+		return
+	}
 	wallet := c.GetString("wallet")
 	if err := h.agentSvc.TopUpCredits(wallet, body.TxHash, body.AmountMon); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -318,6 +362,10 @@ func (h *AgentHandler) SetAgentPrice(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if body.Price < 0 || body.Price > 1000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "price must be between 0 and 1000 MON"})
 		return
 	}
 	if err := h.agentSvc.SetAgentPrice(uint(id), c.GetString("wallet"), body.Price); err != nil {

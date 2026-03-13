@@ -18,6 +18,9 @@ func (h *GuildHandler) ListGuilds(c *gin.Context) {
 	if page < 1 {
 		page = 1
 	}
+	if limit < 1 {
+		limit = 20
+	}
 	if limit > 50 {
 		limit = 50
 	}
@@ -33,6 +36,10 @@ func (h *GuildHandler) CreateGuild(c *gin.Context) {
 	var input services.CreateGuildInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(input.Name) > 50 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "guild name too long (max 50 characters)"})
 		return
 	}
 	input.CreatorWallet = c.GetString("wallet")

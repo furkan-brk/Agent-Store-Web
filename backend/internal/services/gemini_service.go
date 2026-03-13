@@ -405,16 +405,33 @@ func sanitizeProfile(p AgentProfile) AgentProfile {
 }
 
 // extractCharacteristics safely extracts the four characteristic fields from the LLM output.
-// It strips any leading numbering (e.g. "1. ") that the model may include.
+// It strips any leading numbering (e.g. "1. ", "10. ", "1) ", "- ") that the model may include.
 func extractCharacteristics(chars []string) (face, chest, rightHand, distinction string) {
 	get := func(i int, fallback string) string {
 		if i >= len(chars) {
 			return fallback
 		}
-		s := chars[i]
-		// Strip "N. " prefix if present.
-		if len(s) > 3 && s[1] == '.' && s[2] == ' ' {
-			s = s[3:]
+		s := strings.TrimSpace(chars[i])
+		// Strip common LLM numbering prefixes: "1. ", "10. ", "1) ", "- ", "* "
+		for len(s) > 0 {
+			if s[0] >= '0' && s[0] <= '9' {
+				// Skip digits
+				j := 0
+				for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+					j++
+				}
+				// Expect ". " or ") " after digits
+				if j < len(s) && (s[j] == '.' || s[j] == ')') {
+					rest := s[j+1:]
+					s = strings.TrimSpace(rest)
+					continue
+				}
+			}
+			if strings.HasPrefix(s, "- ") || strings.HasPrefix(s, "* ") {
+				s = strings.TrimSpace(s[2:])
+				continue
+			}
+			break
 		}
 		if s == "" {
 			return fallback
@@ -428,16 +445,24 @@ func extractCharacteristics(chars []string) (face, chest, rightHand, distinction
 	return
 }
 
-// Chat sends a user message to Gemini Flash using systemPrompt as context and returns the text reply.
+// Chat sends a user message to Gemini Flash using systemPrompt via the dedicated
+// systemInstruction field (instead of combining into a single turn) for better adherence.
 func (g *GeminiService) Chat(systemPrompt, userMessage string) (string, error) {
-	// Combine system prompt and user message into a single turn
-	combinedText := "System instructions:\n" + systemPrompt + "\n\nUser message:\n" + userMessage
+	if g.apiKey == "" {
+		return "", fmt.Errorf("gemini api key not configured")
+	}
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, "AIzaSyC2iUTR3zm8yU6FlQUwMs-agDUr6GA2sMg")
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
 
 	reqBody := map[string]interface{}{
+		"systemInstruction": map[string]interface{}{
+			"parts": []map[string]string{{"text": systemPrompt}},
+		},
 		"contents": []map[string]interface{}{
-			{"parts": []map[string]string{{"text": combinedText}}},
+			{
+				"role":  "user",
+				"parts": []map[string]string{{"text": userMessage}},
+			},
 		},
 		"generationConfig": map[string]interface{}{
 			"maxOutputTokens": 1024,

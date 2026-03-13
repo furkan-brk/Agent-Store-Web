@@ -1,12 +1,14 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 type Config struct {
 	Port            string
 	PostgresDSN     string
 	JWTSecret       string
-	ClaudeAPIKey    string
 	GeminiAPIKey    string
 	ReplicateAPIKey string
 	AllowedOrigins  string
@@ -16,11 +18,18 @@ type Config struct {
 }
 
 func Load() *Config {
+	jwtSecret := getEnv("JWT_SECRET", "dev_secret_change_me")
+
+	// Fail loudly in production if JWT_SECRET is the default insecure value.
+	env := getEnv("RAILWAY_ENVIRONMENT", getEnv("GO_ENV", "development"))
+	if env == "production" && jwtSecret == "dev_secret_change_me" {
+		log.Fatal("FATAL: JWT_SECRET must be set in production; refusing to start with default value")
+	}
+
 	return &Config{
 		Port:            getEnv("PORT", "8080"),
 		PostgresDSN:     buildDSN(),
-		JWTSecret:       getEnv("JWT_SECRET", "dev_secret_change_me"),
-		ClaudeAPIKey:    getEnv("CLAUDE_API_KEY", ""),
+		JWTSecret:       jwtSecret,
 		GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
 		ReplicateAPIKey: getEnv("REPLICATE_API_KEY", ""),
 		AllowedOrigins:  getEnv("ALLOWED_ORIGINS", "http://localhost:80,http://localhost:3000,https://agent-store-web-final.vercel.app"),

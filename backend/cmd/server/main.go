@@ -17,7 +17,7 @@ func main() {
 	// (Railway healthcheck hits /health before DB is ready)
 	go database.ConnectWithRetry(cfg.PostgresDSN)
 
-	router := api.SetupRouter(cfg.JWTSecret, cfg.AllowedOrigins, cfg.ClaudeAPIKey, cfg.GeminiAPIKey, cfg.ReplicateAPIKey)
+	router := api.SetupRouter(cfg.JWTSecret, cfg.AllowedOrigins, cfg.GeminiAPIKey, cfg.ReplicateAPIKey)
 	log.Printf("Agent Store Backend starting on :%s", cfg.Port)
 	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("Server error: %v", err)
