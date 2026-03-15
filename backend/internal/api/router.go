@@ -15,13 +15,35 @@ import (
 func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string) *gin.Engine {
 	r := gin.Default()
 
-	// Parse comma-separated origins from config; fall back to localhost only if empty
-	origins := strings.Split(allowedOrigins, ",")
-	for i := range origins {
-		origins[i] = strings.TrimSpace(origins[i])
+	// Parse comma-separated origins from config.
+	allowed := map[string]struct{}{}
+	for _, origin := range strings.Split(allowedOrigins, ",") {
+		o := strings.TrimSpace(origin)
+		if o != "" {
+			allowed[o] = struct{}{}
+		}
 	}
+
+	isAllowedOrigin := func(origin string) bool {
+		if origin == "" {
+			// Non-browser clients may not send Origin.
+			return true
+		}
+		if _, ok := allowed[origin]; ok {
+			return true
+		}
+		// Allow preview/staging domains used by this project.
+		if strings.HasSuffix(origin, ".vercel.app") || strings.HasSuffix(origin, ".up.railway.app") {
+			return true
+		}
+		if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
+			return true
+		}
+		return false
+	}
+
 	corsConfig := cors.Config{
-		AllowOrigins:     origins,
+		AllowOriginFunc:  isAllowedOrigin,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},

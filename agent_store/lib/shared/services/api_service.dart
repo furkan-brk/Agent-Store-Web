@@ -60,11 +60,16 @@ class ApiService {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
+  Map<String, String> get _jsonHeaders => {
+    'Content-Type': 'application/json',
+  };
+
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<String?> getNonce(String wallet) async {
     try {
-      final res = await http.get(Uri.parse('${ApiConstants.authNonce}/$wallet'), headers: _headers);
+      // Public endpoint: keep request simple to avoid browser preflight issues.
+      final res = await http.get(Uri.parse('${ApiConstants.authNonce}/$wallet'));
       if (res.statusCode == 200) {
         return (jsonDecode(res.body) as Map<String, dynamic>)['nonce'] as String?;
       }
@@ -76,7 +81,7 @@ class ApiService {
     required String wallet, required String nonce, required String signature,
   }) async {
     try {
-      final res = await http.post(Uri.parse(ApiConstants.authVerify), headers: _headers,
+      final res = await http.post(Uri.parse(ApiConstants.authVerify), headers: _jsonHeaders,
         body: jsonEncode({'wallet': wallet, 'nonce': nonce, 'signature': signature}));
       if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) { debugPrint('verifySignature: $e'); }
