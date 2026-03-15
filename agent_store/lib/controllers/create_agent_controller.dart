@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
@@ -16,10 +17,11 @@ class CreateAgentController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadCredits();
+    refreshCredits();
   }
 
-  Future<void> _loadCredits() async {
+  /// Refresh credits from API. Called on init and before every submission.
+  Future<void> refreshCredits() async {
     if (ApiService.instance.isAuthenticated) {
       credits.value = await ApiService.instance.getCredits();
     }
@@ -46,16 +48,20 @@ class CreateAgentController extends GetxController {
     preview.value = t;
   }
 
-  Future<bool> checkCredits(dynamic context) async {
-    try {
-      const agentCost = 10;
-      if (credits.value < agentCost) {
-        return false;
+  Future<bool> checkCredits(BuildContext context) async {
+    // Always refresh from API before checking — prevents stale values
+    await refreshCredits();
+    const agentCost = 10;
+    if (credits.value < agentCost) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Insufficient credits: ${credits.value}/10. Top up to create an agent.'),
+          backgroundColor: Colors.orange.shade800,
+        ));
       }
-      return true;
-    } catch (e) {
       return false;
     }
+    return true;
   }
 
   void nextStep() => step.value = (step.value + 1).clamp(0, 2);

@@ -1,18 +1,21 @@
+// lib/features/guild/widgets/team_workflow_modal.dart
+
 import 'package:flutter/material.dart';
+import '../../../app/theme.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../features/character/character_types.dart';
 
 // Workflow step definition per character type
 // Order = logical project pipeline sequence
 const _kSteps = <CharacterType, _WorkflowStep>{
-  CharacterType.scholar:    _WorkflowStep('Research',   '📚', 'Gathers info, trends & requirements'),
-  CharacterType.strategist: _WorkflowStep('Plan',       '📋', 'Roadmaps, priorities & architecture'),
-  CharacterType.oracle:     _WorkflowStep('Analyze',    '📊', 'Data insights, metrics & feedback'),
-  CharacterType.artisan:    _WorkflowStep('Design',     '🎨', 'UI/UX, visuals & prototypes'),
-  CharacterType.wizard:     _WorkflowStep('Build',      '⚙️', 'Code, APIs & integrations'),
-  CharacterType.guardian:   _WorkflowStep('Secure',     '🛡️', 'Security, infra & deployment'),
-  CharacterType.bard:       _WorkflowStep('Document',   '📝', 'Content, docs & communication'),
-  CharacterType.merchant:   _WorkflowStep('Grow',       '📈', 'Marketing, outreach & business'),
+  CharacterType.scholar:    _WorkflowStep('Research',  Icons.menu_book,    'Gathers info, trends & requirements'),
+  CharacterType.strategist: _WorkflowStep('Plan',      Icons.flag,         'Roadmaps, priorities & architecture'),
+  CharacterType.oracle:     _WorkflowStep('Analyze',   Icons.bar_chart,    'Data insights, metrics & feedback'),
+  CharacterType.artisan:    _WorkflowStep('Design',    Icons.brush,        'UI/UX, visuals & prototypes'),
+  CharacterType.wizard:     _WorkflowStep('Build',     Icons.code,         'Code, APIs & integrations'),
+  CharacterType.guardian:   _WorkflowStep('Secure',    Icons.shield,       'Security, infra & deployment'),
+  CharacterType.bard:       _WorkflowStep('Document',  Icons.edit_note,    'Content, docs & communication'),
+  CharacterType.merchant:   _WorkflowStep('Grow',      Icons.trending_up,  'Marketing, outreach & business'),
 };
 
 // Ordered pipeline (logical flow of a software project)
@@ -29,9 +32,9 @@ const _kPipelineOrder = [
 
 class _WorkflowStep {
   final String label;
-  final String emoji;
+  final IconData icon;
   final String description;
-  const _WorkflowStep(this.label, this.emoji, this.description);
+  const _WorkflowStep(this.label, this.icon, this.description);
 }
 
 // ── Main Modal ────────────────────────────────────────────────────────────────
@@ -58,12 +61,12 @@ class TeamWorkflowModal extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 520),
         child: Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFC8BA9A),
+            color: AppTheme.surface,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFADA07A), width: 1.5),
+            border: Border.all(color: AppTheme.border, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF81231E).withValues(alpha: 0.12),
+                color: AppTheme.primary.withValues(alpha: 0.12),
                 blurRadius: 30,
                 spreadRadius: 2,
               ),
@@ -76,65 +79,87 @@ class TeamWorkflowModal extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 // ── Header ───────────────────────────────────────────────
-                Row(children: [
-                  const Text('🔄', style: TextStyle(fontSize: 20)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text(
-                        'Team Workflow',
-                        style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      Text(
-                        '${guild.name} · ${guild.memberCount} agent${guild.memberCount == 1 ? '' : 's'}',
-                        style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
+                      child: const Icon(Icons.sync, color: AppTheme.primary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Team Workflow',
+                            style: TextStyle(
+                              color: AppTheme.textH,
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${guild.name}  ·  ${guild.memberCount} agent${guild.memberCount == 1 ? '' : 's'}',
+                            style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                          ),
+                        ],
                       ),
-                    ]),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Color(0xFF7A6E52), size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ]),
+                    ),
+                    _HoverIconButton(
+                      icon: Icons.close,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // ── Member Roles ─────────────────────────────────────────
-                const _SectionTitle(title: 'Member Roles'),
+                const _SectionTitle(title: 'Member Roles', icon: Icons.people_outline),
                 const SizedBox(height: 10),
                 if (guild.members.isEmpty)
-                  const Text('No members yet.',
-                    style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12))
+                  const _EmptyHint(
+                    icon: Icons.person_add_outlined,
+                    text: 'No members yet. Add agents to your guild.',
+                  )
                 else
                   ...guild.members
                       .where((m) => m.agent != null)
                       .map((m) => _MemberRoleCard(member: m)),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // ── Workflow Pipeline ─────────────────────────────────────
-                const _SectionTitle(title: 'Active Pipeline'),
+                const _SectionTitle(title: 'Active Pipeline', icon: Icons.timeline),
                 const SizedBox(height: 10),
                 if (activePipeline.isEmpty)
-                  const Text('Add agents to generate a pipeline.',
-                    style: TextStyle(color: Color(0xFF7A6E52), fontSize: 12))
+                  const _EmptyHint(
+                    icon: Icons.add_circle_outline,
+                    text: 'Add agents to generate a pipeline.',
+                  )
                 else
                   _PipelineFlow(types: activePipeline),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
 
                 // ── Coverage ─────────────────────────────────────────────
-                const _SectionTitle(title: 'Coverage'),
+                const _SectionTitle(title: 'Coverage', icon: Icons.pie_chart_outline),
                 const SizedBox(height: 10),
                 _CoverageBar(covered: covered, missing: missing),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
+                // ── Close button ─────────────────────────────────────────
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF81231E),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: AppTheme.textH,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
@@ -151,87 +176,187 @@ class TeamWorkflowModal extends StatelessWidget {
   }
 }
 
+// ── Hover Icon Button ─────────────────────────────────────────────────────────
+
+class _HoverIconButton extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  const _HoverIconButton({required this.icon, required this.onPressed});
+
+  @override
+  State<_HoverIconButton> createState() => _HoverIconButtonState();
+}
+
+class _HoverIconButtonState extends State<_HoverIconButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: _hovered ? AppTheme.card2 : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            widget.icon,
+            color: _hovered ? AppTheme.textH : AppTheme.textM,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Empty Hint ────────────────────────────────────────────────────────────────
+
+class _EmptyHint extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _EmptyHint({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.card.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppTheme.textM),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Section Title ─────────────────────────────────────────────────────────────
 
 class _SectionTitle extends StatelessWidget {
   final String title;
-  const _SectionTitle({required this.title});
+  final IconData icon;
+  const _SectionTitle({required this.title, required this.icon});
 
   @override
-  Widget build(BuildContext context) => Text(
-    title.toUpperCase(),
-    style: const TextStyle(
-      color: Color(0xFF6B5A40),
-      fontSize: 10,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 1.2,
-    ),
+  Widget build(BuildContext context) => Row(
+    children: [
+      Icon(icon, size: 12, color: AppTheme.textM),
+      const SizedBox(width: 6),
+      Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          color: AppTheme.textM,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    ],
   );
 }
 
 // ── Member Role Card ──────────────────────────────────────────────────────────
 
-class _MemberRoleCard extends StatelessWidget {
+class _MemberRoleCard extends StatefulWidget {
   final GuildMemberModel member;
   const _MemberRoleCard({required this.member});
 
   @override
+  State<_MemberRoleCard> createState() => _MemberRoleCardState();
+}
+
+class _MemberRoleCardState extends State<_MemberRoleCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final agent = member.agent!;
+    final agent = widget.member.agent!;
     final type = agent.characterType;
     final step = _kSteps[type]!;
     final color = type.primaryColor;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8DEC9),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: _hovered ? AppTheme.card2 : AppTheme.card,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _hovered ? color.withValues(alpha: 0.4) : AppTheme.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(step.icon, color: color, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    agent.title,
+                    style: const TextStyle(
+                      color: AppTheme.textH,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${type.displayName}  ·  ${step.description}',
+                    style: const TextStyle(color: AppTheme.textM, fontSize: 10),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                step.label,
+                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Text(step.emoji, style: const TextStyle(fontSize: 18)),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            agent.title,
-            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${type.displayName} → ${step.label}: ${step.description}',
-            style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ])),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withValues(alpha: 0.4)),
-          ),
-          child: Text(
-            step.label,
-            style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ]),
     );
   }
 }
@@ -253,38 +378,50 @@ class _PipelineFlow extends StatelessWidget {
           final step = _kSteps[type]!;
           final color = type.primaryColor;
 
-          return Row(mainAxisSize: MainAxisSize.min, children: [
-            Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
-                ),
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(step.emoji, style: const TextStyle(fontSize: 18)),
-                ]),
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+                    ),
+                    child: Icon(step.icon, color: color, size: 22),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      step.label,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: 60,
-                child: Text(
-                  step.label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              if (!isLast) ...[
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 10,
+                  color: AppTheme.textM.withValues(alpha: 0.6),
                 ),
-              ),
-            ]),
-            if (!isLast) ...[
-              const SizedBox(width: 4),
-              const Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFF5A5038)),
-              const SizedBox(width: 4),
+                const SizedBox(width: 6),
+              ],
             ],
-          ]);
+          );
         }).toList(),
       ),
     );
@@ -304,48 +441,73 @@ class _CoverageBar extends StatelessWidget {
         ? 0.0
         : covered.length / _kPipelineOrder.length;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Progress bar
-      Row(children: [
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6,
-              backgroundColor: const Color(0xFFADA07A),
-              color: pct >= 0.75
-                  ? const Color(0xFF5A8A48)
-                  : pct >= 0.5
-                      ? const Color(0xFF9B7B1A)
-                      : const Color(0xFF81231E),
+    final barColor = pct >= 0.75
+        ? AppTheme.olive
+        : pct >= 0.5
+            ? AppTheme.gold
+            : AppTheme.primary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Progress bar
+        Row(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 6,
+                  backgroundColor: AppTheme.border,
+                  color: barColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              '${covered.length}/${_kPipelineOrder.length} phases',
+              style: const TextStyle(color: AppTheme.textB, fontSize: 11),
+            ),
+          ],
+        ),
+        if (missing.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 13, color: AppTheme.gold),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Gaps: ${missing.map((t) => _kSteps[t]!.label).join(', ')}',
+                  style: const TextStyle(color: AppTheme.textB, fontSize: 11),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 19),
+            child: Text(
+              'Add ${missing.map((t) => t.displayName).join(' / ')} agents to complete the pipeline.',
+              style: const TextStyle(color: AppTheme.textM, fontSize: 10),
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          '${covered.length}/${_kPipelineOrder.length} phases',
-          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 11),
-        ),
-      ]),
-      if (missing.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        Text(
-          'Gaps: ${missing.map((t) => _kSteps[t]!.label).join(', ')}',
-          style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 11),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Add ${missing.map((t) => t.displayName).join(' / ')} agents to complete the pipeline.',
-          style: const TextStyle(color: Color(0xFF5A5038), fontSize: 10),
-        ),
-      ] else if (covered.isNotEmpty) ...[
-        const SizedBox(height: 6),
-        const Text(
-          '✅ Full pipeline covered — your team handles every phase!',
-          style: TextStyle(color: Color(0xFF5A8A48), fontSize: 11),
-        ),
+        ] else if (covered.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              Icon(Icons.check_circle, size: 14, color: AppTheme.olive),
+              SizedBox(width: 6),
+              Text(
+                'Full pipeline covered -- your team handles every phase!',
+                style: TextStyle(color: AppTheme.olive, fontSize: 11, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ],
       ],
-    ]);
+    );
   }
 }

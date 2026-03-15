@@ -1,10 +1,13 @@
+// lib/features/guild/widgets/team_formation_widget.dart
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../../../app/theme.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 
-/// Renders 2–4 guild members in their formation layout with animated connection lines.
+/// Renders 2-4 guild members in their formation layout with animated connection lines.
 class TeamFormationWidget extends StatefulWidget {
   final List<GuildMemberModel> members;
   final bool showRoles;
@@ -33,12 +36,46 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final n = widget.members.length.clamp(0, 4);
-    if (n == 0) return const SizedBox.shrink();
+
+    if (n == 0) {
+      // Empty state
+      return Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppTheme.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.group_add_outlined,
+              size: 40,
+              color: AppTheme.textM.withValues(alpha: 0.4),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'No team members yet',
+              style: TextStyle(color: AppTheme.textB, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Add agents to form your team',
+              style: TextStyle(color: AppTheme.textM, fontSize: 11),
+            ),
+          ],
+        ),
+      );
+    }
 
     return AnimatedBuilder(
       animation: _anim,
@@ -54,9 +91,9 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
   }
 
   Color _lineColor() {
-    if (widget.members.isEmpty) return Colors.grey;
+    if (widget.members.isEmpty) return AppTheme.border;
     final type = widget.members.first.agent?.characterType;
-    return type?.accentColor ?? const Color(0xFF81231E);
+    return type?.accentColor ?? AppTheme.primary;
   }
 
   Widget _buildFormation(int n) {
@@ -65,7 +102,6 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
 
     switch (n) {
       case 2:
-        // [A] ─── [B] horizontal
         return SizedBox(
           height: cardSize + 40,
           child: Row(
@@ -79,7 +115,6 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
         );
 
       case 3:
-        // Triangle: [A] on top, [B][C] on bottom
         return SizedBox(
           height: cardSize * 2 + gap + 40,
           child: Stack(
@@ -104,23 +139,28 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
         );
 
       case 4:
-        // 2×2 grid
         return SizedBox(
           height: cardSize * 2 + gap + 40,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                _MemberCard(member: widget.members[0], size: cardSize, showRole: widget.showRoles),
-                const SizedBox(width: gap),
-                _MemberCard(member: widget.members[1], size: cardSize, showRole: widget.showRoles),
-              ]),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _MemberCard(member: widget.members[0], size: cardSize, showRole: widget.showRoles),
+                  const SizedBox(width: gap),
+                  _MemberCard(member: widget.members[1], size: cardSize, showRole: widget.showRoles),
+                ],
+              ),
               const SizedBox(height: gap),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                _MemberCard(member: widget.members[2], size: cardSize, showRole: widget.showRoles),
-                const SizedBox(width: gap),
-                _MemberCard(member: widget.members[3], size: cardSize, showRole: widget.showRoles),
-              ]),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _MemberCard(member: widget.members[2], size: cardSize, showRole: widget.showRoles),
+                  const SizedBox(width: gap),
+                  _MemberCard(member: widget.members[3], size: cardSize, showRole: widget.showRoles),
+                ],
+              ),
             ],
           ),
         );
@@ -131,7 +171,7 @@ class _TeamFormationWidgetState extends State<TeamFormationWidget>
   }
 }
 
-class _MemberCard extends StatelessWidget {
+class _MemberCard extends StatefulWidget {
   final GuildMemberModel member;
   final double size;
   final bool showRole;
@@ -139,36 +179,82 @@ class _MemberCard extends StatelessWidget {
   const _MemberCard({required this.member, required this.size, required this.showRole});
 
   @override
+  State<_MemberCard> createState() => _MemberCardState();
+}
+
+class _MemberCardState extends State<_MemberCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final agent = member.agent;
+    final agent = widget.member.agent;
     if (agent == null) return const SizedBox.shrink();
 
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      PixelCharacterWidget(
-        characterType: agent.characterType,
-        rarity: agent.rarity,
-        subclass: agent.subclass,
-        size: size,
-        agentId: agent.id,
-        teamLink: true,
-      ),
-      if (showRole) ...[
-        const SizedBox(height: 4),
-        Text(
-          '${_roleIcon(member.role)} ${member.role}',
-          style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 10),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        transform: _hovered
+            ? Matrix4.translationValues(0.0, -2.0, 0.0)
+            : Matrix4.identity(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PixelCharacterWidget(
+              characterType: agent.characterType,
+              rarity: agent.rarity,
+              subclass: agent.subclass,
+              size: widget.size,
+              agentId: agent.id,
+              generatedImage: agent.generatedImage,
+              teamLink: true,
+            ),
+            if (widget.showRole) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.card,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _roleIcon(widget.member.role),
+                      size: 10,
+                      color: AppTheme.textB,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.member.role,
+                      style: const TextStyle(
+                        color: AppTheme.textB,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
-      ],
-    ]);
+      ),
+    );
   }
 
-  String _roleIcon(String role) => switch (role) {
-    'Brain'    => '🧠',
-    'Shield'   => '🛡',
-    'Scout'    => '⚡',
-    'Innovator'=> '💡',
-    'Striker'  => '⚔',
-    _          => '●',
+  /// Use Material icons instead of emoji for consistent cross-platform rendering
+  IconData _roleIcon(String role) => switch (role) {
+    'Brain'     => Icons.psychology,
+    'Shield'    => Icons.shield,
+    'Scout'     => Icons.bolt,
+    'Innovator' => Icons.lightbulb_outline,
+    'Striker'   => Icons.gps_fixed,
+    _           => Icons.person,
   };
 }
 
@@ -201,14 +287,12 @@ class _ConnectionPainter extends CustomPainter {
 
     switch (memberCount) {
       case 2:
-        // Horizontal line
         canvas.drawLine(
           Offset(cx - gap - cardSize / 2, cy - 20),
           Offset(cx + gap + cardSize / 2, cy - 20),
           paint,
         );
       case 3:
-        // Triangle lines
         final top = Offset(cx, cardSize / 2);
         final bl  = Offset(cx - cardSize - gap / 2, size.height - cardSize / 2);
         final br  = Offset(cx + cardSize + gap / 2, size.height - cardSize / 2);
@@ -216,9 +300,8 @@ class _ConnectionPainter extends CustomPainter {
         canvas.drawLine(top, br, paint);
         canvas.drawLine(bl, br, paint);
       case 4:
-        // Square with diagonals
-        final tl = Offset(cx - cardSize / 2 - gap / 2, cardSize / 2);
-        final tr = Offset(cx + cardSize / 2 + gap / 2, cardSize / 2);
+        final tl  = Offset(cx - cardSize / 2 - gap / 2, cardSize / 2);
+        final tr  = Offset(cx + cardSize / 2 + gap / 2, cardSize / 2);
         final bll = Offset(cx - cardSize / 2 - gap / 2, size.height - cardSize / 2);
         final br  = Offset(cx + cardSize / 2 + gap / 2, size.height - cardSize / 2);
         canvas.drawLine(tl, tr, paint);
