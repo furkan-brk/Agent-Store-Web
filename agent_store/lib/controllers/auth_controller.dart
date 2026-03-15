@@ -26,10 +26,27 @@ class AuthController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Restore state from services that were already initialized in main()
-    isConnected.value = ApiService.instance.isAuthenticated &&
-        WalletService.instance.isConnected;
-    if (isConnected.value) loadCredits();
+    _restoreSession();
+  }
+
+  /// Restores saved session from SharedPreferences + verifies MetaMask state.
+  /// Called once on app startup from onInit().
+  Future<void> _restoreSession() async {
+    // Both ApiService.init() and WalletService.init() were awaited in main()
+    // before AuthController is created, so their state is already populated.
+    final hasToken = ApiService.instance.isAuthenticated;
+    final hasWallet = WalletService.instance.isConnected;
+
+    if (hasToken && hasWallet) {
+      isConnected.value = true;
+      await loadCredits();
+    } else if (hasToken && !hasWallet) {
+      // JWT exists but MetaMask no longer has the account — clear the session
+      // because we cannot make authenticated requests without wallet context.
+      ApiService.instance.clearToken();
+      isConnected.value = false;
+    }
+    // If neither token nor wallet, user is simply not logged in — nothing to do.
   }
 
   // ── Wallet connect flow ────────────────────────────────────────────────────

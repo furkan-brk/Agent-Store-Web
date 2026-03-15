@@ -1,6 +1,7 @@
 import 'dart:js_interop';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ── Top-level JS interop declarations ────────────────────────────────────────
 // These map directly to window.agentStoreWallet.* functions defined in
@@ -8,6 +9,9 @@ import 'package:flutter/foundation.dart';
 
 @JS('agentStoreWallet.requestAccounts')
 external JSPromise<JSString> _nativeRequestAccounts();
+
+@JS('agentStoreWallet.getAccounts')
+external JSPromise<JSString> _nativeGetAccounts();
 
 @JS('agentStoreWallet.personalSign')
 external JSPromise<JSString> _nativePersonalSign(JSString message, JSString address);
@@ -20,6 +24,8 @@ external JSPromise<JSString> _nativeSendTransaction(JSString toAddress, JSString
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+const _kWalletKey = 'wallet_address';
+
 /// Web3 wallet service — MetaMask integration via JS interop (web only).
 /// The actual JS functions live in web/index.html as window.agentStoreWallet.
 class WalletService {
@@ -30,6 +36,35 @@ class WalletService {
   String? _wallet;
   String? get connectedWallet => _wallet;
   bool get isConnected => _wallet != null;
+
+  /// Call once at app startup to restore a previously saved wallet address.
+  /// After restoring from SharedPreferences, silently verifies that MetaMask
+  /// still has the account connected via `eth_accounts` (no popup).
+  /// If MetaMask no longer exposes the saved account, clears the stored value.
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedWallet = prefs.getString(_kWalletKey);
+    if (savedWallet == null || savedWallet.isEmpty) return;
+
+    if (kIsWeb) {
+      // Silently check if MetaMask still has this account connected
+      final currentAccount = await _jsGetAccounts();
+      if (currentAccount != null &&
+          currentAccount.isNotEmpty &&
+          currentAccount.toLowerCase() == savedWallet.toLowerCase()) {
+        _wallet = savedWallet;
+        debugPrint('WalletService.init: restored wallet $savedWallet');
+      } else {
+        // MetaMask no longer has this account connected — clear stored data
+        debugPrint(
+            'WalletService.init: MetaMask account mismatch or disconnected, clearing stored wallet');
+        await prefs.remove(_kWalletKey);
+      }
+    } else {
+      // Non-web: just restore from prefs (no MetaMask to check)
+      _wallet = savedWallet;
+    }
+  }
 
   /// Requests MetaMask accounts and switches to Monad Testnet.
   /// Returns the connected wallet address, or null on failure.
@@ -44,6 +79,9 @@ class WalletService {
       final addr = await _jsRequestAccounts();
       if (addr == null) return null;
       _wallet = addr.toLowerCase();
+      // Persist to SharedPreferences so it survives page refresh
+      SharedPreferences.getInstance()
+          .then((p) => p.setString(_kWalletKey, _wallet!));
       return _wallet;
     } catch (e) {
       debugPrint('connectWallet: $e');
@@ -74,11 +112,14 @@ class WalletService {
       final monStr = amountMon.toStringAsFixed(18);
       final parts = monStr.split('.');
       final intPart = BigInt.parse(parts[0]);
-      final fracStr = parts.length > 1 ? parts[1].padRight(18, '0').substring(0, 18) : '0' * 18;
+      final fracStr = parts.length > 1
+          ? parts[1].padRight(18, '0').substring(0, 18)
+          : '0' * 18;
       final fracPart = BigInt.parse(fracStr);
       final amountWei = intPart * BigInt.from(10).pow(18) + fracPart;
       final hexWei = '0x${amountWei.toRadixString(16)}';
-      final result = await _nativeSendTransaction(toAddress.toJS, hexWei.toJS).toDart;
+      final result =
+          await _nativeSendTransaction(toAddress.toJS, hexWei.toJS).toDart;
       return result.toDart;
     } catch (e) {
       debugPrint('sendTransaction: $e');
@@ -86,13 +127,29 @@ class WalletService {
     }
   }
 
-  void disconnect() => _wallet = null;
+  void disconnect() {
+    _wallet = null;
+    // Clear persisted wallet address
+    SharedPreferences.getInstance().then((p) => p.remove(_kWalletKey));
+  }
 
   // ── JS bridge implementations ─────────────────────────────────────────────
 
   Future<String?> _jsRequestAccounts() async {
     final result = await _nativeRequestAccounts().toDart;
     return result.toDart;
+  }
+
+  /// Silently checks which account MetaMask currently exposes (no popup).
+  /// Returns the account address or null/empty if none.
+  Future<String?> _jsGetAccounts() async {
+    try {
+      final result = await _nativeGetAccounts().toDart;
+      return result.toDart;
+    } catch (e) {
+      debugPrint('_jsGetAccounts: $e');
+      return null;
+    }
   }
 
   Future<String?> _jsPersonalSign(String msg, String addr) async {
