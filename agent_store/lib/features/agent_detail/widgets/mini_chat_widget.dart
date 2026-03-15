@@ -19,6 +19,14 @@ class MiniChatWidget extends StatefulWidget {
 }
 
 class _MiniChatWidgetState extends State<MiniChatWidget> {
+  static const _panelBg = Color(0xFFD4C6A7);
+  static const _panelBorder = Color(0xFF9B8B66);
+  static const _assistantBubbleBg = Color(0xFF2F3522);
+  static const _assistantText = Color(0xFFF2E8D2);
+  static const _userBubbleBg = Color(0xFF8E2C24);
+  static const _inputBg = Color(0xFFE5D6B5);
+  static const _inputText = Color(0xFF2B2C1E);
+
   List<({String role, String text})> _messages = [];
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
@@ -30,8 +38,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
 
   /// Serialises the message list and writes it to localStorage.
   void _saveHistory(List<({String role, String text})> messages) {
-    final encoded =
-        messages.map((m) => '${m.role}|||${m.text}').join(';;;');
+    final encoded = messages.map((m) => '${m.role}|||${m.text}').join(';;;');
     html.window.localStorage[_storageKey] = encoded;
   }
 
@@ -78,8 +85,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     });
     _scrollToBottom();
 
-    final reply =
-        await ApiService.instance.chatWithAgent(widget.agentId, text);
+    final reply = await ApiService.instance.chatWithAgent(widget.agentId, text);
 
     if (mounted) {
       setState(() {
@@ -133,17 +139,17 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: const Color(0xFFC8BA9A),
+        color: _panelBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFADA07A)),
+        border: Border.all(color: _panelBorder),
       ),
       child: Column(
         children: [
           // ── Header ─────────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFADA07A))),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: _panelBorder)),
             ),
             child: Row(
               children: [
@@ -159,8 +165,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 Expanded(
                   child: Text(
                     widget.agentTitle,
-                    style: const TextStyle(
-                        color: Color(0xFF7A6E52), fontSize: 12),
+                    style: const TextStyle(color: Color(0xFF5A4D34), fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -168,12 +173,10 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF81231E)),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF81231E)),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.terminal,
-                      size: 16, color: Color(0xFF6366F1)),
+                  icon: const Icon(Icons.terminal, size: 16, color: Color(0xFF6366F1)),
                   tooltip: 'Terminal\'den çalıştır',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -182,8 +185,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 const SizedBox(width: 8),
                 if (_messages.isNotEmpty)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        size: 16, color: Color(0xFF7A6E52)),
+                    icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFF7A6E52)),
                     tooltip: 'Clear chat history',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -199,8 +201,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 ? const Center(
                     child: Text(
                       'Send a message to test this agent...',
-                      style: TextStyle(
-                          color: Color(0xFF5A5038), fontSize: 13),
+                      style: TextStyle(color: Color(0xFF4A4030), fontSize: 13),
                     ),
                   )
                 : ListView.builder(
@@ -211,31 +212,21 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                       final msg = _messages[i];
                       final isUser = msg.role == 'user';
                       return Align(
-                        alignment: isUser
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
+                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                         child: Container(
-                          margin:
-                              const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.of(context).size.width * 0.6,
+                            maxWidth: MediaQuery.of(context).size.width * 0.6,
                           ),
                           decoration: BoxDecoration(
-                            color: isUser
-                                ? const Color(0xFF81231E)
-                                    .withValues(alpha: 0.8)
-                                : const Color(0xFF282918),
+                            color: isUser ? _userBubbleBg.withValues(alpha: 0.8) : _assistantBubbleBg,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             msg.text,
                             style: TextStyle(
-                              color: isUser
-                                  ? Colors.white
-                                  : const Color(0xFF4A4033),
+                              color: isUser ? Colors.white : _assistantText,
                               fontSize: 13,
                               height: 1.4,
                             ),
@@ -249,37 +240,30 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           // ── Input row ───────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFADA07A))),
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: _panelBorder)),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
-                    style:
-                        const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13),
+                    style: const TextStyle(color: _inputText, fontSize: 13),
                     onSubmitted: (_) => _send(),
                     decoration: const InputDecoration(
                       hintText: 'Type a message...',
-                      hintStyle: TextStyle(
-                          color: Color(0xFF5A5038), fontSize: 13),
+                      hintStyle: TextStyle(color: Color(0xFF6A5C42), fontSize: 13),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       filled: true,
-                      fillColor: Color(0xFFB8AA88),
+                      fillColor: _inputBg,
                       enabledBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(8)),
-                        borderSide:
-                            BorderSide(color: Color(0xFFADA07A)),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                        borderSide: BorderSide(color: _panelBorder),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(8)),
-                        borderSide:
-                            BorderSide(color: Color(0xFF81231E)),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                        borderSide: BorderSide(color: Color(0xFF81231E)),
                       ),
                     ),
                   ),
@@ -291,10 +275,8 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   color: const Color(0xFF81231E),
                   disabledColor: const Color(0xFFC0B490),
                   style: IconButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFF81231E).withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                    backgroundColor: const Color(0xFF81231E).withValues(alpha: 0.1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ],
