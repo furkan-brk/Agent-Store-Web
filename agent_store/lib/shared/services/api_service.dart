@@ -287,6 +287,33 @@ class ApiService {
     } catch (e) { debugPrint('updateProfile: $e'); return false; }
   }
 
+  // ── Trial ─────────────────────────────────────────────────────────────────
+
+  /// Generates a one-time trial token and returns a CLI command that the user
+  /// can paste into their terminal. The prompt is encrypted server-side and
+  /// only decrypted by the local Node.js script with the user's own API key.
+  Future<Map<String, dynamic>?> generateTrialToken(int agentId, String provider, String message) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.agents}/$agentId/trial'),
+        headers: _headers,
+        body: jsonEncode({'provider': provider, 'message': message}),
+      ).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      if (res.statusCode == 403) {
+        final data = jsonDecode(res.body);
+        throw Exception(data['error'] ?? 'Trial already used');
+      }
+      debugPrint('generateTrialToken: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('generateTrialToken: $e');
+      rethrow;
+    }
+    return null;
+  }
+
   // ── Ratings ───────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> getRatings(int agentId) async {
@@ -344,8 +371,60 @@ class ApiService {
         headers: _headers,
         body: jsonEncode({'price': price}),
       );
-      return res.statusCode == 200;
+      if (res.statusCode == 200) {
+        invalidateCache('agents');
+        return true;
+      }
+      return false;
     } catch (e) { debugPrint('setAgentPrice: $e'); return false; }
+  }
+
+  /// Update agent metadata (title, description, tags).
+  Future<Map<String, dynamic>?> updateAgent(int agentId, {
+    String? title,
+    String? description,
+    List<String>? tags,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (title != null) body['title'] = title;
+      if (description != null) body['description'] = description;
+      if (tags != null) body['tags'] = tags;
+
+      final res = await http.put(
+        Uri.parse('${ApiConstants.agents}/$agentId'),
+        headers: _headers,
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 15));
+
+      if (res.statusCode == 200) {
+        invalidateCache('agents');
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      final err = jsonDecode(res.body);
+      throw Exception(err['error'] ?? 'Failed to update agent');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Regenerate agent avatar image (once per 24h).
+  Future<Map<String, dynamic>?> regenerateImage(int agentId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.agents}/$agentId/regenerate-image'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 120));
+
+      if (res.statusCode == 200) {
+        invalidateCache('agents');
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      final err = jsonDecode(res.body);
+      throw Exception(err['error'] ?? 'Failed to regenerate image');
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>?> topUpCredits(String txHash, double amountMon) async {
