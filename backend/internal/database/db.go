@@ -12,6 +12,11 @@ import (
 
 var DB *gorm.DB
 
+// IsReady returns true once the DB connection has been established.
+func IsReady() bool {
+	return DB != nil
+}
+
 // ConnectWithRetry retries DB connection indefinitely until successful.
 // Called in a goroutine so the HTTP server can start (and pass healthcheck) immediately.
 func ConnectWithRetry(dsn string) {
@@ -47,9 +52,14 @@ func migrate() {
 		&models.CreditTransaction{},
 		&models.PurchasedAgent{},
 		&models.AgentRating{},
+		&models.TrialUse{},
+		&models.TrialToken{},
 	)
 	if err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}
 	log.Println("Migration complete")
+
+	// Set default price for any agents without a price
+	DB.Model(&models.Agent{}).Where("price = 0").Update("price", 10)
 }

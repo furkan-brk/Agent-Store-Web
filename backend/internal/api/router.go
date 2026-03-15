@@ -6,6 +6,7 @@ import (
 
 	"github.com/agentstore/backend/internal/api/handlers"
 	"github.com/agentstore/backend/internal/api/middleware"
+	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/services"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -51,6 +52,7 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string
 	gmH := handlers.NewGuildMasterHandler(gmSvc)
 
 	v1 := r.Group("/api/v1")
+	v1.Use(middleware.DBReadiness())
 	{
 		auth := v1.Group("/auth")
 		auth.Use(authRL.Middleware())
@@ -60,10 +62,13 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string
 		agents := v1.Group("/agents")
 		agents.GET("", agentH.ListAgents)
 		agents.GET("/trending", agentH.TrendingAgents)
-		agents.GET("/:id", agentH.GetAgent)
+		agents.GET("/:id", middleware.OptionalAuthMiddleware(authSvc), agentH.GetAgent)
 		agents.POST("", middleware.AuthMiddleware(authSvc), agentH.CreateAgent)
+		agents.PUT("/:id", middleware.AuthMiddleware(authSvc), agentH.UpdateAgent)
+		agents.POST("/:id/regenerate-image", middleware.AuthMiddleware(authSvc), agentH.RegenerateImage)
 		agents.POST("/:id/fork", middleware.AuthMiddleware(authSvc), agentH.ForkAgent)
 		agents.POST("/:id/chat", middleware.AuthMiddleware(authSvc), agentH.ChatWithAgent)
+		agents.POST("/:id/trial", middleware.AuthMiddleware(authSvc), agentH.GenerateTrialToken)
 		agents.POST("/:id/purchase", middleware.AuthMiddleware(authSvc), agentH.RecordPurchase)
 		agents.GET("/:id/purchase-status", middleware.AuthMiddleware(authSvc), agentH.GetPurchaseStatus)
 		agents.PUT("/:id/price", middleware.AuthMiddleware(authSvc), agentH.SetAgentPrice)
@@ -79,6 +84,9 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string
 		user.POST("/credits/topup", agentH.TopUpCredits)
 		user.GET("/profile", agentH.GetUserProfile)
 		user.PATCH("/profile", agentH.UpdateProfile)
+
+		// Public trial script endpoint (no auth, token-based)
+		v1.GET("/trial/:token/script", agentH.GetTrialScript)
 
 		v1.GET("/users/:wallet", agentH.GetPublicProfile)
 		v1.GET("/leaderboard", agentH.GetLeaderboard)
@@ -99,7 +107,7 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string
 	}
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "service": "agent-store-backend"})
+		c.JSON(200, gin.H{"status": "ok", "service": "agent-store-backend", "db_ready": database.IsReady()})
 	})
 
 	return r
