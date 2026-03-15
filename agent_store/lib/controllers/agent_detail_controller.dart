@@ -20,6 +20,13 @@ class AgentDetailController extends GetxController {
   final credits = 999.obs;
   final copied = false.obs;
 
+  // ── Trial state (encrypted CLI flow) ─────────────────────────────────────
+  final isTrialLoading = false.obs;
+  final trialUsed = false.obs;
+  final trialCommand = Rxn<String>();
+  final trialToken = Rxn<String>();
+  final selectedTool = 'claude'.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -102,7 +109,11 @@ class AgentDetailController extends GetxController {
   Future<bool> purchaseAgent(String txHash, double amountMon) async {
     isPurchaseLoading.value = true;
     final ok = await ApiService.instance.purchaseAgent(agentId, txHash, amountMon: amountMon);
-    if (ok) isPurchased.value = true;
+    if (ok) {
+      isPurchased.value = true;
+      // Reload the agent to get the full prompt now that it is owned
+      await load();
+    }
     isPurchaseLoading.value = false;
     return ok;
   }
@@ -119,11 +130,44 @@ class AgentDetailController extends GetxController {
     return a.creatorWallet.toLowerCase() == wallet.toLowerCase();
   }
 
-  Future<bool> rateAgent(int rating, {String comment = ''}) async {
-    return ApiService.instance.rateAgent(agentId, rating, comment: comment);
+  /// True when the user has access to the full prompt (creator, purchased, or free agent).
+  bool get hasAccess {
+    final a = agent.value;
+    if (a == null) return false;
+    if (isOwnAgent) return true;
+    if (isPurchased.value) return true;
+    if (a.owned) return true;
+    if (a.price <= 0) return true;
+    return false;
   }
 
-  Future<String?> chat(String message) async {
-    return ApiService.instance.chatWithAgent(agentId, message);
+  /// Generates an encrypted trial token and CLI command. The user pastes the
+  /// command into their terminal; it downloads a Node.js script that runs
+  /// locally with their own API key. The prompt never leaves the server
+  /// unencrypted.
+  Future<void> generateTrial(String message) async {
+    if (isTrialLoading.value || trialUsed.value) return;
+    isTrialLoading.value = true;
+    try {
+      final result = await ApiService.instance.generateTrialToken(
+        agentId,
+        selectedTool.value,
+        message,
+      );
+      if (result != null) {
+        trialCommand.value = result['command'] as String?;
+        trialToken.value = result['token'] as String?;
+      }
+    } catch (e) {
+      if (e.toString().contains('Trial already used')) {
+        trialUsed.value = true;
+      }
+    } finally {
+      isTrialLoading.value = false;
+    }
+  }
+
+  Future<bool> rateAgent(int rating, {String comment = ''}) async {
+    return ApiService.instance.rateAgent(agentId, rating, comment: comment);
   }
 }

@@ -126,7 +126,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   @override
   Widget build(BuildContext context) {
     return Column(mainAxisSize: MainAxisSize.min, children: [
-      _frame(),
+      RepaintBoundary(child: _frame(context)),
       if (widget.showName) ...[
         const SizedBox(height: 8),
         Text(
@@ -152,13 +152,17 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
     ]);
   }
 
-  Widget _frame() {
+  Widget _frame(BuildContext context) {
     final fc = widget.rarity.color;
+    final theme = Theme.of(context);
+
     return Container(
       width: widget.size + 16,
       height: widget.size + 16,
       decoration: BoxDecoration(
-        color: const Color(0xFFC8BA9A),
+        // Use a dark background that matches the app theme
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(color: fc, width: 2),
         boxShadow: [BoxShadow(color: fc.withValues(alpha: 0.35), blurRadius: 14, spreadRadius: 2)],
       ),
@@ -174,7 +178,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
     );
   }
 
-  // ── Generated image path ─────────────────────────────────────────────────
+  // -- Generated image path ---------------------------------------------------
 
   Widget _buildImageWithEffects(double v) {
     double floatY = 0;
@@ -202,6 +206,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
                 gradient: LinearGradient(
                   colors: [
                     Colors.transparent,
@@ -227,6 +232,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
           child: IgnorePointer(
             child: DecoratedBox(
               decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
                 border: Border.all(
                   color: widget.characterType.accentColor.withValues(alpha: pulse),
                   width: 2,
@@ -241,7 +247,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
     return Transform.translate(offset: Offset(0, floatY), child: img);
   }
 
-  // ── Shimmer skeleton (shown when generatedImage is null/pending) ──────────
+  // -- Shimmer skeleton (shown when generatedImage is null/pending) ------------
 
   Widget _loadingShimmer(double v) {
     final rarityColor = widget.rarity.color;
@@ -251,8 +257,8 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
         width: widget.size,
         height: widget.size,
         child: Stack(children: [
-          // Dark base
-          Container(color: const Color(0xFF141508)),
+          // Dark base matching app background
+          Container(color: const Color(0xFF1E1A14)),
           // Sweeping shimmer gradient driven by animation value
           Positioned.fill(
             child: DecoratedBox(
@@ -285,12 +291,12 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
     );
   }
 
-  // ── Error placeholder (image bytes invalid after decode) ─────────────────
+  // -- Error placeholder (image bytes invalid after decode) --------------------
 
   Widget _errorPlaceholder() => Container(
     width: widget.size,
     height: widget.size,
-    color: const Color(0xFF141508),
+    color: const Color(0xFF1E1A14),
     child: Icon(
       Icons.broken_image_outlined,
       color: widget.characterType.accentColor.withValues(alpha: 0.4),
@@ -299,7 +305,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   );
 }
 
-// ── Subwidgets ──────────────────────────────────────────────────────────────
+// -- Subwidgets ---------------------------------------------------------------
 
 class _SubclassBadge extends StatelessWidget {
   final CharacterSubclass subclass;
@@ -336,6 +342,8 @@ class _RarityBadge extends StatelessWidget {
     decoration: BoxDecoration(
       gradient: LinearGradient(colors: rarity.gradientColors),
       borderRadius: BorderRadius.circular(12),
+      // Subtle border to ensure visibility on dark backgrounds
+      border: Border.all(color: rarity.color.withValues(alpha: 0.4)),
     ),
     child: Text(rarity.displayName.toUpperCase(),
       style: const TextStyle(color: Colors.white, fontSize: 9,
@@ -359,22 +367,47 @@ class _StatRow extends StatelessWidget {
   const _StatRow({required this.name, required this.value});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(children: [
-      SizedBox(width: 78, child: Text(name.toUpperCase(),
-        style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 9, letterSpacing: 0.8))),
-      Expanded(child: ClipRRect(
-        borderRadius: BorderRadius.circular(2),
-        child: LinearProgressIndicator(
-          value: value / 100,
-          backgroundColor: const Color(0xFF282918),
-          valueColor: const AlwaysStoppedAnimation(Color(0xFF81231E)),
-          minHeight: 5,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(children: [
+        SizedBox(
+          width: 78,
+          child: Text(
+            name.toUpperCase(),
+            style: TextStyle(
+              color: colorScheme.onSurface.withValues(alpha: 0.45),
+              fontSize: 9,
+              letterSpacing: 0.8,
+            ),
+          ),
         ),
-      )),
-      const SizedBox(width: 6),
-      Text('$value', style: const TextStyle(color: Color(0xFF4A4033), fontSize: 9)),
-    ]),
-  );
+        Expanded(child: ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: LinearProgressIndicator(
+            value: value / 100,
+            backgroundColor: colorScheme.surface,
+            valueColor: AlwaysStoppedAnimation(colorScheme.primary),
+            minHeight: 5,
+          ),
+        )),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 20,
+          child: Text(
+            '$value',
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
 }

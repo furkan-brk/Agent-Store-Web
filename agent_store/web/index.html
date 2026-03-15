@@ -32,6 +32,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="icons/app_icon.svg"/>
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Agent Store</title>
@@ -45,7 +46,7 @@
     window.agentStoreWallet = {
 
       /**
-       * Requests the user's MetaMask accounts.
+       * Requests the user's MetaMask accounts (shows popup if not connected).
        * Returns the first (active) account address as a lowercase string.
        */
       requestAccounts: async function () {
@@ -57,6 +58,24 @@
           throw new Error('No accounts returned from MetaMask.');
         }
         return accounts[0].toLowerCase();
+      },
+
+      /**
+       * Silently checks which accounts MetaMask currently exposes (no popup).
+       * Returns the first account address as a lowercase string, or empty string
+       * if no accounts are connected.
+       */
+      getAccounts: async function () {
+        if (!window.ethereum) return '';
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts && accounts.length > 0) {
+            return accounts[0].toLowerCase();
+          }
+        } catch (e) {
+          console.warn('getAccounts failed:', e);
+        }
+        return '';
       },
 
       /**

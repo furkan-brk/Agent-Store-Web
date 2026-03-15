@@ -1,6 +1,8 @@
+// lib/features/guild_master/screens/guild_master_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../app/theme.dart';
 import '../../../controllers/guild_master_controller.dart';
 import '../../../features/character/character_types.dart';
 
@@ -18,234 +20,667 @@ class GuildMasterScreen extends StatelessWidget {
     ));
 
     return Obx(() => switch (ctrl.phase.value) {
-      GuildMasterPhase.input   => _buildInput(ctrl),
-      GuildMasterPhase.loading => _buildLoading(),
-      GuildMasterPhase.ready   => _buildReady(ctrl),
+      GuildMasterPhase.input   => _buildInput(context, ctrl),
+      GuildMasterPhase.loading => _buildLoading(context),
+      GuildMasterPhase.ready   => _buildReady(context, ctrl),
     });
   }
 
-  Widget _buildInput(GuildMasterController ctrl) {
+  Widget _buildInput(BuildContext context, GuildMasterController ctrl) {
     final problemCtrl = TextEditingController();
+    final cs = Theme.of(context).colorScheme;
+
     return Center(child: ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 560),
-      child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Center(child: Container(
-          width: 64, height: 64,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF9B2828), Color(0xFF5A1515)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFCAB891).withValues(alpha: 0.25), width: 1.5),
-            boxShadow: [BoxShadow(color: const Color(0xFF81231E).withValues(alpha: 0.45), blurRadius: 24, spreadRadius: 4)],
-          ),
-          child: const Icon(Icons.auto_awesome, color: Color(0xFF2B2C1E), size: 32),
-        )),
-        const SizedBox(height: 24),
-        const Text('Guild Master', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF2B2C1E), fontSize: 28, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        const Text('AI-Powered Team Builder', textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF6B5A40), fontSize: 14)),
-        const SizedBox(height: 32),
-        _GlowTextField(controller: problemCtrl, hintText: 'Describe your challenge or project...\n\nExample: I need to build a secure REST API with a nice dashboard and marketing copy.', maxLines: 5),
-        Obx(() {
-          if (ctrl.error.value != null) {
-            return Padding(padding: const EdgeInsets.only(top: 12), child: Text(ctrl.error.value!, style: const TextStyle(color: Color(0xFFCAB891), fontSize: 13)));
-          }
-          return const SizedBox.shrink();
-        }),
-        const SizedBox(height: 20),
-        SizedBox(height: 48, child: ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF81231E), foregroundColor: const Color(0xFFDDD1BB), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          onPressed: () => ctrl.findTeam(problemCtrl.text),
-          child: const Text('Find My Team  →', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        )),
-      ])),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // -- Crown icon badge --
+            Center(child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.border2, width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.auto_awesome, color: AppTheme.textH, size: 32),
+            )),
+            const SizedBox(height: 24),
+
+            // -- Title --
+            const Text(
+              'Guild Master',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textH,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'AI-Powered Team Builder',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textB, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Describe your project or challenge and Guild Master will assemble the ideal team of AI agents to tackle it together.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppTheme.textM.withValues(alpha: 0.85),
+                fontSize: 12,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // -- Text field with glow --
+            _GlowTextField(
+              controller: problemCtrl,
+              hintText: 'Describe your challenge or project...\n\nExample: I need to build a secure REST API with a nice dashboard and marketing copy.',
+              maxLines: 5,
+            ),
+
+            // -- Error message --
+            Obx(() {
+              if (ctrl.error.value != null) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, size: 14, color: cs.error),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          ctrl.error.value!,
+                          style: TextStyle(color: cs.error, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            }),
+            const SizedBox(height: 20),
+
+            // -- Submit button --
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: AppTheme.textH,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.groups, size: 18),
+                label: const Text(
+                  'Find My Team',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                onPressed: () => ctrl.findTeam(problemCtrl.text),
+              ),
+            ),
+          ],
+        ),
+      ),
     ));
   }
 
-  Widget _buildLoading() => const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    CircularProgressIndicator(color: Color(0xFF81231E)),
-    SizedBox(height: 20),
-    Text('Analyzing your challenge...', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 15)),
-  ]));
-
-  Widget _buildReady(GuildMasterController ctrl) {
-    final chatCtrl = TextEditingController();
-    final scrollCtrl = ScrollController();
-
-    void scrollToBottom() {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (scrollCtrl.hasClients) {
-          scrollCtrl.animateTo(scrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-        }
-      });
-    }
-
-    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      // Left panel
-      SizedBox(width: 350, child: Container(
-        decoration: const BoxDecoration(color: Color(0xFFC8BA9A), border: Border(right: BorderSide(color: Color(0xFFADA07A)))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Padding(padding: const EdgeInsets.fromLTRB(20, 24, 20, 12), child: Obx(() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('YOUR TEAM', style: TextStyle(color: Color(0xFF81231E), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-            const SizedBox(height: 6),
-            Text(ctrl.suggestion.value?['suggested_name'] as String? ?? 'Custom Squad', style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(ctrl.suggestion.value?['reasoning'] as String? ?? '', style: const TextStyle(color: Color(0xFF6B5A40), fontSize: 13, height: 1.5)),
-          ]))),
-          const Divider(color: Color(0xFFADA07A)),
-          Expanded(child: Obx(() => ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            itemCount: ctrl.teamAgents.length,
-            itemBuilder: (_, i) => _AgentMiniCard(
-              agent: ctrl.teamAgents[i],
-              selected: ctrl.selectedAgentIds.contains((ctrl.teamAgents[i]['id'] as num).toInt()),
-              onTap: () => ctrl.toggleAgent((ctrl.teamAgents[i]['id'] as num).toInt()),
+  Widget _buildLoading(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: CircularProgressIndicator(
+              color: AppTheme.primary,
+              strokeWidth: 3,
+              backgroundColor: AppTheme.border.withValues(alpha: 0.3),
             ),
-          ))),
-          Padding(padding: const EdgeInsets.all(16), child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF6B5A40), side: const BorderSide(color: Color(0xFFADA07A)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            icon: const Icon(Icons.refresh, size: 16), label: const Text('New Problem'),
-            onPressed: ctrl.reset,
-          )),
-        ]),
-      )),
-      // Right panel — chat
-      Expanded(child: Column(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFADA07A)))),
-          child: Obx(() => Row(children: [
-            const Icon(Icons.chat_bubble_outline, color: Color(0xFF81231E), size: 18),
-            const SizedBox(width: 10),
-            const Text('GUILD MASTER CHAT', style: TextStyle(color: Color(0xFF81231E), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-            const Spacer(),
-            Text('${ctrl.selectedAgentIds.length} agent${ctrl.selectedAgentIds.length == 1 ? '' : 's'} active', style: const TextStyle(color: Color(0xFF7A6E52), fontSize: 12)),
-          ])),
-        ),
-        Expanded(child: Obx(() => ctrl.messages.isEmpty
-          ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.forum_outlined, color: Color(0xFFC0B490), size: 48),
-              SizedBox(height: 12),
-              Text('Ask your team anything!', style: TextStyle(color: Color(0xFF7A6E52), fontSize: 14)),
-            ]))
-          : ListView.builder(
-              controller: scrollCtrl,
-              padding: const EdgeInsets.all(16),
-              itemCount: ctrl.messages.length + (ctrl.isChatLoading.value ? 1 : 0),
-              itemBuilder: (_, i) {
-                if (i == ctrl.messages.length) {
-                  return const Padding(padding: EdgeInsets.only(top: 8), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF81231E)))));
-                }
-                final msg = ctrl.messages[i];
-                if (msg.isUser) return _UserBubble(text: msg.userText!);
-                return _TeamResponseGroup(responses: msg.teamResponses!);
-              },
-            ))),
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFADA07A)))),
-          child: Row(children: [
-            Expanded(child: TextField(
-              controller: chatCtrl,
-              style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14),
-              decoration: InputDecoration(
-                hintText: 'Message your team...',
-                hintStyle: const TextStyle(color: Color(0xFF5A5038)),
-                filled: true, fillColor: const Color(0xFFB8AA88),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFADA07A))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFADA07A))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF81231E))),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              ),
-              onSubmitted: (v) async {
-                final t = v.trim();
-                chatCtrl.clear();
-                await ctrl.sendChat(t);
-                scrollToBottom();
-              },
-            )),
-            const SizedBox(width: 10),
-            Obx(() => SizedBox(height: 46, child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF81231E), foregroundColor: const Color(0xFFDDD1BB), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), padding: const EdgeInsets.symmetric(horizontal: 20)),
-              onPressed: ctrl.isChatLoading.value ? null : () async {
-                final t = chatCtrl.text.trim();
-                chatCtrl.clear();
-                await ctrl.sendChat(t);
-                scrollToBottom();
-              },
-              child: const Icon(Icons.send, size: 18),
-            ))),
-          ]),
-        ),
-      ])),
-    ]);
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Analyzing your challenge...',
+            style: TextStyle(color: AppTheme.textB, fontSize: 15, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Selecting the best agents for your team',
+            style: TextStyle(color: AppTheme.textM, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReady(BuildContext context, GuildMasterController ctrl) {
+    return LayoutBuilder(builder: (context, constraints) {
+      // Responsive: stack vertically on narrow screens
+      final isNarrow = constraints.maxWidth < 768;
+
+      if (isNarrow) {
+        return Column(children: [
+          SizedBox(
+            height: 280,
+            child: _LeftPanel(ctrl: ctrl),
+          ),
+          Expanded(child: _ChatPanel(ctrl: ctrl)),
+        ]);
+      }
+
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(width: 350, child: _LeftPanel(ctrl: ctrl)),
+          Expanded(child: _ChatPanel(ctrl: ctrl)),
+        ],
+      );
+    });
   }
 }
 
-// ── Sub-widgets (pure stateless) ──────────────────────────────────────────────
+// ── Left Panel (team sidebar) ─────────────────────────────────────────────────
+
+class _LeftPanel extends StatelessWidget {
+  final GuildMasterController ctrl;
+  const _LeftPanel({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.surface,
+        border: Border(right: BorderSide(color: AppTheme.border)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // -- Team header --
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: Obx(() => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.shield, color: AppTheme.primary, size: 14),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'YOUR TEAM',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  ctrl.suggestion.value?['suggested_name'] as String? ?? 'Custom Squad',
+                  style: const TextStyle(
+                    color: AppTheme.textH,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  ctrl.suggestion.value?['reasoning'] as String? ?? '',
+                  style: const TextStyle(
+                    color: AppTheme.textB,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            )),
+          ),
+
+          const Divider(color: AppTheme.border, height: 1),
+
+          // -- Agent list --
+          Expanded(
+            child: Obx(() {
+              if (ctrl.teamAgents.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.group_off_outlined,
+                        color: AppTheme.textM.withValues(alpha: 0.5),
+                        size: 40,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No agents found',
+                        style: TextStyle(color: AppTheme.textM, fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Try a different challenge description',
+                        style: TextStyle(color: AppTheme.textM, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                itemCount: ctrl.teamAgents.length,
+                itemBuilder: (_, i) => _AgentMiniCard(
+                  agent: ctrl.teamAgents[i],
+                  selected: ctrl.selectedAgentIds.contains(
+                    (ctrl.teamAgents[i]['id'] as num).toInt(),
+                  ),
+                  onTap: () => ctrl.toggleAgent(
+                    (ctrl.teamAgents[i]['id'] as num).toInt(),
+                  ),
+                ),
+              );
+            }),
+          ),
+
+          // -- Reset button --
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.textB,
+                side: const BorderSide(color: AppTheme.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('New Problem'),
+              onPressed: ctrl.reset,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Chat Panel ────────────────────────────────────────────────────────────────
+
+class _ChatPanel extends StatefulWidget {
+  final GuildMasterController ctrl;
+  const _ChatPanel({required this.ctrl});
+
+  @override
+  State<_ChatPanel> createState() => _ChatPanelState();
+}
+
+class _ChatPanelState extends State<_ChatPanel> {
+  final _chatCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void dispose() {
+    _chatCtrl.dispose();
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.animateTo(
+          _scrollCtrl.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    final text = _chatCtrl.text.trim();
+    if (text.isEmpty) return;
+    _chatCtrl.clear();
+    await widget.ctrl.sendChat(text);
+    _scrollToBottom();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // -- Chat header --
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: const BoxDecoration(
+            color: AppTheme.surface,
+            border: Border(bottom: BorderSide(color: AppTheme.border)),
+          ),
+          child: Obx(() => Row(
+            children: [
+              const Icon(Icons.chat_bubble_outline, color: AppTheme.primary, size: 18),
+              const SizedBox(width: 10),
+              const Text(
+                'GUILD MASTER CHAT',
+                style: TextStyle(
+                  color: AppTheme.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.gold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  '${widget.ctrl.selectedAgentIds.length} agent${widget.ctrl.selectedAgentIds.length == 1 ? '' : 's'} active',
+                  style: const TextStyle(color: AppTheme.gold, fontSize: 11, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          )),
+        ),
+
+        // -- Messages area --
+        Expanded(
+          child: Obx(() {
+            if (widget.ctrl.messages.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.forum_outlined,
+                      color: AppTheme.textM.withValues(alpha: 0.4),
+                      size: 48,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Ask your team anything!',
+                      style: TextStyle(
+                        color: AppTheme.textB,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Your selected agents will collaborate on an answer',
+                      style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return ListView.builder(
+              controller: _scrollCtrl,
+              padding: const EdgeInsets.all(16),
+              itemCount: widget.ctrl.messages.length +
+                  (widget.ctrl.isChatLoading.value ? 1 : 0),
+              itemBuilder: (_, i) {
+                if (i == widget.ctrl.messages.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Center(
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.primary,
+                          backgroundColor: AppTheme.border.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                final msg = widget.ctrl.messages[i];
+                if (msg.isUser) return _UserBubble(text: msg.userText!);
+                return _TeamResponseGroup(responses: msg.teamResponses!);
+              },
+            );
+          }),
+        ),
+
+        // -- Input bar --
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: const BoxDecoration(
+            color: AppTheme.surface,
+            border: Border(top: BorderSide(color: AppTheme.border)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _chatCtrl,
+                  style: const TextStyle(color: AppTheme.textH, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Message your team...',
+                    hintStyle: const TextStyle(color: AppTheme.textM),
+                    filled: true,
+                    fillColor: AppTheme.card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
+                  onSubmitted: (_) => _sendMessage(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Obx(() => SizedBox(
+                height: 46,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: AppTheme.textH,
+                    disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  onPressed: widget.ctrl.isChatLoading.value ? null : _sendMessage,
+                  child: const Icon(Icons.send, size: 18),
+                ),
+              )),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
 
 class _GlowTextField extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
   final int maxLines;
   const _GlowTextField({required this.controller, required this.hintText, this.maxLines = 1});
+
   @override
   State<_GlowTextField> createState() => _GlowTextFieldState();
 }
 
 class _GlowTextFieldState extends State<_GlowTextField> {
   bool _focused = false;
+
   @override
-  Widget build(BuildContext context) => AnimatedContainer(
-    duration: const Duration(milliseconds: 200),
-    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), boxShadow: _focused ? [BoxShadow(color: const Color(0xFF81231E).withValues(alpha: 0.3), blurRadius: 16, spreadRadius: 2)] : []),
-    child: Focus(
-      onFocusChange: (f) => setState(() => _focused = f),
-      child: TextField(controller: widget.controller, maxLines: widget.maxLines,
-        style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14),
-        decoration: InputDecoration(
-          hintText: widget.hintText, hintStyle: const TextStyle(color: Color(0xFF5A5038), fontSize: 13),
-          filled: true, fillColor: const Color(0xFFB8AA88),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFADA07A))),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFADA07A))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF81231E), width: 1.5)),
-          contentPadding: const EdgeInsets.all(16),
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: _focused
+            ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.25), blurRadius: 16, spreadRadius: 2)]
+            : [],
+      ),
+      child: Focus(
+        onFocusChange: (f) => setState(() => _focused = f),
+        child: TextField(
+          controller: widget.controller,
+          maxLines: widget.maxLines,
+          style: const TextStyle(color: AppTheme.textH, fontSize: 14),
+          decoration: InputDecoration(
+            hintText: widget.hintText,
+            hintStyle: TextStyle(color: AppTheme.textM.withValues(alpha: 0.7), fontSize: 13),
+            filled: true,
+            fillColor: AppTheme.card,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.all(16),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
-class _AgentMiniCard extends StatelessWidget {
+class _AgentMiniCard extends StatefulWidget {
   final Map<String, dynamic> agent;
   final bool selected;
   final VoidCallback onTap;
   const _AgentMiniCard({required this.agent, required this.selected, required this.onTap});
 
   @override
+  State<_AgentMiniCard> createState() => _AgentMiniCardState();
+}
+
+class _AgentMiniCardState extends State<_AgentMiniCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    final charType = characterTypeFromString(agent['character_type'] as String? ?? '');
+    final charType = characterTypeFromString(widget.agent['character_type'] as String? ?? '');
     final color = charType.primaryColor;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFE8DEC9), borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: selected ? color : const Color(0xFFADA07A), width: selected ? 1.5 : 1),
-          boxShadow: selected ? [BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 10, spreadRadius: 1)] : [],
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? color.withValues(alpha: 0.12)
+                : _hovered
+                    ? AppTheme.card2
+                    : AppTheme.card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: widget.selected ? color : _hovered ? AppTheme.border2 : AppTheme.border,
+              width: widget.selected ? 1.5 : 1,
+            ),
+            boxShadow: widget.selected
+                ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 10, spreadRadius: 1)]
+                : [],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: color.withValues(alpha: 0.4)),
+                  boxShadow: [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 8)],
+                ),
+                child: Icon(_charTypeIcon(charType), color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.agent['title'] as String? ?? 'Unknown Agent',
+                      style: const TextStyle(
+                        color: AppTheme.textH,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        charType.displayName,
+                        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                widget.selected ? Icons.check_circle : Icons.circle_outlined,
+                color: widget.selected ? color : AppTheme.textM.withValues(alpha: 0.5),
+                size: 20,
+              ),
+            ],
+          ),
         ),
-        child: Row(children: [
-          Container(width: 44, height: 44, decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.4)), boxShadow: [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 8)]),
-            child: Icon(_charTypeIcon(charType), color: color, size: 22)),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(agent['title'] as String? ?? 'Unknown Agent', style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)), child: Text(charType.displayName, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500))),
-          ])),
-          Icon(selected ? Icons.check_circle : Icons.circle_outlined, color: selected ? color : const Color(0xFFC0B490), size: 18),
-        ]),
       ),
     );
   }
@@ -265,14 +700,21 @@ class _AgentMiniCard extends StatelessWidget {
 class _UserBubble extends StatelessWidget {
   final String text;
   const _UserBubble({required this.text});
+
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.centerRight,
     child: Container(
       margin: const EdgeInsets.only(bottom: 12, left: 60),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: const Color(0xFF81231E), borderRadius: BorderRadius.circular(12)),
-      child: Text(text, style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 14)),
+      decoration: BoxDecoration(
+        color: AppTheme.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SelectableText(
+        text,
+        style: const TextStyle(color: AppTheme.textH, fontSize: 14, height: 1.4),
+      ),
     ),
   );
 }
@@ -280,51 +722,111 @@ class _UserBubble extends StatelessWidget {
 class _TeamResponseGroup extends StatelessWidget {
   final List<Map<String, dynamic>> responses;
   const _TeamResponseGroup({required this.responses});
+
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: responses.map((r) => _TeamResponseCard(response: r)).toList());
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: responses.map((r) => _TeamResponseCard(response: r)).toList(),
+  );
 }
 
 class _TeamResponseCard extends StatefulWidget {
   final Map<String, dynamic> response;
   const _TeamResponseCard({required this.response});
+
   @override
   State<_TeamResponseCard> createState() => _TeamResponseCardState();
 }
 
-class _TeamResponseCardState extends State<_TeamResponseCard> with SingleTickerProviderStateMixin {
+class _TeamResponseCardState extends State<_TeamResponseCard>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _opacity;
+
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350))..forward();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 350))
+      ..forward();
     _opacity = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
   }
+
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final charType = characterTypeFromString(widget.response['character_type'] as String? ?? '');
+    final charType = characterTypeFromString(
+      widget.response['character_type'] as String? ?? '',
+    );
     final color = charType.primaryColor;
     final title = widget.response['agent_title'] as String? ?? 'Agent';
     final role  = widget.response['role']        as String? ?? 'Specialist';
-    final reply = widget.response['reply']        as String? ?? '';
-    return FadeTransition(opacity: _opacity, child: Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(color: const Color(0xFFE8DEC9), borderRadius: BorderRadius.circular(10), border: Border(left: BorderSide(color: color, width: 3))),
-      child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(width: 28, height: 28, decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6)), child: Icon(_charTypeIcon(charType), color: color, size: 14)),
-          const SizedBox(width: 8),
-          Text(title, style: const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 8),
-          Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(4)), child: Text(role, style: TextStyle(color: color, fontSize: 10))),
-        ]),
-        const SizedBox(height: 10),
-        Text(reply, style: const TextStyle(color: Color(0xFF4A4033), fontSize: 13, height: 1.55)),
-      ])),
-    ));
+    final reply = widget.response['reply']       as String? ?? '';
+
+    return FadeTransition(
+      opacity: _opacity,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.card,
+          borderRadius: BorderRadius.circular(10),
+          border: Border(left: BorderSide(color: color, width: 3)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(_charTypeIcon(charType), color: color, size: 14),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppTheme.textH,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      role,
+                      style: TextStyle(color: color, fontSize: 10),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              SelectableText(
+                reply,
+                style: const TextStyle(color: AppTheme.textB, fontSize: 13, height: 1.55),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
+
   IconData _charTypeIcon(CharacterType t) => switch (t) {
     CharacterType.wizard     => Icons.code,
     CharacterType.strategist => Icons.flag,

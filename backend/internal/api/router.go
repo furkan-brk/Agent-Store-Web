@@ -1,20 +1,27 @@
 package api
 
 import (
+	"strings"
 	"time"
 
 	"github.com/agentstore/backend/internal/api/handlers"
 	"github.com/agentstore/backend/internal/api/middleware"
+	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/services"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicateAPIKey string) *gin.Engine {
+func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string) *gin.Engine {
 	r := gin.Default()
 
+	// Parse comma-separated origins from config; fall back to localhost only if empty
+	origins := strings.Split(allowedOrigins, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
 	corsConfig := cors.Config{
-		AllowAllOrigins:  true,
+		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -27,7 +34,7 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	cache := services.NewCacheStore()
 
 	authSvc := services.NewAuthService(jwtSecret)
-	aiSvc := services.NewAIService(claudeAPIKey)
+	aiSvc := services.NewAIService("")
 	geminiSvc := services.NewGeminiService(geminiAPIKey)
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
 	scoreSvc := services.NewScoreService(geminiAPIKey)
@@ -36,24 +43,32 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	guildSvc := services.NewGuildService(scoreSvc, cache)
 	gmSvc := services.NewGuildMasterService(aiSvc)
 
+	// Rate limiter: 20 requests per minute on auth endpoints to mitigate brute-force
+	authRL := middleware.NewRateLimiter(20, 1*time.Minute)
+
 	authH := handlers.NewAuthHandler(authSvc)
 	agentH := handlers.NewAgentHandler(agentSvc)
 	guildH := handlers.NewGuildHandler(guildSvc)
 	gmH := handlers.NewGuildMasterHandler(gmSvc)
 
 	v1 := r.Group("/api/v1")
+	v1.Use(middleware.DBReadiness())
 	{
 		auth := v1.Group("/auth")
+		auth.Use(authRL.Middleware())
 		auth.GET("/nonce/:wallet", authH.GetNonce)
 		auth.POST("/verify", authH.VerifySignature)
 
 		agents := v1.Group("/agents")
 		agents.GET("", agentH.ListAgents)
 		agents.GET("/trending", agentH.TrendingAgents)
-		agents.GET("/:id", agentH.GetAgent)
+		agents.GET("/:id", middleware.OptionalAuthMiddleware(authSvc), agentH.GetAgent)
 		agents.POST("", middleware.AuthMiddleware(authSvc), agentH.CreateAgent)
+		agents.PUT("/:id", middleware.AuthMiddleware(authSvc), agentH.UpdateAgent)
+		agents.POST("/:id/regenerate-image", middleware.AuthMiddleware(authSvc), agentH.RegenerateImage)
 		agents.POST("/:id/fork", middleware.AuthMiddleware(authSvc), agentH.ForkAgent)
 		agents.POST("/:id/chat", middleware.AuthMiddleware(authSvc), agentH.ChatWithAgent)
+		agents.POST("/:id/trial", middleware.AuthMiddleware(authSvc), agentH.GenerateTrialToken)
 		agents.POST("/:id/purchase", middleware.AuthMiddleware(authSvc), agentH.RecordPurchase)
 		agents.GET("/:id/purchase-status", middleware.AuthMiddleware(authSvc), agentH.GetPurchaseStatus)
 		agents.PUT("/:id/price", middleware.AuthMiddleware(authSvc), agentH.SetAgentPrice)
@@ -69,6 +84,9 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 		user.POST("/credits/topup", agentH.TopUpCredits)
 		user.GET("/profile", agentH.GetUserProfile)
 		user.PATCH("/profile", agentH.UpdateProfile)
+
+		// Public trial script endpoint (no auth, token-based)
+		v1.GET("/trial/:token/script", agentH.GetTrialScript)
 
 		v1.GET("/users/:wallet", agentH.GetPublicProfile)
 		v1.GET("/leaderboard", agentH.GetLeaderboard)
@@ -89,7 +107,7 @@ func SetupRouter(jwtSecret, allowedOrigins, claudeAPIKey, geminiAPIKey, replicat
 	}
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "service": "agent-store-backend"})
+		c.JSON(200, gin.H{"status": "ok", "service": "agent-store-backend", "db_ready": database.IsReady()})
 	})
 
 	return r

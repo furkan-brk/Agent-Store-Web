@@ -1,0 +1,197 @@
+[
+  {
+    "id": "arcane_library",
+    "name": "Arcane Library",
+    "tags": [
+      "backend",
+      "wizard",
+      "scholar",
+      "research"
+    ],
+    "prompt": "Medieval fantasy arcane library interior, towering bookshelves reaching into shadow, floating magical tomes with glowing pages, warm candlelight, dust motes in golden light beams, ancient stone arches, mystical atmosphere, no people, no characters, slightly soft dreamy focus, warm parchment tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "wizard_tower",
+    "name": "Wizard Tower",
+    "tags": [
+      "backend",
+      "wizard",
+      "general"
+    ],
+    "prompt": "Medieval fantasy wizard tower interior, spiral stone staircase, glowing crystal orbs on shelves, alchemical apparatus, starlit window revealing night sky, purple and blue magical energy wisps, ancient scrolls scattered on oak desk, no people, no characters, atmospheric soft focus, warm tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "throne_room",
+    "name": "Throne Room",
+    "tags": [
+      "strategist",
+      "business",
+      "general"
+    ],
+    "prompt": "Medieval fantasy grand throne room, ornate golden throne on raised dais, crimson banners hanging from stone pillars, stained glass windows casting colored light, polished marble floor, braziers with warm fire, regal and commanding atmosphere, no people, no characters, slightly blurred soft focus, warm golden tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "war_tent",
+    "name": "War Command Tent",
+    "tags": [
+      "strategist",
+      "general"
+    ],
+    "prompt": "Medieval fantasy war command tent interior, large tactical map spread on wooden table, miniature army figurines, oil lanterns casting warm light, armor stands, sword rack, canvas tent walls, battle plans pinned to board, military atmosphere, no people, no characters, soft focus, warm amber tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "observatory",
+    "name": "Celestial Observatory",
+    "tags": [
+      "oracle",
+      "data",
+      "research"
+    ],
+    "prompt": "Medieval fantasy celestial observatory tower, massive brass astrolabe, star charts on walls, telescope pointed at starlit sky through domed opening, floating constellation maps, crystal spheres reflecting starlight, mystical cosmic atmosphere, no people, no characters, soft dreamy focus, deep blue and gold tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "crystal_cave",
+    "name": "Crystal Cavern",
+    "tags": [
+      "oracle",
+      "data"
+    ],
+    "prompt": "Medieval fantasy underground crystal cavern, massive glowing crystals in amber and teal, underground river reflecting crystal light, stalactites with bioluminescent moss, natural stone formations, ethereal mysterious atmosphere, no people, no characters, soft atmospheric focus, warm amber and cool teal tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "fortress_wall",
+    "name": "Fortress Battlements",
+    "tags": [
+      "guardian",
+      "security",
+      "general"
+    ],
+    "prompt": "Medieval fantasy fortress battlements at sunset, massive stone walls with crenellations, iron-reinforced gate visible below, watchtower with signal fire, distant mountains, heavy defensive architecture, shields and spears mounted on walls, strong protective atmosphere, no people, no characters, soft golden hour light, warm stone tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "castle_gate",
+    "name": "Castle Gatehouse",
+    "tags": [
+      "guardian",
+      "security"
+    ],
+    "prompt": "Medieval fantasy castle gatehouse interior, massive iron portcullis, torch-lit stone corridors, arrow slits in thick walls, heavy oak doors with iron bands, guard room with weapon racks, chains and pulleys for drawbridge mechanism, defensive stronghold atmosphere, no people, no characters, soft torchlight focus, warm grey and amber tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "artisan_workshop",
+    "name": "Artisan Workshop",
+    "tags": [
+      "artisan",
+      "frontend",
+      "creative"
+    ],
+    "prompt": "Medieval fantasy artisan workshop, woodcarving tools on workbench, half-finished sculptures, colorful paint pots, easel with canvas, stained glass pieces, natural light from large arched window, creative clutter of materials, warm inviting atmosphere, no people, no characters, soft warm focus, rich sienna and teal tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "gallery_hall",
+    "name": "Royal Gallery",
+    "tags": [
+      "artisan",
+      "frontend"
+    ],
+    "prompt": "Medieval fantasy royal art gallery, ornate gilded frames on stone walls, tapestries depicting mythical scenes, marble pedestals with sculptures, polished herringbone floor, skylights casting natural light, refined elegant atmosphere, no people, no characters, soft dreamy focus, warm cream and gold tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "tavern_hearth",
+    "name": "Tavern Hearth",
+    "tags": [
+      "bard",
+      "creative",
+      "general"
+    ],
+    "prompt": "Medieval fantasy cozy tavern interior, large stone fireplace with roaring fire, wooden beams on ceiling, ale mugs on oak bar counter, lute leaning against chair, warm orange candlelight, worn wooden floor, comfortable welcoming atmosphere, no people, no characters, soft warm focus, rich amber and brown tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "forest_clearing",
+    "name": "Enchanted Forest Clearing",
+    "tags": [
+      "bard",
+      "creative"
+    ],
+    "prompt": "Medieval fantasy enchanted forest clearing at twilight, ancient oak trees with firefly lights, moss-covered stones arranged in circle, wild flowers glowing softly, small stream reflecting moonlight, magical woodland atmosphere, no people, no characters, soft ethereal focus, emerald green and warm gold tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "monastery",
+    "name": "Monastery Scriptorium",
+    "tags": [
+      "scholar",
+      "research"
+    ],
+    "prompt": "Medieval fantasy monastery scriptorium, rows of slanted writing desks, illuminated manuscripts with gold leaf, inkwells and quill pens, tall narrow windows with plain glass, stone arched ceiling, quiet contemplative atmosphere, candles providing warm focused light, no people, no characters, soft warm focus, parchment beige and brown tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "ancient_archive",
+    "name": "Ancient Archive",
+    "tags": [
+      "scholar",
+      "research",
+      "data"
+    ],
+    "prompt": "Medieval fantasy underground archive vault, endless rows of scroll shelves carved into rock, floating magical index lights, ancient stone catalog drawers, protective ward runes on doorframe, reverent quiet atmosphere of stored knowledge, no people, no characters, soft amber focus, warm brown and gold tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "market_square",
+    "name": "Market Square",
+    "tags": [
+      "merchant",
+      "business"
+    ],
+    "prompt": "Medieval fantasy bustling market square at golden hour, colorful merchant stalls with awnings, exotic goods displayed on tables, cobblestone ground, fountain in center, guild hall building in background, festive trading atmosphere, no people, no characters, soft golden light, warm rich tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "trading_port",
+    "name": "Trading Harbor",
+    "tags": [
+      "merchant",
+      "business"
+    ],
+    "prompt": "Medieval fantasy trading harbor, wooden sailing ships docked at stone pier, cargo crates and barrels, warehouse buildings, calm sea reflecting sunset, lighthouse in distance, prosperous maritime atmosphere, no people, no characters, soft sunset focus, warm orange and navy tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "alchemy_lab",
+    "name": "Alchemist Laboratory",
+    "tags": [
+      "wizard",
+      "oracle",
+      "backend",
+      "data"
+    ],
+    "prompt": "Medieval fantasy alchemist laboratory, bubbling glass flasks and retorts, colorful liquid potions, herb bundles hanging from ceiling, mortar and pestle, flame under copper distillation apparatus, mysterious smoke wisps, experimental atmosphere, no people, no characters, soft warm focus, emerald and amber tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "training_grounds",
+    "name": "Knight Training Grounds",
+    "tags": [
+      "strategist",
+      "guardian",
+      "general"
+    ],
+    "prompt": "Medieval fantasy knight training grounds at dawn, wooden practice dummies, weapon racks with swords and shields, sand arena with fence, stone castle wall in background, morning mist, disciplined martial atmosphere, no people, no characters, soft dawn light focus, warm grey and gold tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "royal_court",
+    "name": "Royal Court Chamber",
+    "tags": [
+      "strategist",
+      "merchant",
+      "business"
+    ],
+    "prompt": "Medieval fantasy royal court chamber, long polished conference table with maps, ornate high-backed chairs, coat of arms tapestries, chandelier with many candles, tall arched windows with heavy drapes, political power atmosphere, no people, no characters, soft candlelight focus, rich burgundy and gold tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  },
+  {
+    "id": "enchanted_garden",
+    "name": "Enchanted Garden",
+    "tags": [
+      "artisan",
+      "bard",
+      "creative",
+      "general"
+    ],
+    "prompt": "Medieval fantasy enchanted castle garden, stone pathways between magical flower beds, ornamental fountain with crystal-clear water, ivy-covered archway, perfectly trimmed hedges, butterflies and small birds, peaceful serene atmosphere, no people, no characters, soft dreamy focus, lush green and pastel tones, wide landscape composition. No text, letters, numbers, words, or symbols anywhere."
+  }
+]

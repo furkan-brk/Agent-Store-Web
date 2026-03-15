@@ -15,8 +15,8 @@ import (
 
 const (
 	pollinationsImageAPI = "https://api.pollinations.ai/v1/images"
-	pollinationsTimeout  = 120 * time.Second
-	maxRetries           = 3
+	pollinationsTimeout  = 30 * time.Second
+	maxRetries           = 1
 	initialBackoff       = 2 * time.Second
 )
 
@@ -36,38 +36,7 @@ func NewPollinationsService() *PollinationsService {
 // GenerateImage generates a pixel-art image using the Pollinations API and returns base64-encoded PNG.
 // The profile parameter provides visual characteristics (colors, features) that are merged into the prompt.
 func (p *PollinationsService) GenerateImage(profile *AgentProfile) (string, error) {
-	// Extract per-characteristic details safely.
-	face, chest, rightHand, distinction := extractCharacteristics(profile.Characteristics)
-
-	fullPrompt := fmt.Sprintf(
-		`A professional, high-fidelity 2D pixel art avatar in a strict 16-bit retro video game aesthetic. `+
-			`Crisp, blocky pixels, absolutely no anti-aliasing. High contrast, clean arcade sprite style. 1:1 aspect ratio.`+
-			"\n\n"+
-			`The character is standing in the identical full-body standing pose, with the identical size, proportions, `+
-			`and central positioning as a reference robot character template. It is clad in sleek, futuristic power armor `+
-			`with a simple, integrated sci-fi jacket design. Pouches and heavy detailed elements are completely removed, `+
-			`replaced by a smooth, clean armored surface.`+
-			"\n\n"+
-			`Main armor plating color: %s. Accent color for gears, vents, and symbols: %s. `+
-			`The helmet visor shows %s. The chest panel displays %s. `+
-			`Unique surface detail: %s.`+
-			"\n\n"+
-			`Props and Pose (Strictly Preserved):`+"\n"+
-			`1. Left Hand: Holding a flat, integrated data tablet with a vibrant %s neon glow. `+
-			`The tablet displays glowing lines of graphical metrics, abstract symbols, and grid patterns — `+
-			`but NO text, letters, or words.`+"\n"+
-			`2. Right Hand: Holding %s.`+
-			"\n\n"+
-			`Background: Completely flat, solid dark grey (#1a1a1a), no gradients, no scenery. `+
-			`No text, letters, or symbols anywhere in the image.`,
-		profile.PrimaryColor,
-		profile.SecondaryColor,
-		face,
-		chest,
-		distinction,
-		profile.TabletGlowColor,
-		rightHand,
-	)
+	fullPrompt := BuildAvatarPrompt(profile)
 
 	imageURL, err := p.callPollinationsAPI(fullPrompt)
 	if err != nil {
@@ -121,7 +90,7 @@ func (p *PollinationsService) attemptPollinationsRequest(prompt string) (string,
 		"steps":     20,
 		"guidance":  7.5,
 		"seed":      -1,
-		"negative":  "text, letters, words, watermark, signature",
+		"negative":  "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon",
 		"sampler":   "euler",
 		"scheduler": "normal",
 		"upscale":   false,
@@ -267,38 +236,7 @@ func (p *PollinationsService) attemptDownloadImage(imageURL string) (string, err
 // GenerateImageSync is a simpler synchronous method that uses Pollinations' direct image endpoint.
 // It returns a direct image URL without needing to handle base64 encoding.
 func (p *PollinationsService) GenerateImageSync(profile *AgentProfile) (string, error) {
-	// Extract per-characteristic details safely.
-	face, chest, rightHand, distinction := extractCharacteristics(profile.Characteristics)
-
-	fullPrompt := fmt.Sprintf(
-		`A professional, high-fidelity 2D pixel art avatar in a strict 16-bit retro video game aesthetic. `+
-			`Crisp, blocky pixels, absolutely no anti-aliasing. High contrast, clean arcade sprite style. 1:1 aspect ratio.`+
-			"\n\n"+
-			`The character is standing in the identical full-body standing pose, with the identical size, proportions, `+
-			`and central positioning as a reference robot character template. It is clad in sleek, futuristic power armor `+
-			`with a simple, integrated sci-fi jacket design. Pouches and heavy detailed elements are completely removed, `+
-			`replaced by a smooth, clean armored surface.`+
-			"\n\n"+
-			`Main armor plating color: %s. Accent color for gears, vents, and symbols: %s. `+
-			`The helmet visor shows %s. The chest panel displays %s. `+
-			`Unique surface detail: %s.`+
-			"\n\n"+
-			`Props and Pose (Strictly Preserved):`+"\n"+
-			`1. Left Hand: Holding a flat, integrated data tablet with a vibrant %s neon glow. `+
-			`The tablet displays glowing lines of graphical metrics, abstract symbols, and grid patterns — `+
-			`but NO text, letters, or words.`+"\n"+
-			`2. Right Hand: Holding %s.`+
-			"\n\n"+
-			`Background: Completely flat, solid dark grey (#1a1a1a), no gradients, no scenery. `+
-			`No text, letters, or symbols anywhere in the image.`,
-		profile.PrimaryColor,
-		profile.SecondaryColor,
-		face,
-		chest,
-		distinction,
-		profile.TabletGlowColor,
-		rightHand,
-	)
+	fullPrompt := BuildAvatarPrompt(profile)
 
 	// Use the direct image endpoint: https://image.pollinations.ai
 	params := url.Values{}
@@ -306,7 +244,7 @@ func (p *PollinationsService) GenerateImageSync(profile *AgentProfile) (string, 
 	params.Set("width", "512")
 	params.Set("height", "512")
 	params.Set("model", "flux")
-	params.Set("negative", "text, letters, words, watermark, signature")
+	params.Set("negative", "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon")
 
 	directURL := "https://image.pollinations.ai/?" + params.Encode()
 	return directURL, nil

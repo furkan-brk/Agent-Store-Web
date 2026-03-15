@@ -1,3 +1,4 @@
+// lib/features/store/screens/store_screen.dart
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
 import 'dart:html' as html;
@@ -9,7 +10,7 @@ import '../../../app/theme.dart';
 import '../../../controllers/store_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
-import '../../../shared/services/wallet_service.dart';
+import '../../../shared/widgets/wallet_guard.dart';
 import '../widgets/agent_card.dart';
 import '../widgets/category_sidebar.dart';
 import '../widgets/filter_panel.dart';
@@ -32,6 +33,7 @@ class StoreScreen extends StatefulWidget {
 class _StoreScreenState extends State<StoreScreen> {
   late final StoreController _ctrl;
   final _searchCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
   Timer? _debounce;
 
   @override
@@ -83,64 +85,96 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   Future<void> _onSaveAgent(AgentModel agent) async {
-    if (!ApiService.instance.isAuthenticated || !WalletService.instance.isConnected) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Connect your wallet to save agents'),
-        action: SnackBarAction(label: 'Connect', onPressed: () => context.go('/wallet')),
-      ));
-      return;
-    }
+    if (!WalletGuard.checkWithSnackBar(context, actionLabel: 'save agents')) return;
     final ok = await ApiService.instance.addToLibrary(agent.id);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(ok ? 'Saved to library' : 'Already in library'),
+        content: Row(children: [
+          Icon(
+            ok ? Icons.bookmark_added_rounded : Icons.bookmark_outlined,
+            color: ok ? AppTheme.olive : AppTheme.gold,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(ok ? 'Saved to library' : 'Already in library')),
+        ]),
         duration: const Duration(seconds: 2),
       ));
     }
   }
 
   @override
-  void dispose() { _debounce?.cancel(); _searchCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
+    super.dispose();
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: AppTheme.bg,
-    body: Row(children: [
-      Obx(() => CategorySidebar(
-        selectedCategory: _ctrl.category.value,
-        onSelect: (cat) {
-          _searchCtrl.clear();
-          _ctrl.search.value = '';
-          _ctrl.category.value = cat;
-          _ctrl.load();
-        },
-      )),
-      // ShimmerScope provides a shared AnimationController for all AgentCardSkeleton children.
-    Expanded(child: ShimmerScope(
-      child: RefreshIndicator(
-        onRefresh: _ctrl.load,
-        color: AppTheme.primary,
-        child: CustomScrollView(cacheExtent: 1200, slivers: [
-          // Header is purely driven by TextEditingController + inner Obx calls → no outer Obx needed.
-          SliverToBoxAdapter(child: _buildHeader()),
-          // TrendingRow: only hide/show when search changes.
-          Obx(() => _ctrl.search.value.isEmpty
-            ? const SliverToBoxAdapter(child: TrendingRow())
-            : const SliverToBoxAdapter(child: SizedBox.shrink())),
-          // Discovery: only visible with empty search + no category + not loading.
-          Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
-            ? SliverToBoxAdapter(child: _buildDiscovery())
-            : const SliverToBoxAdapter(child: SizedBox.shrink())),
-          // Section heading has its own inner Obx → no outer wrapper needed.
-          SliverToBoxAdapter(child: _buildSectionHeader()),
-          // Main content sliver: rebuilds ONLY when isLoading/agents/hasError change.
-          Obx(() => _buildContentSliver()),
-        ]),
-      ),
-    )),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Hide category sidebar on narrow screens
+    final showSidebar = screenWidth >= 768;
+
+    return Scaffold(
+      backgroundColor: AppTheme.bg,
+      body: Row(children: [
+        if (showSidebar)
+          Obx(() => CategorySidebar(
+            selectedCategory: _ctrl.category.value,
+            onSelect: (cat) {
+              _searchCtrl.clear();
+              _ctrl.search.value = '';
+              _ctrl.category.value = cat;
+              _ctrl.load();
+            },
+          )),
+        // ShimmerScope provides a shared AnimationController for all AgentCardSkeleton children.
+        Expanded(child: ShimmerScope(
+          child: Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: _ctrl.load,
+                color: AppTheme.primary,
+                child: CustomScrollView(cacheExtent: 1200, slivers: [
+                  // Header is purely driven by TextEditingController + inner Obx calls.
+                  SliverToBoxAdapter(child: _buildHeader(showSidebar)),
+                  // TrendingRow: only hide/show when search changes.
+                  Obx(() => _ctrl.search.value.isEmpty
+                    ? const SliverToBoxAdapter(child: TrendingRow())
+                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                  // Discovery: only visible with empty search + no category + not loading.
+                  Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
+                    ? SliverToBoxAdapter(child: _buildDiscovery())
+                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                  // Section heading with divider
+                  SliverToBoxAdapter(child: _buildSectionHeader()),
+                  // Main content sliver: rebuilds ONLY when isLoading/agents/hasError change.
+                  Obx(() => _buildContentSliver()),
+                  // End-of-list spacer
+                  Obx(() => (_ctrl.agents.isNotEmpty && !_ctrl.isLoading.value)
+                    ? SliverToBoxAdapter(child: _buildEndOfList())
+                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                ]),
+              ),
+              // Subtle loading indicator overlay when refreshing with stale data
+              Obx(() => (_ctrl.isLoading.value && _ctrl.agents.isNotEmpty)
+                ? Positioned(
+                    top: 0, left: 0, right: 0,
+                    child: LinearProgressIndicator(
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation(AppTheme.primary.withValues(alpha: 0.7)),
+                      minHeight: 2,
+                    ),
+                  )
+                : const SizedBox.shrink()),
+            ],
+          ),
+        )),
+      ]),
+    );
+  }
 
   // Returns a sliver based on current controller state.
   Widget _buildContentSliver() {
@@ -176,78 +210,76 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  Widget _buildHeader() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+  Widget _buildHeader(bool showSidebar) => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      ShaderMask(
-        shaderCallback: (b) => const LinearGradient(colors: [AppTheme.primary, AppTheme.gold], begin: Alignment.centerLeft, end: Alignment.centerRight).createShader(b),
-        child: const Text('Agent Store', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-      ),
-      const SizedBox(height: 4),
-      Obx(() => Text('${_ctrl.total.value} agents available', style: const TextStyle(color: AppTheme.textM, fontSize: 13))),
-      const SizedBox(height: 16),
+      // Title row with accent decoration
       Row(children: [
-        Expanded(child: TextField(
-          controller: _searchCtrl,
-          onSubmitted: (v) { _debounce?.cancel(); _ctrl.search.value = v; _saveRecentSearch(v); _ctrl.load(); },
-          onChanged: _onSearchChanged,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: InputDecoration(
-            hintText: 'Search agents...', prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textM),
-            suffixIcon: _searchCtrl.text.isNotEmpty ? IconButton(icon: const Icon(Icons.clear_rounded, color: AppTheme.textM), onPressed: _clearSearch) : null,
-            fillColor: AppTheme.card, filled: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppTheme.border)),
+        Container(
+          width: 4, height: 28,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppTheme.primary, AppTheme.gold],
+            ),
+            borderRadius: BorderRadius.circular(2),
           ),
-        )),
+        ),
         const SizedBox(width: 12),
-        Obx(() => Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(color: AppTheme.card, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.border)),
-          child: DropdownButton<String>(
-            value: _ctrl.sort.value,
-            dropdownColor: AppTheme.card2, underline: const SizedBox(),
-            icon: const Icon(Icons.sort_rounded, color: AppTheme.textM, size: 16),
-            style: const TextStyle(color: AppTheme.textB, fontSize: 12),
-            items: const [
-              DropdownMenuItem(value: 'newest', child: Text('Newest')),
-              DropdownMenuItem(value: 'popular', child: Text('Popular')),
-              DropdownMenuItem(value: 'saves', child: Text('Most Saved')),
-              DropdownMenuItem(value: 'price_asc', child: Text('Price ↑')),
-              DropdownMenuItem(value: 'price_desc', child: Text('Price ↓')),
-              DropdownMenuItem(value: 'oldest', child: Text('Oldest')),
-            ],
-            onChanged: (v) { if (v != null) { _ctrl.sort.value = v; _ctrl.load(); } },
-          ),
-        )),
-        const SizedBox(width: 8),
-        Obx(() => Stack(clipBehavior: Clip.none, children: [
-          Container(
-            decoration: BoxDecoration(
-              color: _ctrl.showFilter.value ? AppTheme.primary.withValues(alpha: 0.15) : AppTheme.card,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _ctrl.showFilter.value ? AppTheme.primary : AppTheme.border),
-            ),
-            child: IconButton(
-              icon: Icon(Icons.tune_rounded, color: _ctrl.showFilter.value ? AppTheme.primary : AppTheme.textM, size: 18),
-              onPressed: () => _ctrl.showFilter.toggle(),
-              padding: const EdgeInsets.all(8), constraints: const BoxConstraints(), tooltip: 'Filter',
+        const Expanded(
+          child: Text(
+            'Discover Agents',
+            style: TextStyle(
+              color: AppTheme.textH,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
             ),
           ),
-          if (_ctrl.activeFilterCount > 0)
-            Positioned(top: -4, right: -4, child: CircleAvatar(
-              radius: 8, backgroundColor: AppTheme.gold,
-              child: Text('${_ctrl.activeFilterCount}', style: const TextStyle(color: Color(0xFF1E1A14), fontSize: 10, fontWeight: FontWeight.bold)),
-            )),
-        ])),
+        ),
       ]),
+      const SizedBox(height: 8),
+      Obx(() => Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.auto_awesome, size: 14, color: AppTheme.gold),
+          const SizedBox(width: 6),
+          Text(
+            '${_ctrl.total.value} agents available',
+            style: const TextStyle(color: AppTheme.textM, fontSize: 13, letterSpacing: 0.2),
+          ),
+        ]),
+      )),
+      const SizedBox(height: 20),
+      // Search + Sort + Filter row
+      LayoutBuilder(builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 500;
+        if (isCompact) {
+          return Column(children: [
+            _buildSearchField(),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: _buildSortDropdown()),
+              const SizedBox(width: 8),
+              _buildFilterButton(),
+            ]),
+          ]);
+        }
+        return Row(children: [
+          Expanded(child: _buildSearchField()),
+          const SizedBox(width: 12),
+          _buildSortDropdown(),
+          const SizedBox(width: 8),
+          _buildFilterButton(),
+        ]);
+      }),
       // Filter panel
       Obx(() => AnimatedSwitcher(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 250),
         transitionBuilder: (child, a) => SizeTransition(sizeFactor: a, child: FadeTransition(opacity: a, child: child)),
         child: _ctrl.showFilter.value
-          ? Padding(key: const ValueKey('fp'), padding: const EdgeInsets.only(top: 12), child: FilterPanel(
+          ? Padding(key: const ValueKey('fp'), padding: const EdgeInsets.only(top: 14), child: FilterPanel(
               minPrice: 0, maxPrice: 10,
               currentMin: _ctrl.minPrice.value, currentMax: _ctrl.maxPrice.value,
               selectedTags: _ctrl.filterTags.toList(),
@@ -258,145 +290,650 @@ class _StoreScreenState extends State<StoreScreen> {
           : const SizedBox.shrink(key: ValueKey('fh')),
       )),
       // Recent searches
-      Obx(() => _ctrl.recentSearches.isNotEmpty && _ctrl.search.value.isEmpty ? Column(children: [
-        const SizedBox(height: 10),
-        SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-          const Icon(Icons.history, size: 12, color: AppTheme.textM),
-          const SizedBox(width: 6),
-          const Text('Recent:', style: TextStyle(color: AppTheme.textM, fontSize: 11)),
-          const SizedBox(width: 8),
-          ..._ctrl.recentSearches.map((s) => Padding(padding: const EdgeInsets.only(right: 6), child: ActionChip(
-            label: Text(s, style: const TextStyle(fontSize: 10, color: AppTheme.textB)),
-            onPressed: () { _debounce?.cancel(); _searchCtrl.text = s; _ctrl.search.value = s; _ctrl.load(); },
-            backgroundColor: AppTheme.card2, side: const BorderSide(color: AppTheme.border),
-            padding: const EdgeInsets.symmetric(horizontal: 4), visualDensity: VisualDensity.compact,
-          ))),
-          TextButton(
-            onPressed: () { html.window.localStorage.remove('recent_searches'); _ctrl.recentSearches.clear(); },
-            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-            child: const Text('Clear', style: TextStyle(fontSize: 10, color: AppTheme.textM)),
+      Obx(() => _ctrl.recentSearches.isNotEmpty && _ctrl.search.value.isEmpty ? Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.card.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
           ),
-        ])),
-      ]) : const SizedBox.shrink()),
+          child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+            const Icon(Icons.history_rounded, size: 13, color: AppTheme.textM),
+            const SizedBox(width: 8),
+            const Text('Recent:', style: TextStyle(color: AppTheme.textM, fontSize: 11, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 10),
+            ..._ctrl.recentSearches.map((s) => Padding(padding: const EdgeInsets.only(right: 6), child: ActionChip(
+              label: Text(s, style: const TextStyle(fontSize: 10, color: AppTheme.textB)),
+              onPressed: () { _debounce?.cancel(); _searchCtrl.text = s; _ctrl.search.value = s; _ctrl.load(); },
+              backgroundColor: AppTheme.card2, side: const BorderSide(color: AppTheme.border),
+              padding: const EdgeInsets.symmetric(horizontal: 6), visualDensity: VisualDensity.compact,
+            ))),
+            TextButton.icon(
+              onPressed: () { html.window.localStorage.remove('recent_searches'); _ctrl.recentSearches.clear(); },
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              icon: const Icon(Icons.close_rounded, size: 11, color: AppTheme.textM),
+              label: const Text('Clear', style: TextStyle(fontSize: 10, color: AppTheme.textM)),
+            ),
+          ])),
+        ),
+      ) : const SizedBox.shrink()),
+      const SizedBox(height: 4),
     ]),
   );
 
-  Widget _buildSectionHeader() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-    child: Obx(() => Text(
-      _ctrl.search.value.isNotEmpty ? 'Results for "${_ctrl.search.value}"'
-        : _ctrl.category.value.isNotEmpty ? '${_ctrl.category.value[0].toUpperCase()}${_ctrl.category.value.substring(1)} Agents'
-        : 'All Agents',
-      style: const TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-    )),
+  Widget _buildSearchField() => TextField(
+    controller: _searchCtrl,
+    focusNode: _searchFocus,
+    onSubmitted: (v) { _debounce?.cancel(); _ctrl.search.value = v; _saveRecentSearch(v); _ctrl.load(); },
+    onChanged: _onSearchChanged,
+    style: const TextStyle(color: AppTheme.textH, fontSize: 14),
+    decoration: InputDecoration(
+      hintText: 'Search by name, category, or tag...',
+      hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
+      prefixIcon: const Padding(
+        padding: EdgeInsets.only(left: 12, right: 8),
+        child: Icon(Icons.search_rounded, color: AppTheme.textM, size: 20),
+      ),
+      prefixIconConstraints: const BoxConstraints(minWidth: 40),
+      suffixIcon: _searchCtrl.text.isNotEmpty
+        ? IconButton(
+            icon: const Icon(Icons.clear_rounded, color: AppTheme.textM, size: 18),
+            onPressed: _clearSearch,
+            tooltip: 'Clear search',
+          )
+        : null,
+      fillColor: AppTheme.card, filled: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppTheme.border),
+      ),
+    ),
   );
 
-  Widget _buildErrorView() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    const Icon(Icons.cloud_off_outlined, color: AppTheme.border2, size: 56),
-    const SizedBox(height: 12),
-    const Text('Could not load agents', style: TextStyle(color: AppTheme.textB, fontSize: 18)),
-    const SizedBox(height: 6),
-    const Text('Check your connection and try again', style: TextStyle(color: AppTheme.textM, fontSize: 13)),
-    const SizedBox(height: 20),
-    ElevatedButton.icon(onPressed: _ctrl.load, icon: const Icon(Icons.refresh, size: 16), label: const Text('Retry')),
+  Widget _buildSortDropdown() => Obx(() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    decoration: BoxDecoration(
+      color: AppTheme.card,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppTheme.border),
+    ),
+    child: DropdownButton<String>(
+      value: _ctrl.sort.value,
+      dropdownColor: AppTheme.card2, underline: const SizedBox(),
+      icon: const Padding(
+        padding: EdgeInsets.only(left: 6),
+        child: Icon(Icons.sort_rounded, color: AppTheme.textM, size: 16),
+      ),
+      style: const TextStyle(color: AppTheme.textH, fontSize: 12),
+      items: const [
+        DropdownMenuItem(value: 'newest', child: _SortMenuItem(icon: Icons.schedule_rounded, label: 'Newest')),
+        DropdownMenuItem(value: 'popular', child: _SortMenuItem(icon: Icons.trending_up_rounded, label: 'Popular')),
+        DropdownMenuItem(value: 'saves', child: _SortMenuItem(icon: Icons.bookmark_rounded, label: 'Most Saved')),
+        DropdownMenuItem(value: 'price_asc', child: _SortMenuItem(icon: Icons.arrow_upward_rounded, label: 'Price Low')),
+        DropdownMenuItem(value: 'price_desc', child: _SortMenuItem(icon: Icons.arrow_downward_rounded, label: 'Price High')),
+        DropdownMenuItem(value: 'oldest', child: _SortMenuItem(icon: Icons.history_rounded, label: 'Oldest')),
+      ],
+      onChanged: (v) { if (v != null) { _ctrl.sort.value = v; _ctrl.load(); } },
+    ),
+  ));
+
+  Widget _buildFilterButton() => Obx(() => Stack(clipBehavior: Clip.none, children: [
+    _HoverContainer(
+      isActive: _ctrl.showFilter.value,
+      onTap: () => _ctrl.showFilter.toggle(),
+      tooltip: 'Filter options',
+      child: Icon(
+        Icons.tune_rounded,
+        color: _ctrl.showFilter.value ? AppTheme.primary : AppTheme.textM,
+        size: 18,
+      ),
+    ),
+    if (_ctrl.activeFilterCount > 0)
+      Positioned(top: -4, right: -4, child: Container(
+        width: 18, height: 18,
+        decoration: BoxDecoration(
+          color: AppTheme.gold,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTheme.bg, width: 1.5),
+          boxShadow: [BoxShadow(color: AppTheme.gold.withValues(alpha: 0.4), blurRadius: 6)],
+        ),
+        child: Center(child: Text(
+          '${_ctrl.activeFilterCount}',
+          style: const TextStyle(color: Color(0xFF1E1A14), fontSize: 9, fontWeight: FontWeight.bold),
+        )),
+      )),
   ]));
+
+  Widget _buildSectionHeader() => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
+    child: Column(children: [
+      Obx(() {
+        final IconData icon;
+        final String text;
+        final String? subtitle;
+        if (_ctrl.search.value.isNotEmpty) {
+          icon = Icons.search_rounded;
+          text = 'Results for "${_ctrl.search.value}"';
+          subtitle = '${_ctrl.agents.length} agent${_ctrl.agents.length != 1 ? 's' : ''} found';
+        } else if (_ctrl.category.value.isNotEmpty) {
+          icon = _getCategoryIcon(_ctrl.category.value);
+          text = '${_ctrl.category.value[0].toUpperCase()}${_ctrl.category.value.substring(1)} Agents';
+          subtitle = '${_ctrl.agents.length} in this category';
+        } else {
+          icon = Icons.grid_view_rounded;
+          text = 'All Agents';
+          subtitle = null;
+        }
+        return Row(children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppTheme.gold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: AppTheme.gold),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(text, style: const TextStyle(
+                color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.3)),
+              if (subtitle != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(subtitle, style: const TextStyle(color: AppTheme.textM, fontSize: 11)),
+                ),
+            ],
+          )),
+        ]);
+      }),
+      const Padding(
+        padding: EdgeInsets.only(top: 12),
+        child: Divider(color: AppTheme.border, height: 1, thickness: 1),
+      ),
+      const SizedBox(height: 16),
+    ]),
+  );
+
+  IconData _getCategoryIcon(String category) => switch (category.toLowerCase()) {
+    'backend'  => Icons.code_rounded,
+    'frontend' => Icons.brush_rounded,
+    'data'     => Icons.bar_chart_rounded,
+    'security' => Icons.shield_rounded,
+    'creative' => Icons.auto_awesome_rounded,
+    'business' => Icons.trending_up_rounded,
+    'research' => Icons.science_rounded,
+    'planning' => Icons.map_rounded,
+    _          => Icons.folder_open_rounded,
+  };
+
+  Widget _buildErrorView() => Center(child: Padding(
+    padding: const EdgeInsets.all(32),
+    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Container(
+        width: 80, height: 80,
+        decoration: BoxDecoration(
+          color: AppTheme.primary.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTheme.primary.withValues(alpha: 0.25)),
+        ),
+        child: const Icon(Icons.cloud_off_rounded, color: AppTheme.primary, size: 36),
+      ),
+      const SizedBox(height: 20),
+      const Text(
+        'Could not load agents',
+        style: TextStyle(color: AppTheme.textH, fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 8),
+      const Text(
+        'Please check your internet connection and try again.',
+        style: TextStyle(color: AppTheme.textM, fontSize: 13, height: 1.5),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 24),
+      ElevatedButton.icon(
+        onPressed: _ctrl.load,
+        icon: const Icon(Icons.refresh_rounded, size: 18),
+        label: const Text('Try Again'),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    ]),
+  ));
 
   Widget _buildEmpty() {
     if (_ctrl.search.value.isNotEmpty) {
-      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.search_off_rounded, color: AppTheme.border2, size: 52),
-        const SizedBox(height: 12),
-        const Text('No agents found', style: TextStyle(color: AppTheme.textB, fontSize: 16)),
-        const SizedBox(height: 6),
-        const Text('Try a different search term', style: TextStyle(color: AppTheme.textM, fontSize: 12)),
-        const SizedBox(height: 16),
-        TextButton(onPressed: _clearSearch, child: const Text('Clear search')),
-      ]));
+      return Center(child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 72, height: 72,
+            decoration: BoxDecoration(
+              color: AppTheme.gold.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
+            ),
+            child: const Icon(Icons.search_off_rounded, color: AppTheme.gold, size: 32),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'No agents found',
+            style: TextStyle(color: AppTheme.textH, fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'No results for "${_ctrl.search.value}". Try a different term or browse categories.',
+            style: const TextStyle(color: AppTheme.textM, fontSize: 13, height: 1.5),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            OutlinedButton.icon(
+              onPressed: _clearSearch,
+              icon: const Icon(Icons.clear_rounded, size: 16),
+              label: const Text('Clear search'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: () => context.go('/create'),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Create Agent'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ]),
+        ]),
+      ));
     }
-    return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      const Icon(Icons.search_off_rounded, color: AppTheme.border2, size: 56),
-      const SizedBox(height: 12),
-      const Text('No agents found', style: TextStyle(color: AppTheme.textB, fontSize: 18)),
-      if (_ctrl.category.value.isNotEmpty) ...[
+    return Center(child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 80, height: 80,
+          decoration: BoxDecoration(
+            color: AppTheme.gold.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+            border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
+          ),
+          child: const Icon(Icons.inventory_2_outlined, color: AppTheme.gold, size: 36),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'No agents yet',
+          style: TextStyle(color: AppTheme.textH, fontSize: 18, fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
-        TextButton(onPressed: () { _ctrl.category.value = ''; _ctrl.load(); }, child: const Text('Clear filters')),
-      ],
-    ]));
+        Text(
+          _ctrl.category.value.isNotEmpty
+            ? 'No agents in this category yet. Be the first to create one!'
+            : 'The store is empty. Create your first AI agent to get started.',
+          style: const TextStyle(color: AppTheme.textM, fontSize: 13, height: 1.5),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          if (_ctrl.category.value.isNotEmpty) ...[
+            OutlinedButton.icon(
+              onPressed: () { _ctrl.category.value = ''; _ctrl.load(); },
+              icon: const Icon(Icons.clear_all_rounded, size: 16),
+              label: const Text('Clear filters'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          ElevatedButton.icon(
+            onPressed: () => context.go('/create'),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Create Agent'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ]),
+      ]),
+    ));
   }
 
+  /// End-of-list indicator for long scrollable grids
+  Widget _buildEndOfList() => Padding(
+    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+    child: Obx(() => Column(children: [
+      const Divider(color: AppTheme.border, height: 1, thickness: 1),
+      const SizedBox(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Icon(Icons.check_circle_outline_rounded, size: 14, color: AppTheme.textM),
+        const SizedBox(width: 8),
+        Text(
+          'Showing all ${_ctrl.agents.length} agent${_ctrl.agents.length != 1 ? 's' : ''}',
+          style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+        ),
+      ]),
+    ])),
+  );
+
   static const _kDiscoveryCategories = <(CharacterType, String, IconData)>[
-    (CharacterType.wizard,     'backend',   Icons.code_outlined),
-    (CharacterType.strategist, 'planning',  Icons.map_outlined),
-    (CharacterType.oracle,     'data',      Icons.bar_chart_outlined),
-    (CharacterType.guardian,   'security',  Icons.shield_outlined),
-    (CharacterType.artisan,    'frontend',  Icons.brush_outlined),
-    (CharacterType.bard,       'creative',  Icons.auto_stories_outlined),
-    (CharacterType.scholar,    'research',  Icons.school_outlined),
-    (CharacterType.merchant,   'marketing', Icons.trending_up_outlined),
+    (CharacterType.wizard,     'backend',   Icons.code_rounded),
+    (CharacterType.strategist, 'planning',  Icons.map_rounded),
+    (CharacterType.oracle,     'data',      Icons.bar_chart_rounded),
+    (CharacterType.guardian,   'security',  Icons.shield_rounded),
+    (CharacterType.artisan,    'frontend',  Icons.brush_rounded),
+    (CharacterType.bard,       'creative',  Icons.auto_stories_rounded),
+    (CharacterType.scholar,    'research',  Icons.school_rounded),
+    (CharacterType.merchant,   'marketing', Icons.trending_up_rounded),
   ];
 
   static const _kPopularTags = ['AI', 'coding', 'writing', 'analysis', 'planning', 'security', 'research', 'marketing', 'automation', 'data'];
 
   Widget _buildDiscovery() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+    padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Browse by Category', style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 10),
-      GridView.builder(
-        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.5),
-        itemCount: _kDiscoveryCategories.length,
-        itemBuilder: (_, i) {
-          final (type, key, icon) = _kDiscoveryCategories[i];
-          final color = type.primaryColor;
-          return InkWell(
-            onTap: () { _ctrl.category.value = key; _ctrl.load(); },
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color.withValues(alpha: 0.2), AppTheme.card2]),
-                borderRadius: BorderRadius.circular(10), border: Border.all(color: color.withValues(alpha: 0.4)),
+      // "Browse by Category" header
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppTheme.gold.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.category_rounded, size: 14, color: AppTheme.gold),
+        ),
+        const SizedBox(width: 8),
+        const Text('Browse by Category', style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w600)),
+      ]),
+      const SizedBox(height: 12),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _kDiscoveryCategories.map((entry) {
+            final (type, key, icon) = entry;
+            final color = type.primaryColor;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: _HoverChip(
+                icon: icon,
+                label: type.displayName,
+                color: color,
+                onPressed: () { _ctrl.category.value = key; _ctrl.load(); },
               ),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(icon, color: color, size: 22),
-                const SizedBox(height: 4),
-                Text(type.displayName, style: const TextStyle(color: AppTheme.textH, fontSize: 11, fontWeight: FontWeight.w600)),
-              ]),
-            ),
-          );
-        },
+            );
+          }).toList(),
+        ),
       ),
       const SizedBox(height: 16),
-      const Text('Popular Tags', style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w600)),
-      const SizedBox(height: 8),
-      Wrap(spacing: 6, runSpacing: 6, children: _kPopularTags.map((tag) => ActionChip(
-        label: Text(tag, style: const TextStyle(color: AppTheme.textB, fontSize: 11)),
+      // "Popular Tags" header
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: AppTheme.gold.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Icon(Icons.local_offer_rounded, size: 14, color: AppTheme.gold),
+        ),
+        const SizedBox(width: 8),
+        const Text('Popular Tags', style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w600)),
+      ]),
+      const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: _kPopularTags.map((tag) => _HoverTagChip(
+        tag: tag,
         onPressed: () { _debounce?.cancel(); _searchCtrl.text = tag; _ctrl.search.value = tag; _saveRecentSearch(tag); _ctrl.load(); },
-        backgroundColor: AppTheme.card2, side: const BorderSide(color: AppTheme.border2),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0), visualDensity: VisualDensity.compact,
       )).toList()),
-      const SizedBox(height: 8),
+      const SizedBox(height: 12),
     ]),
   );
 }
 
-/// Wraps [AgentCard] with a bookmark/save button overlay
-class _AgentCardWithSave extends StatelessWidget {
+// ══════════════════════════════════════════════════════════════════════════════
+// Sort menu item with icon
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _SortMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _SortMenuItem({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+    Icon(icon, size: 14, color: AppTheme.textM),
+    const SizedBox(width: 6),
+    Text(label),
+  ]);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Hover-aware container for icon buttons (filter, etc.)
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _HoverContainer extends StatefulWidget {
+  final bool isActive;
+  final VoidCallback onTap;
+  final String tooltip;
+  final Widget child;
+  const _HoverContainer({required this.isActive, required this.onTap, required this.tooltip, required this.child});
+
+  @override
+  State<_HoverContainer> createState() => _HoverContainerState();
+}
+
+class _HoverContainerState extends State<_HoverContainer> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: widget.isActive
+                ? AppTheme.primary.withValues(alpha: 0.15)
+                : _hovered
+                  ? AppTheme.card2
+                  : AppTheme.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: widget.isActive
+                  ? AppTheme.primary
+                  : _hovered
+                    ? AppTheme.border2
+                    : AppTheme.border,
+              ),
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Hover-aware category chip for discovery section
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _HoverChip extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+  const _HoverChip({required this.icon, required this.label, required this.color, required this.onPressed});
+
+  @override
+  State<_HoverChip> createState() => _HoverChipState();
+}
+
+class _HoverChipState extends State<_HoverChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: _hovered
+              ? widget.color.withValues(alpha: 0.2)
+              : widget.color.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _hovered
+                ? widget.color.withValues(alpha: 0.6)
+                : widget.color.withValues(alpha: 0.3),
+            ),
+            boxShadow: _hovered
+              ? [BoxShadow(color: widget.color.withValues(alpha: 0.15), blurRadius: 8, spreadRadius: 1)]
+              : [],
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(widget.icon, size: 16, color: widget.color),
+            const SizedBox(width: 6),
+            Text(widget.label, style: TextStyle(
+              color: widget.color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Hover-aware tag chip for popular tags
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _HoverTagChip extends StatefulWidget {
+  final String tag;
+  final VoidCallback onPressed;
+  const _HoverTagChip({required this.tag, required this.onPressed});
+
+  @override
+  State<_HoverTagChip> createState() => _HoverTagChipState();
+}
+
+class _HoverTagChipState extends State<_HoverTagChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: _hovered ? AppTheme.card2 : AppTheme.card,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _hovered ? AppTheme.gold.withValues(alpha: 0.4) : AppTheme.border2,
+            ),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.tag_rounded, size: 12, color: _hovered ? AppTheme.gold : AppTheme.textM),
+            const SizedBox(width: 4),
+            Text(widget.tag, style: TextStyle(
+              color: _hovered ? AppTheme.textH : AppTheme.textB,
+              fontSize: 11,
+              fontWeight: _hovered ? FontWeight.w600 : FontWeight.normal,
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Agent card wrapper with hover-aware bookmark/save button
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _AgentCardWithSave extends StatefulWidget {
   final AgentModel agent;
   final VoidCallback onSave;
   const _AgentCardWithSave({required this.agent, required this.onSave});
 
   @override
+  State<_AgentCardWithSave> createState() => _AgentCardWithSaveState();
+}
+
+class _AgentCardWithSaveState extends State<_AgentCardWithSave> {
+  bool _saveHovered = false;
+
+  @override
   Widget build(BuildContext context) => Stack(clipBehavior: Clip.none, children: [
-    AgentCard(agent: agent),
+    AgentCard(agent: widget.agent),
     Positioned(
       top: 8, right: 8,
-      child: GestureDetector(
-        onTap: onSave,
-        child: Container(
-          width: 28, height: 28,
-          decoration: BoxDecoration(color: AppTheme.surface.withValues(alpha: 0.9), shape: BoxShape.circle, border: Border.all(color: AppTheme.border2)),
-          child: const Icon(Icons.bookmark_add_outlined, size: 15, color: AppTheme.gold),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _saveHovered = true),
+        onExit: (_) => setState(() => _saveHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: Tooltip(
+          message: 'Save to library',
+          child: GestureDetector(
+            onTap: widget.onSave,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 30, height: 30,
+              decoration: BoxDecoration(
+                color: _saveHovered
+                  ? AppTheme.gold.withValues(alpha: 0.2)
+                  : AppTheme.surface.withValues(alpha: 0.9),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _saveHovered ? AppTheme.gold : AppTheme.border2,
+                  width: _saveHovered ? 1.5 : 1,
+                ),
+                boxShadow: _saveHovered
+                  ? [BoxShadow(color: AppTheme.gold.withValues(alpha: 0.3), blurRadius: 8)]
+                  : [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4)],
+              ),
+              child: Icon(
+                _saveHovered ? Icons.bookmark_add_rounded : Icons.bookmark_add_outlined,
+                size: 15,
+                color: _saveHovered ? AppTheme.gold : AppTheme.textM,
+              ),
+            ),
+          ),
         ),
       ),
     ),

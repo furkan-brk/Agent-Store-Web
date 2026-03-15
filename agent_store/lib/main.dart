@@ -4,11 +4,17 @@ import 'app/router.dart';
 import 'app/theme.dart';
 import 'controllers/auth_controller.dart';
 import 'shared/services/api_service.dart';
+import 'shared/services/wallet_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await ApiService.instance.init(); // restore JWT from SharedPreferences
-  // Register global AuthController — lives for the entire app lifetime
+  // Restore JWT and wallet address from SharedPreferences before anything else.
+  // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
+  await ApiService.instance.init();
+  await WalletService.instance.init();
+  // Register global AuthController — lives for the entire app lifetime.
+  // By this point both services have their persisted state restored,
+  // so AuthController.onInit() can read isAuthenticated + isConnected.
   Get.put(AuthController(), permanent: true);
   runApp(const AgentStoreApp());
 }

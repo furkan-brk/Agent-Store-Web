@@ -24,3 +24,18 @@ func AuthMiddleware(authSvc *services.AuthService) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// OptionalAuthMiddleware extracts the wallet from the JWT if present, but does
+// not block unauthenticated requests. Use this on public endpoints that behave
+// differently for authenticated users (e.g., showing/hiding the prompt).
+func OptionalAuthMiddleware(authSvc *services.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		header := c.GetHeader("Authorization")
+		if header != "" && strings.HasPrefix(header, "Bearer ") {
+			if wallet, err := authSvc.ValidateJWT(strings.TrimPrefix(header, "Bearer ")); err == nil {
+				c.Set("wallet", wallet)
+			}
+		}
+		c.Next()
+	}
+}

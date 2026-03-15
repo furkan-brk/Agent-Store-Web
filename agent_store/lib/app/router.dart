@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:get/get.dart';
 import '../features/store/screens/store_screen.dart';
 import '../features/agent_detail/screens/agent_detail_screen.dart';
 import '../features/library/screens/library_screen.dart';
@@ -16,6 +17,7 @@ import '../shared/widgets/notification_panel.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
 import '../features/guild_master/screens/guild_master_screen.dart';
+import '../controllers/auth_controller.dart';
 
 // Intent classes for keyboard shortcuts
 class _GoStoreIntent extends Intent {
@@ -106,6 +108,9 @@ class _AppShell extends StatefulWidget {
 class _AppShellState extends State<_AppShell> {
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isNarrow = screenWidth < 768;
+
     return Shortcuts(
       shortcuts: const <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.keyS, alt: true): _GoStoreIntent(),
@@ -130,101 +135,424 @@ class _AppShellState extends State<_AppShell> {
         },
         child: Focus(
           autofocus: true,
-          child: Scaffold(
-            body: Row(children: [const _Sidebar(), Expanded(child: widget.child)]),
-          ),
+          child: isNarrow
+              ? _NarrowLayout(child: widget.child)
+              : _WideLayout(child: widget.child),
         ),
       ),
+    );
+  }
+}
+
+/// Desktop/tablet layout with persistent sidebar
+class _WideLayout extends StatelessWidget {
+  final Widget child;
+  const _WideLayout({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          const _Sidebar(),
+          // Thin vertical divider between sidebar and content
+          Container(
+            width: 1,
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: child,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mobile layout with hamburger drawer
+class _NarrowLayout extends StatelessWidget {
+  final Widget child;
+  const _NarrowLayout({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.onPrimary, size: 16),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'AgentStore',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 8),
+            child: NotificationBell(),
+          ),
+        ],
+      ),
+      drawer: const Drawer(child: _Sidebar(isDrawer: true)),
+      body: child,
     );
   }
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar();
+  final bool isDrawer;
+  const _Sidebar({this.isDrawer = false});
 
   @override
   Widget build(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
-      width: 210,
-      color: const Color(0xFFC8BA9A),
-      child: Column(children: [
-        const SizedBox(height: 32),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(children: [
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(color: const Color(0xFF81231E), borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.auto_awesome, color: Color(0xFFDDD1BB), size: 18),
+      width: isDrawer ? null : 220,
+      color: theme.scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+            // ── Branding ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.auto_awesome, color: colorScheme.onPrimary, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'AgentStore',
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 10),
-            const Text('AgentStore', style: TextStyle(color: Color(0xFF2B2C1E), fontWeight: FontWeight.bold, fontSize: 15)),
-          ]),
+            const SizedBox(height: 28),
+
+            // ── Primary ──
+            _SectionLabel(label: 'EXPLORE', colorScheme: colorScheme),
+            _NavItem(icon: Icons.storefront_outlined,  label: 'Store',   path: '/',        loc: loc, tooltip: 'Alt+S', isDrawer: isDrawer),
+            _NavItem(icon: Icons.bookmarks_outlined,   label: 'Library', path: '/library', loc: loc, tooltip: 'Alt+L', isDrawer: isDrawer),
+            _NavItem(icon: Icons.add_circle_outline,   label: 'Create Agent', path: '/create', loc: loc, tooltip: 'Alt+C', isDrawer: isDrawer),
+
+            const SizedBox(height: 16),
+
+            // ── Community ──
+            _SectionLabel(label: 'COMMUNITY', colorScheme: colorScheme),
+            _NavItem(icon: Icons.groups_outlined,          label: 'Guilds',        path: '/guild',        loc: loc, tooltip: 'Alt+G', isDrawer: isDrawer),
+            _NavItem(icon: Icons.auto_awesome_outlined,    label: 'Guild Master',  path: '/guild-master', loc: loc, tooltip: 'AI Team Builder', isDrawer: isDrawer),
+            _NavItem(icon: Icons.emoji_events_outlined,    label: 'Leaderboard',   path: '/leaderboard',  loc: loc, isDrawer: isDrawer),
+
+            const SizedBox(height: 16),
+
+            // ── Account ──
+            _SectionLabel(label: 'ACCOUNT', colorScheme: colorScheme),
+            _NavItem(icon: Icons.analytics_outlined,                label: 'Dashboard', path: '/creator',  loc: loc, isDrawer: isDrawer),
+            _NavItem(icon: Icons.settings_outlined,                 label: 'Settings',  path: '/settings', loc: loc, isDrawer: isDrawer),
+            _NavItem(icon: Icons.account_balance_wallet_outlined,   label: 'Wallet',    path: '/wallet',   loc: loc, isDrawer: isDrawer),
+
+            const Spacer(),
+
+            // ── Notification bell (desktop only — mobile has it in AppBar) ──
+            if (!isDrawer) ...[
+              Divider(color: colorScheme.outline, height: 1, indent: 20, endIndent: 20),
+              const SizedBox(height: 8),
+            ],
+
+            // ── User info + notification ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: _UserFooter(isDrawer: isDrawer),
+            ),
+            const SizedBox(height: 12),
+          ],
         ),
-        const SizedBox(height: 28),
-        _NavItem(icon: Icons.storefront_outlined,           label: 'Store',   path: '/',       loc: loc, tooltip: 'Alt+S'),
-        _NavItem(icon: Icons.bookmarks_outlined,            label: 'Library', path: '/library',loc: loc, tooltip: 'Alt+L'),
-        _NavItem(icon: Icons.add_box_outlined,              label: 'Create',  path: '/create', loc: loc, tooltip: 'Alt+C'),
-        _NavItem(icon: Icons.groups_outlined,               label: 'Guilds',       path: '/guild',        loc: loc, tooltip: 'Alt+G'),
-        _NavItem(icon: Icons.auto_awesome,                  label: 'Guild Master', path: '/guild-master', loc: loc, tooltip: 'AI Team Builder'),
-        _NavItem(icon: Icons.emoji_events_outlined,         label: 'Leaderboard', path: '/leaderboard', loc: loc),
-        _NavItem(icon: Icons.analytics_outlined,            label: 'Creator',     path: '/creator',      loc: loc),
-        const Spacer(),
-        const Divider(color: Color(0xFFADA07A), height: 1),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Row(children: [
-            Text('', style: TextStyle(color: Color(0xFF6B5A40), fontSize: 12)),
-            Spacer(),
-            NotificationBell(),
-          ]),
-        ),
-        _NavItem(icon: Icons.settings_outlined,               label: 'Settings', path: '/settings', loc: loc),
-        _NavItem(icon: Icons.account_balance_wallet_outlined, label: 'Wallet', path: '/wallet', loc: loc),
-        const SizedBox(height: 16),
-      ]),
+      ),
     );
   }
 }
 
-class _NavItem extends StatelessWidget {
+/// Section group label for sidebar nav groups
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  final ColorScheme colorScheme;
+  const _SectionLabel({required this.label, required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, right: 20, bottom: 4, top: 4),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: colorScheme.onSurface.withValues(alpha: 0.35),
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom section of sidebar showing wallet info + notification bell
+class _UserFooter extends StatelessWidget {
+  final bool isDrawer;
+  const _UserFooter({required this.isDrawer});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final auth = AuthController.to;
+
+    return Obx(() {
+      if (!auth.isConnected.value) {
+        return Row(
+          children: [
+            Expanded(
+              child: _ConnectButton(colorScheme: colorScheme),
+            ),
+            if (!isDrawer) ...[
+              const SizedBox(width: 8),
+              const NotificationBell(),
+            ],
+          ],
+        );
+      }
+
+      return Row(
+        children: [
+          // User avatar circle
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colorScheme.primary.withValues(alpha: 0.15),
+              border: Border.all(color: colorScheme.primary.withValues(alpha: 0.4)),
+            ),
+            child: Icon(Icons.person_outline, color: colorScheme.primary, size: 16),
+          ),
+          const SizedBox(width: 8),
+          // Wallet address + credits
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  auth.username.value.isNotEmpty ? auth.username.value : auth.shortWallet,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  '${auth.credits.value} credits',
+                  style: TextStyle(
+                    color: colorScheme.secondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isDrawer) ...[
+            const SizedBox(width: 4),
+            const NotificationBell(),
+          ],
+        ],
+      );
+    });
+  }
+}
+
+/// Minimal connect button for unauthenticated state in sidebar footer
+class _ConnectButton extends StatelessWidget {
+  final ColorScheme colorScheme;
+  const _ConnectButton({required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => context.go('/wallet'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, color: colorScheme.primary, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                'Connect',
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final String path;
   final String loc;
   final String? tooltip;
-  const _NavItem({required this.icon, required this.label, required this.path, required this.loc, this.tooltip});
+  final bool isDrawer;
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.path,
+    required this.loc,
+    this.tooltip,
+    this.isDrawer = false,
+  });
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _hovered = false;
+
+  bool get _selected =>
+      widget.loc == widget.path ||
+      (widget.path != '/' && widget.loc.startsWith(widget.path));
 
   @override
   Widget build(BuildContext context) {
-    final selected = loc == path || (path != '/' && loc.startsWith(path));
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // Determine colors based on state: selected > hovered > default
+    Color iconColor;
+    Color labelColor;
+    Color bgColor;
+    FontWeight fontWeight;
+
+    if (_selected) {
+      iconColor = colorScheme.primary;
+      labelColor = colorScheme.primary;
+      bgColor = colorScheme.primary.withValues(alpha: 0.12);
+      fontWeight = FontWeight.w600;
+    } else if (_hovered) {
+      iconColor = colorScheme.onSurface;
+      labelColor = colorScheme.onSurface;
+      bgColor = colorScheme.onSurface.withValues(alpha: 0.06);
+      fontWeight = FontWeight.w500;
+    } else {
+      iconColor = colorScheme.onSurface.withValues(alpha: 0.5);
+      labelColor = colorScheme.onSurface.withValues(alpha: 0.6);
+      bgColor = Colors.transparent;
+      fontWeight = FontWeight.normal;
+    }
+
     final item = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      child: InkWell(
-        onTap: () => context.go(path),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? const Color(0xFF81231E).withValues(alpha: 0.15) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: () {
+            context.go(widget.path);
+            // Close drawer on mobile after navigation
+            if (widget.isDrawer) Navigator.of(context).maybePop();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+              // Left accent bar for selected item
+              border: _selected
+                  ? Border(
+                      left: BorderSide(color: colorScheme.primary, width: 3),
+                    )
+                  : null,
+            ),
+            child: Row(
+              children: [
+                Icon(widget.icon, color: iconColor, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: labelColor,
+                      fontWeight: fontWeight,
+                      fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Row(children: [
-            Icon(icon, color: selected ? const Color(0xFF81231E) : const Color(0xFF7A6E52), size: 20),
-            const SizedBox(width: 10),
-            Text(label, style: TextStyle(
-              color: selected ? const Color(0xFF81231E) : const Color(0xFF6B5A40),
-              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            )),
-          ]),
         ),
       ),
     );
 
-    if (tooltip != null) {
+    if (widget.tooltip != null) {
       return Tooltip(
-        message: tooltip!,
+        message: widget.tooltip!,
         preferBelow: false,
         child: item,
       );

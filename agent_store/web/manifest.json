@@ -1,14 +1,19 @@
 {
-    "name": "agent_store",
-    "short_name": "agent_store",
+    "name": "Agent Store",
+    "short_name": "Agent Store",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1E1B4B",
+    "theme_color": "#6366F1",
+    "description": "AI Agent prompt marketplace with pixel-art characters and Web3 login.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
+        {
+            "src": "icons/app_icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        },
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",

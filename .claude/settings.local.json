@@ -34,7 +34,27 @@
       "Bash(powershell:*)",
       "Bash(git:*)",
       "Bash(cd:*)",
-      "Bash(go vet:*)"
+      "Bash(go vet:*)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\" && bash clean-build.sh 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && flutter run -d chrome --web-port 3000 2>&1)",
+      "Bash(taskkill /F /IM dart.exe 2>&1; taskkill /F /IM flutter.exe 2>&1; echo \"done\")",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && flutter run -d chrome --web-port 5000 2>&1)",
+      "Bash(tasklist /FI \"IMAGENAME eq dart.exe\" 2>&1)",
+      "Bash(find /c/Users/alpdu/Documents/GitHub/Agent-Store-Web -name \"*.sql\" -o -name \"seeds*\" -o -name \"*seed*\" 2>/dev/null | head -20)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\backend\" && go run ./cmd/seed/ 2>&1)",
+      "WebSearch",
+      "WebFetch(domain:replicate.com)",
+      "Bash(ls -la \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\\\\assets\\\\backgrounds\"/*.png 2>&1 | wc -l)",
+      "Bash(ls \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\\\\assets\\\\backgrounds\"/*.png 2>&1)",
+      "Bash(ls \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\\\\assets\\\\backgrounds\\\\\" 2>/dev/null || echo \"Directory not found\")",
+      "Bash(cd \"C:/Users/alpdu/Documents/GitHub/Agent-Store-Web/backend\" && go run ./cmd/test4/)",
+      "Bash(curl -s http://localhost:8080/api/v1/agents?limit=4'&'sort=newest 2>&1 | grep -oP '\"\\(id|title|card_version|character_type|prompt_score\\)\":\\\\s*\"?[^\",}]*\"?' | paste - - - - -)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\backend\" && JWT_SECRET=ar8W6BiG28pLJJYW8gchEEFV1XnjZQV2l2GGn82RN4l go run ./cmd/test4/)",
+      "Bash(dir \"C:\\\\Users\\\\alpdu\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-alpdu-Documents-GitHub-Agent-Store-Web\\\\4d121ce7-3c4a-4618-b3d2-9516c702f51d\\\\tasks\\\\ad932183fbe02a2e9.output\" 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && dart analyze lib/app/theme.dart lib/features/store/screens/store_screen.dart lib/features/store/widgets/category_sidebar.dart 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && dart analyze lib/ 2>&1 | tail -10)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\backend\" && go get github.com/google/uuid && go vet ./... 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && flutter pub get 2>&1 | tail -5)"
     ]
   }
 }

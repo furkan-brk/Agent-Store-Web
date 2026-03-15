@@ -1,3 +1,5 @@
+// lib/features/store/widgets/category_sidebar.dart
+
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 
@@ -12,20 +14,16 @@ class CategorySidebar extends StatelessWidget {
   });
 
   static const _categories = [
-    'all', 'backend', 'frontend', 'data',
-    'security', 'creative', 'business', 'research',
+    ('all', 'All Agents', Icons.apps_rounded),
+    ('backend', 'Backend', Icons.code_rounded),
+    ('planning', 'Planning', Icons.map_rounded),
+    ('frontend', 'Frontend', Icons.palette_rounded),
+    ('data', 'Data', Icons.bar_chart_rounded),
+    ('security', 'Security', Icons.shield_rounded),
+    ('creative', 'Creative', Icons.auto_awesome_rounded),
+    ('research', 'Research', Icons.science_rounded),
+    ('business', 'Business', Icons.business_center_rounded),
   ];
-
-  static const _icons = {
-    'all':      Icons.apps_rounded,
-    'backend':  Icons.code_rounded,
-    'frontend': Icons.brush_rounded,
-    'data':     Icons.bar_chart_rounded,
-    'security': Icons.shield_rounded,
-    'creative': Icons.auto_awesome_rounded,
-    'business': Icons.trending_up_rounded,
-    'research': Icons.science_rounded,
-  };
 
   @override
   Widget build(BuildContext context) {
@@ -38,36 +36,8 @@ class CategorySidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Logo/brand area
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppTheme.border)),
-            ),
-            child: Row(children: [
-              Container(
-                width: 28, height: 28,
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.5)),
-                ),
-                child: const Icon(Icons.bolt, color: AppTheme.primary, size: 16),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Agent Store',
-                style: TextStyle(
-                  color: AppTheme.textH,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ]),
-          ),
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 18, 16, 8),
+            padding: EdgeInsets.fromLTRB(16, 24, 16, 4),
             child: Text(
               'CATEGORIES',
               style: TextStyle(
@@ -78,24 +48,59 @@ class CategorySidebar extends StatelessWidget {
               ),
             ),
           ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(color: AppTheme.border, height: 16),
+          ),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 16, left: 8, right: 8),
               itemCount: _categories.length,
               itemBuilder: (_, i) {
-                final cat = _categories[i];
-                final label = cat == 'all'
-                    ? 'All Agents'
-                    : cat[0].toUpperCase() + cat.substring(1);
-                final isSelected = selectedCategory == (cat == 'all' ? '' : cat);
-                final icon = _icons[cat] ?? Icons.apps_rounded;
+                final (key, label, icon) = _categories[i];
+                final isSelected =
+                    selectedCategory == (key == 'all' ? '' : key);
                 return _CategoryItem(
                   icon: icon,
                   label: label,
                   isSelected: isSelected,
-                  onTap: () => onSelect(cat == 'all' ? '' : cat),
+                  onTap: () => onSelect(key == 'all' ? '' : key),
                 );
               },
+            ),
+          ),
+          // Agent count footer
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: AppTheme.border)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppTheme.olive,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.olive.withValues(alpha: 0.5),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Store Online',
+                  style: TextStyle(
+                    color: AppTheme.textM,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -128,7 +133,7 @@ class _CategoryItemState extends State<_CategoryItem> {
   Widget build(BuildContext context) {
     final active = widget.isSelected || _hovered;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 1),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
@@ -144,17 +149,22 @@ class _CategoryItemState extends State<_CategoryItem> {
                       ? AppTheme.card2.withValues(alpha: 0.8)
                       : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
-              border: Border(
-                left: BorderSide(
-                  color: widget.isSelected
-                      ? AppTheme.gold
-                      : Colors.transparent,
-                  width: 2.5,
-                ),
-              ),
             ),
             child: Row(
               children: [
+                // Left indicator bar for selected state
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 3,
+                  height: 18,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: widget.isSelected
+                        ? AppTheme.gold
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
                 Icon(
                   widget.icon,
                   color: widget.isSelected
@@ -165,20 +175,30 @@ class _CategoryItemState extends State<_CategoryItem> {
                   size: 16,
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  widget.label,
-                  style: TextStyle(
-                    color: widget.isSelected
-                        ? AppTheme.textH
-                        : active
-                            ? AppTheme.textB
-                            : AppTheme.textM,
-                    fontSize: 12,
-                    fontWeight: widget.isSelected
-                        ? FontWeight.w600
-                        : FontWeight.normal,
+                Expanded(
+                  child: Text(
+                    widget.label,
+                    style: TextStyle(
+                      color: widget.isSelected
+                          ? AppTheme.textH
+                          : active
+                              ? AppTheme.textB
+                              : AppTheme.textM,
+                      fontSize: 12,
+                      fontWeight: widget.isSelected
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                // Subtle arrow for selected
+                if (widget.isSelected)
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.gold,
+                    size: 14,
+                  ),
               ],
             ),
           ),

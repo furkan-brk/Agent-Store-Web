@@ -10,16 +10,16 @@ import (
 	"time"
 )
 
-// replicateStylePrefixes provides per-character-type style descriptors for pixel art generation.
+// replicateStylePrefixes provides per-character-type style descriptors for medieval fantasy generation.
 var replicateStylePrefixes = map[string]string{
-	"wizard":     "pixel art RPG wizard, glowing purple robes, magic staff, fantasy",
-	"strategist": "pixel art RPG commander, red armor, tactical, strategy",
-	"oracle":     "pixel art RPG oracle, golden robes, crystal ball, mystical",
-	"guardian":   "pixel art RPG paladin, blue heavy armor, shield, defender",
-	"artisan":    "pixel art RPG artisan, colorful clothes, creative tools",
-	"bard":       "pixel art RPG bard, green cloak, lute, performer",
-	"scholar":    "pixel art RPG scholar, brown robes, glasses, books",
-	"merchant":   "pixel art RPG merchant, golden outfit, coin bag, trader",
+	"wizard":     "medieval fantasy wizard, purple robes, pointed hat, crystal staff, arcane runes",
+	"strategist": "medieval fantasy knight commander, crimson surcoat, plate armor, war banner",
+	"oracle":     "medieval fantasy mystic seer, amber robes, astrolabe, star charts, celestial",
+	"guardian":   "medieval fantasy armored knight, steel plate, tower shield, fortress defender",
+	"artisan":    "medieval fantasy craftsman, leather apron, fine tunic, woodcarving tools",
+	"bard":       "medieval fantasy bard, emerald cloak, feathered hat, ornate lute, tavern",
+	"scholar":    "medieval fantasy monk scholar, brown robes, brass spectacles, ancient tome",
+	"merchant":   "medieval fantasy guild merchant, gold-trimmed doublet, coin purse, market stall",
 }
 
 // ReplicateService handles pixel-art image generation via Replicate API.
@@ -33,7 +33,7 @@ func NewReplicateService(apiKey string) *ReplicateService {
 	return &ReplicateService{
 		apiKey: apiKey,
 		httpClient: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout: 45 * time.Second,
 		},
 	}
 }
@@ -58,7 +58,7 @@ func (r *ReplicateService) GeneratePixelArt(imagePrompt, charType string) (strin
 	}
 
 	fullPrompt := prefix + ", " + imagePrompt +
-		", 8-bit pixel art game sprite, front facing, dark background, vibrant colors, retro RPG"
+		", detailed 2D medieval fantasy upper-body portrait, warm painterly tones, storybook RPG art, centered character, solid bright green #00FF00 background, no text"
 
 	reqBody := map[string]interface{}{
 		"input": map[string]interface{}{

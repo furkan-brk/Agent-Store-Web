@@ -24,7 +24,9 @@ contract AgentRegistry is Ownable {
 
     mapping(uint256 => AgentRecord) public agents;
     mapping(address => uint256[])   public creatorAgents;
+    mapping(address => bool) private _registrars;
     uint256 public totalAgents;
+    bool public openRegistration; // when true, any address can register
 
     event AgentRegistered(
         uint256 indexed agentId,
@@ -33,13 +35,47 @@ contract AgentRegistry is Ownable {
         bytes32 imageHash
     );
     event AgentDeactivated(uint256 indexed agentId);
+    event RegistrarAdded(address indexed registrar);
+    event RegistrarRemoved(address indexed registrar);
 
     error AlreadyRegistered();
     error AgentNotFound();
     error NotAuthorized();
     error AlreadyInactive();
+    error ZeroHash();
 
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable(msg.sender) {
+        _registrars[msg.sender] = true;
+        openRegistration = true; // default open for testnet; set to false for production
+    }
+
+    /// @notice Only registrars or owner can call when openRegistration is false.
+    modifier onlyRegistrar() {
+        if (!openRegistration && !_registrars[msg.sender] && msg.sender != owner()) revert NotAuthorized();
+        _;
+    }
+
+    /// @notice Add a registrar address (owner only).
+    function addRegistrar(address r) external onlyOwner {
+        _registrars[r] = true;
+        emit RegistrarAdded(r);
+    }
+
+    /// @notice Remove a registrar address (owner only).
+    function removeRegistrar(address r) external onlyOwner {
+        _registrars[r] = false;
+        emit RegistrarRemoved(r);
+    }
+
+    /// @notice Toggle open registration (owner only).
+    function setOpenRegistration(bool open) external onlyOwner {
+        openRegistration = open;
+    }
+
+    /// @notice Check if an address is a registrar.
+    function isRegistrar(address addr) external view returns (bool) {
+        return _registrars[addr];
+    }
 
     /**
      * @notice Register a new agent with its prompt hash and AI avatar image hash.
@@ -48,7 +84,8 @@ contract AgentRegistry is Ownable {
      * @param imageHash   keccak256 of the raw avatar image bytes from GenerateAvatarImage.
      *                    Pass bytes32(0) if the image generation failed.
      */
-    function registerAgent(uint256 agentId, bytes32 contentHash, bytes32 imageHash) external {
+    function registerAgent(uint256 agentId, bytes32 contentHash, bytes32 imageHash) external onlyRegistrar {
+        if (contentHash == bytes32(0)) revert ZeroHash();
         if (agents[agentId].registeredAt != 0) revert AlreadyRegistered();
         agents[agentId] = AgentRecord({
             creator:      msg.sender,

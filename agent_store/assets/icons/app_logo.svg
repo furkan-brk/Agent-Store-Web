@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4A843"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square base with pixel-notched corners -->
+  <path d="
+    M12 4 H52
+    L56 4 L56 8
+    L60 8 L60 12
+    L60 52
+    L60 56 L56 56
+    L56 60 L52 60
+    H12
+    L8 60 L8 56
+    L4 56 L4 52
+    L4 12
+    L4 8 L8 8
+    L8 4 Z
+  " fill="url(#bg)"/>
+
+  <!-- Inner border highlight (subtle depth) -->
+  <path d="
+    M14 8 H50
+    L52 8 L52 10
+    L54 10 L54 12
+    L54 50
+    L54 52 L52 52
+    L52 54 L50 54
+    H14
+    L12 54 L12 52
+    L10 52 L10 50
+    L10 14
+    L10 12 L12 12
+    L12 10 L14 10
+    Z
+  " fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="0.5"/>
+
+  <!-- Agent head (pixel circle) -->
+  <rect x="26" y="14" width="12" height="4" fill="#E0E7FF" rx="0"/>
+  <rect x="24" y="18" width="16" height="8" fill="#E0E7FF" rx="0"/>
+  <rect x="26" y="26" width="12" height="2" fill="#E0E7FF" rx="0"/>
+
+  <!-- Eyes (dark pixels) -->
+  <rect x="27" y="20" width="3" height="3" fill="#1E1B4B"/>
+  <rect x="34" y="20" width="3" height="3" fill="#1E1B4B"/>
+
+  <!-- Eye glint -->
+  <rect x="27" y="20" width="1.5" height="1.5" fill="rgba(255,255,255,0.6)"/>
+  <rect x="34" y="20" width="1.5" height="1.5" fill="rgba(255,255,255,0.6)"/>
+
+  <!-- Body / torso -->
+  <rect x="24" y="30" width="16" height="10" fill="#C7D2FE" rx="0"/>
+  <rect x="22" y="32" width="20" height="6" fill="#C7D2FE" rx="0"/>
+
+  <!-- Core gem (gold accent — the "AI core") -->
+  <rect x="30" y="32" width="4" height="4" fill="url(#glow)"/>
+  <rect x="31" y="31" width="2" height="1" fill="#D4A843"/>
+  <rect x="31" y="36" width="2" height="1" fill="#D4A843"/>
+
+  <!-- Arms (pixel blocks) -->
+  <rect x="18" y="32" width="4" height="2" fill="#A5B4FC"/>
+  <rect x="42" y="32" width="4" height="2" fill="#A5B4FC"/>
+  <rect x="16" y="34" width="4" height="4" fill="#A5B4FC"/>
+  <rect x="44" y="34" width="4" height="4" fill="#A5B4FC"/>
+
+  <!-- Left hand holding tablet -->
+  <rect x="15" y="38" width="6" height="4" fill="#D4A843"/>
+  <rect x="16" y="39" width="4" height="2" fill="#1E1B4B"/>
+
+  <!-- Right hand with spark -->
+  <rect x="44" y="38" width="4" height="3" fill="#A5B4FC"/>
+  <rect x="46" y="36" width="2" height="2" fill="#D4A843"/>
+  <rect x="45" y="35" width="1" height="1" fill="#D4A843" opacity="0.7"/>
+  <rect x="49" y="35" width="1" height="1" fill="#D4A843" opacity="0.7"/>
+
+  <!-- Legs -->
+  <rect x="26" y="40" width="5" height="6" fill="#818CF8"/>
+  <rect x="33" y="40" width="5" height="6" fill="#818CF8"/>
+
+  <!-- Feet -->
+  <rect x="24" y="46" width="7" height="3" fill="#6366F1"/>
+  <rect x="33" y="46" width="7" height="3" fill="#6366F1"/>
+
+  <!-- Store shelf / platform line (gold) -->
+  <rect x="12" y="50" width="40" height="2" fill="#D4A843" rx="0"/>
+  <rect x="14" y="52" width="36" height="1" fill="#B8860B" opacity="0.5"/>
+</svg>
