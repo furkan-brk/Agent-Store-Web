@@ -3,6 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "./server"
+startCommand = "/app/server"
 healthcheckPath = "/health"
 healthcheckTimeout = 60

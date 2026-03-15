@@ -31,16 +31,45 @@ func Load() *Config {
 }
 
 func buildDSN() string {
-	// Railway injects DATABASE_URL when a PostgreSQL service is linked
-	if url := os.Getenv("DATABASE_URL"); url != "" {
+	// Prefer full URLs injected by Railway (or other platforms), if present.
+	if url := firstEnv("DATABASE_URL", "DATABASE_PRIVATE_URL", "DATABASE_PUBLIC_URL", "POSTGRES_URL"); url != "" {
 		return url
 	}
-	return "host=" + getEnv("POSTGRES_HOST", "localhost") +
-		" port=" + getEnv("POSTGRES_PORT", "5432") +
-		" user=" + getEnv("POSTGRES_USER", "agent_user") +
-		" password=" + getEnv("POSTGRES_PASSWORD", "agent_pass") +
-		" dbname=" + getEnv("POSTGRES_DB", "agent_store") +
-		" sslmode=disable TimeZone=UTC"
+
+	// Fallback to host/port/user/password vars. Support both app-local and Railway PG* names.
+	host := firstEnv("POSTGRES_HOST", "PGHOST")
+	if host == "" {
+		host = "localhost"
+	}
+
+	port := firstEnv("POSTGRES_PORT", "PGPORT")
+	if port == "" {
+		port = "5432"
+	}
+
+	user := firstEnv("POSTGRES_USER", "PGUSER")
+	if user == "" {
+		user = "agent_user"
+	}
+
+	password := firstEnv("POSTGRES_PASSWORD", "PGPASSWORD")
+	if password == "" {
+		password = "agent_pass"
+	}
+
+	dbName := firstEnv("POSTGRES_DB", "PGDATABASE")
+	if dbName == "" {
+		dbName = "agent_store"
+	}
+
+	sslMode := getEnv("POSTGRES_SSLMODE", "disable")
+
+	return "host=" + host +
+		" port=" + port +
+		" user=" + user +
+		" password=" + password +
+		" dbname=" + dbName +
+		" sslmode=" + sslMode + " TimeZone=UTC"
 }
 
 func getEnv(key, fallback string) string {
@@ -48,4 +77,13 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		if v := os.Getenv(key); v != "" {
+			return v
+		}
+	}
+	return ""
 }
