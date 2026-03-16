@@ -69,14 +69,30 @@ class _LegendScreenState extends State<LegendScreen> {
 
   Future<void> _loadData() async {
     setState(() => _loadingAgents = true);
-    final agents = ApiService.instance.isAuthenticated ? await ApiService.instance.getLibrary() : <AgentModel>[];
-    if (!mounted) return;
-    setState(() {
-      _libraryAgents = agents;
-      _missions = MissionService.instance.missions;
-      _savedWorkflows = LegendService.instance.workflows;
-      _loadingAgents = false;
-    });
+    try {
+      final agents = ApiService.instance.isAuthenticated ? await ApiService.instance.getLibrary() : <AgentModel>[];
+      if (!mounted) return;
+      setState(() {
+        _libraryAgents = agents;
+        _missions = MissionService.instance.missions;
+        _savedWorkflows = LegendService.instance.workflows;
+        _loadingAgents = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _libraryAgents = <AgentModel>[];
+        _missions = MissionService.instance.missions;
+        _savedWorkflows = LegendService.instance.workflows;
+        _loadingAgents = false;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showNotice(
+          'Legend data could not be loaded. Please try again.',
+          background: AppTheme.error,
+        );
+      });
+    }
   }
 
   bool get _hasCanvasContent => _nodes.isNotEmpty || _edges.isNotEmpty;

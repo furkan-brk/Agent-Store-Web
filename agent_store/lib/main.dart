@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:get/get.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
@@ -12,6 +14,10 @@ import 'features/legend/services/legend_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    // Keep routes stable on refresh and avoid mixed path/hash URLs.
+    usePathUrlStrategy();
+  }
   Get.put(AppTelemetryService(), permanent: true);
   // Restore JWT and wallet address from SharedPreferences before anything else.
   // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
