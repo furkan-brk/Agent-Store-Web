@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:developer' as developer;
 import '../models/workflow_models.dart';
 
 class LegendService {
@@ -26,9 +27,11 @@ class LegendService {
   }
 
   Future<LegendWorkflow> saveWorkflow(LegendWorkflow wf) async {
+     developer.log('[LegendService] saveWorkflow: name="${wf.name}", id="${wf.id}"');
     _workflows.removeWhere((w) => w.id == wf.id);
     _workflows.insert(0, wf);
     _sortWorkflows();
+     developer.log('[LegendService] Workflow added. Total workflows: ${_workflows.length}');
     await _persist();
     return wf;
   }
@@ -45,10 +48,13 @@ class LegendService {
 
   Future<void> _persist() async {
     final prefs = await SharedPreferences.getInstance();
+     developer.log('[LegendService] Persisting ${_workflows.length} workflows');
     await prefs.setString(
       _key,
       jsonEncode(_workflows.map((w) => w.toJson()).toList()),
     );
+     final saved = prefs.getString(_key);
+     developer.log('[LegendService] Persist complete. Verify: ${saved?.length ?? 0} bytes');
   }
 
   /// Create a brand-new empty workflow.
