@@ -410,27 +410,27 @@ class _LegendScreenState extends State<LegendScreen> {
   }
 
   void _onPortDragEnd(String? toPortId) {
-    if (_dragFromPort != null && toPortId != null && _dragFromPort != toPortId) {
-      final fromParts = _dragFromPort!.split('_');
-      final toParts = toPortId.split('_');
-      if (fromParts.length == 2 && toParts.length == 2) {
-        final fromNodeId = fromParts[0];
-        final toNodeId = toParts[0];
-        if (fromNodeId != toNodeId) {
-          // Only allow output -> input connections
-          if (fromParts[1] == 'output' && toParts[1] == 'input') {
-            final alreadyExists = _edges.any(
-              (e) => e.fromId == fromNodeId && e.toId == toNodeId,
-            );
-            if (!alreadyExists) {
-              setState(() {
-                _edges.add(WorkflowEdge(
-                  id: '${fromNodeId}_$toNodeId',
-                  fromId: fromNodeId,
-                  toId: toNodeId,
-                ));
-              });
-            }
+    final fromPortId = _dragFromPort;
+    // Prefer pointer-based drop target because drag end callback comes from source port.
+    final dropTargetPortId = _findNearestPortId(_dragCurrentOffset) ?? toPortId;
+
+    if (fromPortId != null && dropTargetPortId != null && fromPortId != dropTargetPortId) {
+      final from = _parsePortId(fromPortId);
+      final to = _parsePortId(dropTargetPortId);
+      if (from != null && to != null && from.nodeId != to.nodeId) {
+        // Only allow output -> input connections.
+        if (from.side == 'output' && to.side == 'input') {
+          final alreadyExists = _edges.any(
+            (e) => e.fromId == from.nodeId && e.toId == to.nodeId,
+          );
+          if (!alreadyExists) {
+            setState(() {
+              _edges.add(WorkflowEdge(
+                id: '${from.nodeId}_${to.nodeId}',
+                fromId: from.nodeId,
+                toId: to.nodeId,
+              ));
+            });
           }
         }
       }
@@ -439,6 +439,49 @@ class _LegendScreenState extends State<LegendScreen> {
       _dragFromPort = null;
       _dragCurrentOffset = Offset.zero;
     });
+  }
+
+  _PortRef? _parsePortId(String portId) {
+    final sep = portId.lastIndexOf('_');
+    if (sep <= 0 || sep >= portId.length - 1) return null;
+    final nodeId = portId.substring(0, sep);
+    final side = portId.substring(sep + 1);
+    if (side != 'input' && side != 'output') return null;
+    return _PortRef(nodeId: nodeId, side: side);
+  }
+
+  String? _findNearestPortId(Offset localOffset) {
+    if (_nodes.isEmpty) return null;
+    const maxDistance = 18.0;
+
+    String? nearestPortId;
+    var nearestDist = double.infinity;
+
+    for (final node in _nodes) {
+      final inputCenter = Offset(
+        node.x + _canvasOffset.dx,
+        node.y + _canvasOffset.dy + _kNodeH / 2,
+      );
+      final outputCenter = Offset(
+        node.x + _canvasOffset.dx + _kNodeW,
+        node.y + _canvasOffset.dy + _kNodeH / 2,
+      );
+
+      final inputDist = (localOffset - inputCenter).distance;
+      if (inputDist < nearestDist) {
+        nearestDist = inputDist;
+        nearestPortId = '${node.id}_input';
+      }
+
+      final outputDist = (localOffset - outputCenter).distance;
+      if (outputDist < nearestDist) {
+        nearestDist = outputDist;
+        nearestPortId = '${node.id}_output';
+      }
+    }
+
+    if (nearestDist > maxDistance) return null;
+    return nearestPortId;
   }
 
   // ── Canvas pan ─────────────────────────────────────────────────────────────
@@ -674,7 +717,7 @@ class _LegendScreenState extends State<LegendScreen> {
           const SizedBox(width: 8),
           // Connect mode toggle
           // Delete selected
-          if (_selectedNodeId != null) ...[            
+          if (_selectedNodeId != null) ...[
             _ToolbarButton(
               icon: Icons.delete_outline,
               label: 'Delete',
@@ -1375,6 +1418,13 @@ class _NodeCard extends StatelessWidget {
   }
 }
 
+class _PortRef {
+  final String nodeId;
+  final String side;
+
+  const _PortRef({required this.nodeId, required this.side});
+}
+
 // ── Edge painter ──────────────────────────────────────────────────────────────
 
 class _EdgePainter extends CustomPainter {
@@ -1465,7 +1515,11 @@ class _EdgePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_EdgePainter old) =>
-      old.edges != edges || old.nodes != nodes || old.offset != offset || old.dragFromPort != dragFromPort || old.dragOffset != dragOffset;
+      old.edges != edges ||
+      old.nodes != nodes ||
+      old.offset != offset ||
+      old.dragFromPort != dragFromPort ||
+      old.dragOffset != dragOffset;
 }
 
 // ── Rename Node Dialog with Mentions ──────────────────────────────────────────
@@ -1539,10 +1593,8 @@ class _RenameNodeDialogWithMentionsState extends State<_RenameNodeDialogWithMent
 
     final q = query.toLowerCase();
     if (trigger == '@') {
-      final suggestions = widget.libraryAgents
-          .where((a) => q.isEmpty || a.title.toLowerCase().contains(q))
-          .take(8)
-          .toList();
+      final suggestions =
+          widget.libraryAgents.where((a) => q.isEmpty || a.title.toLowerCase().contains(q)).take(8).toList();
       setState(() {
         _mentionStart = triggerIndex;
         _activeTrigger = '@';
@@ -1613,7 +1665,6 @@ class _RenameNodeDialogWithMentionsState extends State<_RenameNodeDialogWithMent
     );
     _hideMentions();
   }
-
 
   @override
   Widget build(BuildContext context) {
