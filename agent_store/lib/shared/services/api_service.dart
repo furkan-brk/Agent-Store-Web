@@ -369,6 +369,23 @@ class ApiService {
     return false;
   }
 
+  /// Lightweight network probe used for startup preload tiering.
+  Future<({int elapsedMs, bool success})> probeNetwork() async {
+    final sw = Stopwatch()..start();
+    try {
+      final uri = Uri.parse(ApiConstants.agents).replace(queryParameters: {
+        'page': '1',
+        'limit': '1',
+      });
+      final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      sw.stop();
+      return (elapsedMs: sw.elapsedMilliseconds, success: res.statusCode == 200);
+    } catch (_) {
+      sw.stop();
+      return (elapsedMs: sw.elapsedMilliseconds, success: false);
+    }
+  }
+
   Future<bool> setAgentPrice(int agentId, double price) async {
     try {
       final res = await http.put(

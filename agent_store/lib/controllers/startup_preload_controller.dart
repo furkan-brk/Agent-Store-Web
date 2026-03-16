@@ -9,6 +9,9 @@ import 'leaderboard_controller.dart';
 import 'library_controller.dart';
 import 'store_controller.dart';
 import '../shared/services/api_service.dart';
+import '../shared/services/app_telemetry_service.dart';
+
+enum _PreloadTier { fast, medium, slow }
 
 class StartupPreloadController extends GetxService {
   bool _started = false;
@@ -21,15 +24,61 @@ class StartupPreloadController extends GetxService {
   }
 
   Future<void> _preload() async {
+    // Stage 1: critical pages first.
     _ensure<StoreController>(() => StoreController());
     _ensure<GuildController>(() => GuildController());
-    _ensure<LeaderboardController>(() => LeaderboardController());
-    _ensure<CreateAgentController>(() => CreateAgentController());
 
-    if (ApiService.instance.isAuthenticated) {
-      _ensure<LibraryController>(() => LibraryController());
-      _ensure<CreatorController>(() => CreatorController());
+    final probe = await ApiService.instance.probeNetwork();
+    final tier = _resolveTier(probe.elapsedMs, probe.success);
+    _telemetry.logPreloadTier(
+      tier: tier.name,
+      probeMs: probe.elapsedMs,
+      probeSuccess: probe.success,
+    );
+
+    // Stage 2: progressively warm the rest based on network quality.
+    switch (tier) {
+      case _PreloadTier.fast:
+        _preloadSecondary();
+      case _PreloadTier.medium:
+        _schedule(const Duration(milliseconds: 250), _preloadSecondary);
+      case _PreloadTier.slow:
+        _schedule(const Duration(milliseconds: 600), () {
+          _ensure<CreateAgentController>(() => CreateAgentController());
+        });
+        _schedule(const Duration(milliseconds: 1400), () {
+          _ensure<LeaderboardController>(() => LeaderboardController());
+        });
+        _schedule(const Duration(milliseconds: 2200), _preloadAuthHeavy);
     }
+  }
+
+  AppTelemetryService get _telemetry => Get.find<AppTelemetryService>();
+
+  _PreloadTier _resolveTier(int elapsedMs, bool success) {
+    if (!success) return _PreloadTier.slow;
+    if (elapsedMs <= 350) return _PreloadTier.fast;
+    if (elapsedMs <= 900) return _PreloadTier.medium;
+    return _PreloadTier.slow;
+  }
+
+  void _preloadSecondary() {
+    _ensure<CreateAgentController>(() => CreateAgentController());
+    _ensure<LeaderboardController>(() => LeaderboardController());
+    _preloadAuthHeavy();
+  }
+
+  void _preloadAuthHeavy() {
+    if (!ApiService.instance.isAuthenticated) return;
+    _ensure<LibraryController>(() => LibraryController());
+    _ensure<CreatorController>(() => CreatorController());
+  }
+
+  void _schedule(Duration delay, void Function() task) {
+    unawaited(Future<void>.delayed(delay, () {
+      if (!_started) return;
+      task();
+    }));
   }
 
   T _ensure<T extends GetxController>(T Function() builder) {

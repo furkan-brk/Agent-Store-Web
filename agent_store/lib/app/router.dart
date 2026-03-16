@@ -18,6 +18,7 @@ import '../features/settings/screens/settings_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
 import '../features/guild_master/screens/guild_master_screen.dart';
 import '../controllers/auth_controller.dart';
+import '../shared/services/app_telemetry_service.dart';
 
 // Intent classes for keyboard shortcuts
 class _GoStoreIntent extends Intent {
@@ -108,6 +109,8 @@ class _AppShell extends StatefulWidget {
 class _AppShellState extends State<_AppShell> {
   @override
   Widget build(BuildContext context) {
+    final loc = GoRouterState.of(context).uri.toString();
+    Get.find<AppTelemetryService>().onRouteSeen(loc);
     final screenWidth = MediaQuery.of(context).size.width;
     final isNarrow = screenWidth < 768;
 

@@ -5,10 +5,12 @@ import 'app/theme.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/startup_preload_controller.dart';
 import 'shared/services/api_service.dart';
+import 'shared/services/app_telemetry_service.dart';
 import 'shared/services/wallet_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  Get.put(AppTelemetryService(), permanent: true);
   // Restore JWT and wallet address from SharedPreferences before anything else.
   // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
   await ApiService.instance.init();
@@ -27,11 +29,18 @@ class AgentStoreApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final telemetry = Get.find<AppTelemetryService>();
     return MaterialApp.router(
       title: 'Agent Store',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: AppRouter.router,
+      builder: (context, child) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          telemetry.markFirstFrame();
+        });
+        return child ?? const SizedBox.shrink();
+      },
     );
   }
 }
