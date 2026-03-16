@@ -15,10 +15,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare slim Railway deploy directory
+        run: |
+          rm -rf .railway-deploy
+          mkdir -p .railway-deploy
+          cp Dockerfile .railway-deploy/Dockerfile
+          cp railway.toml .railway-deploy/railway.toml
+          cp .dockerignore .railway-deploy/.dockerignore
+          cp .railwayignore .railway-deploy/.railwayignore
+          cp -R backend .railway-deploy/backend
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
+        working-directory: .railway-deploy
         run: railway up --service Agent_Store --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
