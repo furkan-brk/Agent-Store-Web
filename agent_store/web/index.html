@@ -31,6 +31,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+  <!-- Material Icons — preload font so CanvasKit has it cached before Flutter requests it -->
+  <link rel="preload" href="assets/fonts/MaterialIcons-Regular.otf" as="font" type="font/otf" crossorigin>
+
+  <!-- Material Icons CSS fallback — ensures icons render even if Flutter font loading is slow -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="icons/app_icon.svg"/>
   <link rel="icon" type="image/png" href="favicon.png"/>

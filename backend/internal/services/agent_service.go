@@ -11,7 +11,9 @@ import (
 	"image/draw"
 	_ "image/jpeg" // decode support
 	"image/png"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -40,10 +42,11 @@ type AgentService struct {
 	scoreSvc        *ScoreService
 	pollinationsSvc *PollinationsService
 	cache           *CacheStore
+	rembgURL        string
 }
 
-func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService, cache *CacheStore) *AgentService {
-	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc, cache: cache}
+func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService, cache *CacheStore, rembgURL string) *AgentService {
+	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc, cache: cache, rembgURL: rembgURL}
 }
 
 type CreateAgentInput struct {
@@ -203,18 +206,9 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		imagePrompt := "A " + prelimCharType + " character with unique abilities and tools"
 		generatedImage = s.generateImageWithFallback(&sanitized, imagePrompt, prelimCharType)
 
-		// Apply chroma key to remove magenta screen background
+		// Remove background via ML service (chroma key fallback)
 		if generatedImage != "" {
-			raw := generatedImage
-			if idx := strings.Index(raw, ","); idx != -1 {
-				raw = raw[idx+1:]
-			}
-			if transparent, err := chromaKey(raw); err != nil {
-				log.Printf("[ChromaKey] failed, keeping original: %v", err)
-			} else {
-				generatedImage = transparent
-				log.Printf("[ChromaKey] background removed successfully")
-			}
+			generatedImage = s.removeBackground(generatedImage)
 		}
 	}()
 
@@ -394,18 +388,9 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	forkProfile := buildFallbackProfile(original.Title, original.CharacterType)
 	forkedImage := s.generateImageWithFallback(forkProfile, "A variant of "+original.CharacterType+" agent", original.CharacterType)
 
-	// Apply chroma key to remove magenta screen background
+	// Remove background via ML service (chroma key fallback)
 	if forkedImage != "" {
-		raw := forkedImage
-		if idx := strings.Index(raw, ","); idx != -1 {
-			raw = raw[idx+1:]
-		}
-		if transparent, err := chromaKey(raw); err != nil {
-			log.Printf("[ChromaKey] fork failed, keeping original: %v", err)
-		} else {
-			forkedImage = transparent
-			log.Printf("[ChromaKey] fork background removed successfully")
-		}
+		forkedImage = s.removeBackground(forkedImage)
 	}
 
 	// Deduct 5 credits for forking
@@ -654,6 +639,59 @@ func (s *AgentService) generateImageWithFallback(profile *AgentProfile, imagePro
 		log.Printf("[Avatar] all providers timed out or failed within 60s (type=%s)", charType)
 		return "" // frontend shows skeleton placeholder
 	}
+}
+
+// removeBackground sends the image to the rembg ML microservice for background removal.
+// On any failure it falls back to chromaKey, and if that also fails it returns the original image unchanged.
+func (s *AgentService) removeBackground(base64Image string) string {
+	raw := base64Image
+	if idx := strings.Index(raw, ","); idx != -1 {
+		raw = raw[idx+1:]
+	}
+
+	imgBytes, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		log.Printf("[BG-Remove] base64 decode failed, returning original: %v", err)
+		return base64Image
+	}
+
+	// POST raw image bytes to rembg service
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(s.rembgURL+"/api/remove", "application/octet-stream", bytes.NewReader(imgBytes))
+	if err != nil {
+		log.Printf("[BG-Remove] ML failed, falling back to chroma key: %v", err)
+		if transparent, ckErr := chromaKey(raw); ckErr != nil {
+			log.Printf("[BG-Remove] chroma key also failed, returning original: %v", ckErr)
+			return base64Image
+		} else {
+			return transparent
+		}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("[BG-Remove] ML returned status %d, falling back to chroma key", resp.StatusCode)
+		if transparent, ckErr := chromaKey(raw); ckErr != nil {
+			log.Printf("[BG-Remove] chroma key also failed, returning original: %v", ckErr)
+			return base64Image
+		} else {
+			return transparent
+		}
+	}
+
+	pngBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[BG-Remove] failed to read ML response, falling back to chroma key: %v", err)
+		if transparent, ckErr := chromaKey(raw); ckErr != nil {
+			log.Printf("[BG-Remove] chroma key also failed, returning original: %v", ckErr)
+			return base64Image
+		} else {
+			return transparent
+		}
+	}
+
+	log.Printf("[BG-Remove] ML removal succeeded (%d bytes)", len(pngBytes))
+	return base64.StdEncoding.EncodeToString(pngBytes)
 }
 
 // chromaKey removes the magenta-screen background (#FF00FF) using global color
@@ -1085,18 +1123,9 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 	imagePrompt := "A " + agent.CharacterType + " character with unique abilities and tools"
 	generatedImage := s.generateImageWithFallback(&sanitized, imagePrompt, agent.CharacterType)
 
-	// Apply chroma key to remove magenta screen background
+	// Remove background via ML service (chroma key fallback)
 	if generatedImage != "" {
-		raw := generatedImage
-		if idx := strings.Index(raw, ","); idx != -1 {
-			raw = raw[idx+1:]
-		}
-		if transparent, chromaErr := chromaKey(raw); chromaErr != nil {
-			log.Printf("[ChromaKey] regen failed, keeping original: %v", chromaErr)
-		} else {
-			generatedImage = transparent
-			log.Printf("[ChromaKey] regen background removed successfully")
-		}
+		generatedImage = s.removeBackground(generatedImage)
 	}
 
 	// Merge new profile into existing character_data

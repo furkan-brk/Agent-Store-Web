@@ -90,7 +90,7 @@ func (p *PollinationsService) attemptPollinationsRequest(prompt string) (string,
 		"steps":     28,
 		"guidance":  8.5,
 		"seed":      -1,
-		"negative":  "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon, frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, mat board, gilded frame, ornamental border, Celtic knot, scroll border, magenta clothing, pink clothing, fuchsia",
+		"negative":  "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon, frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, mat board, gilded frame, ornamental border, Celtic knot, scroll border",
 		"sampler":   "euler",
 		"scheduler": "normal",
 		"upscale":   false,
@@ -244,7 +244,7 @@ func (p *PollinationsService) GenerateImageSync(profile *AgentProfile) (string, 
 	params.Set("width", "512")
 	params.Set("height", "512")
 	params.Set("model", "flux")
-	params.Set("negative", "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon, frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, mat board, gilded frame, ornamental border, Celtic knot, scroll border, magenta clothing, pink clothing, fuchsia")
+	params.Set("negative", "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon, frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, mat board, gilded frame, ornamental border, Celtic knot, scroll border")
 
 	directURL := "https://image.pollinations.ai/?" + params.Encode()
 	return directURL, nil

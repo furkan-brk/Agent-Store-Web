@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string) *gin.Engine {
+func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembgURL string) *gin.Engine {
 	r := gin.Default()
 
 	// Parse comma-separated origins from config.
@@ -61,7 +61,7 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
 	scoreSvc := services.NewScoreService(geminiAPIKey)
 	pollinationsSvc := services.NewPollinationsService()
-	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache)
+	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache, rembgURL)
 	guildSvc := services.NewGuildService(scoreSvc, cache)
 	gmSvc := services.NewGuildMasterService(aiSvc)
 	missionSvc := services.NewMissionService()

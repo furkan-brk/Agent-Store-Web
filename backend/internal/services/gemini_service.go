@@ -71,7 +71,7 @@ const avatarPrompt = `Single character on a solid flat magenta backdrop (#FF00FF
 	`Head: %s. Attire: %s. %s. ` +
 	`A soft %s magical glow emanates from their hands. Holds %s. ` +
 	`The character must have a thin dark ink outline along all edges of their silhouette, separating them clearly from the magenta backdrop. ` +
-	`The character itself MUST NOT contain any magenta, hot pink, fuchsia, or #FF00FF colored elements anywhere — no magenta in clothing, skin, accessories, hair, or effects. ` +
+	`The character should avoid using bright magenta (#FF00FF) as a primary clothing color, but may freely include pink, rose, fuchsia, or purple tones in accents, effects, and details. ` +
 	`No text, letters, numbers, words, or symbols anywhere in the image.`
 
 // Randomized prompt modifiers to ensure visual diversity across generated characters.

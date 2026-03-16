@@ -15,6 +15,7 @@ type Config struct {
 	MonadRPCURL     string
 	CreditsContract string
 	TreasuryWallet  string // wallet address to receive MON for credit top-ups
+	RembgURL        string // URL of the rembg background removal microservice
 }
 
 func Load() *Config {
@@ -36,6 +37,7 @@ func Load() *Config {
 		MonadRPCURL:     getEnv("MONAD_RPC_URL", "https://testnet-rpc.monad.xyz"),
 		CreditsContract: getEnv("CREDITS_CONTRACT_ADDRESS", ""),
 		TreasuryWallet:  getEnv("TREASURY_WALLET", ""),
+		RembgURL:        getEnv("REMBG_URL", "http://rembg:5000"),
 	}
 }
 

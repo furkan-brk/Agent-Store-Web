@@ -28,6 +28,19 @@ services:
       timeout: 3s
       retries: 5
 
+  rembg:
+    build: ./rembg
+    container_name: agent_store_rembg
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/remove"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -37,12 +50,15 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_URL: redis://redis:6379
+      REMBG_URL: http://rembg:5000
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rembg:
         condition: service_healthy
     restart: unless-stopped
 
