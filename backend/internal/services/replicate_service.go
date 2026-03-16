@@ -58,11 +58,12 @@ func (r *ReplicateService) GeneratePixelArt(imagePrompt, charType string) (strin
 	}
 
 	fullPrompt := prefix + ", " + imagePrompt +
-		", detailed 2D medieval fantasy upper-body portrait, warm painterly tones, storybook RPG art, centered character, solid bright green #00FF00 background, no text"
+		", detailed 2D medieval fantasy upper-body character, clean digital painting style, centered character, solid bright magenta #FF00FF backdrop, no border, no frame, no text"
 
 	reqBody := map[string]interface{}{
 		"input": map[string]interface{}{
-			"prompt": fullPrompt,
+			"prompt":          fullPrompt,
+			"negative_prompt": "frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, ornamental border, green background",
 		},
 	}
 

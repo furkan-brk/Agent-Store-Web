@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
+	"image/draw"
 	_ "image/jpeg" // decode support
 	"image/png"
 	"log"
@@ -203,7 +203,7 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		imagePrompt := "A " + prelimCharType + " character with unique abilities and tools"
 		generatedImage = s.generateImageWithFallback(&sanitized, imagePrompt, prelimCharType)
 
-		// Apply chroma key to remove green screen background
+		// Apply chroma key to remove magenta screen background
 		if generatedImage != "" {
 			raw := generatedImage
 			if idx := strings.Index(raw, ","); idx != -1 {
@@ -394,7 +394,7 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	forkProfile := buildFallbackProfile(original.Title, original.CharacterType)
 	forkedImage := s.generateImageWithFallback(forkProfile, "A variant of "+original.CharacterType+" agent", original.CharacterType)
 
-	// Apply chroma key to remove green screen background
+	// Apply chroma key to remove magenta screen background
 	if forkedImage != "" {
 		raw := forkedImage
 		if idx := strings.Index(raw, ","); idx != -1 {
@@ -656,177 +656,214 @@ func (s *AgentService) generateImageWithFallback(profile *AgentProfile, imagePro
 	}
 }
 
-// chromaKey removes the green-screen background using flood-fill from edges.
-// Unlike per-pixel color matching, this approach only removes green pixels that
-// are spatially connected to the image border. Interior green pixels (e.g., a
-// green gemstone on a wizard's staff) are preserved because the flood fill
-// cannot reach them through non-green character pixels.
+// chromaKey removes the magenta-screen background (#FF00FF) using global color
+// replacement with soft alpha edge refinement. Four-pass pipeline:
+//  1. Hard classification: mark all magenta pixels transparent
+//  2. Edge soft alpha: blend character edges smoothly with magenta despill
+//  3. 1-pixel erosion: remove orphan fringe pixels
+//  4. Encode as transparent PNG
 //
-// Frame handling: AI generators sometimes add decorative frames/borders around
-// the image. To handle this, we scan inward from each edge (up to maxScanDepth
-// pixels). Non-green "frame" pixels are marked transparent, and the first green
-// pixel found seeds the flood fill. This effectively punches through any frame
-// to reach the green background behind it.
+// Unlike the previous flood-fill approach, this detects magenta globally — no
+// spatial connectivity required. Interior magenta pockets (between arm and torso,
+// inside held items) are correctly removed. No frame scanning needed.
 func chromaKey(base64Image string) (string, error) {
 	imgBytes, err := base64.StdEncoding.DecodeString(base64Image)
 	if err != nil {
-		return "", fmt.Errorf("decode base64: %w", err)
+		return "", fmt.Errorf("base64 decode: %w", err)
 	}
 
 	img, _, err := image.Decode(bytes.NewReader(imgBytes))
 	if err != nil {
-		return "", fmt.Errorf("decode image: %w", err)
+		return "", fmt.Errorf("image decode: %w", err)
 	}
 
 	bounds := img.Bounds()
-	w := bounds.Max.X - bounds.Min.X
-	h := bounds.Max.Y - bounds.Min.Y
+	w, h := bounds.Dx(), bounds.Dy()
+
+	// Convert to NRGBA for direct pixel access via .Pix slice (much faster than img.At())
 	result := image.NewNRGBA(bounds)
+	draw.Draw(result, bounds, img, bounds.Min, draw.Src)
 
-	// Copy all pixels initially as opaque
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			r, g, b, a := img.At(x, y).RGBA()
-			result.SetNRGBA(x, y, color.NRGBA{uint8(r >> 8), uint8(g >> 8), uint8(b >> 8), uint8(a >> 8)})
+	mask := make([]bool, w*h)
+
+	// ── Pass 1: Hard classification — mark all magenta pixels transparent ──
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			idx := y*result.Stride + x*4
+			r8 := int(result.Pix[idx])
+			g8 := int(result.Pix[idx+1])
+			b8 := int(result.Pix[idx+2])
+
+			if isMagenta(r8, g8, b8) {
+				result.Pix[idx] = 0   // R
+				result.Pix[idx+1] = 0 // G
+				result.Pix[idx+2] = 0 // B
+				result.Pix[idx+3] = 0 // A
+				mask[y*w+x] = true
+			}
 		}
 	}
 
-	visited := make([]bool, w*h)
-	idx := func(x, y int) int { return (y-bounds.Min.Y)*w + (x - bounds.Min.X) }
+	// ── Pass 2: Edge soft alpha + despill ──
+	// Edge pixels are non-masked pixels with at least one masked neighbor (8-connectivity)
+	dx := []int{-1, 0, 1, -1, 1, -1, 0, 1}
+	dy := []int{-1, -1, -1, 0, 0, 1, 1, 1}
 
-	// framePixels tracks non-green pixels found while scanning through frames.
-	// These get marked transparent after the flood fill completes.
-	type point struct{ x, y int }
-	var framePixels []point
-	queue := make([]point, 0, 2*(w+h))
-
-	// Maximum depth to scan inward looking for green through a frame.
-	// ~6% of image dimension handles thick ornamental borders.
-	maxScanDepth := w / 16
-	if dh := h / 16; dh > maxScanDepth {
-		maxScanDepth = dh
-	}
-	if maxScanDepth < 40 {
-		maxScanDepth = 40
-	}
-	if maxScanDepth > 80 {
-		maxScanDepth = 80
-	}
-
-	// scanAndSeed scans inward from an edge pixel along (dx, dy) direction.
-	// If the edge pixel is green → seed directly. If not (frame), scan inward
-	// marking frame pixels, and seed from the first green pixel found.
-	scanAndSeed := func(startX, startY, stepX, stepY int) {
-		if isGreenish(img.At(startX, startY)) {
-			// No frame — seed directly
-			i := idx(startX, startY)
-			if !visited[i] {
-				visited[i] = true
-				queue = append(queue, point{startX, startY})
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if mask[y*w+x] {
+				continue // already transparent
 			}
-			return
-		}
-		// Frame detected — scan inward to find green
-		for depth := 1; depth <= maxScanDepth; depth++ {
-			sx := startX + stepX*depth
-			sy := startY + stepY*depth
-			if sx < bounds.Min.X || sx >= bounds.Max.X || sy < bounds.Min.Y || sy >= bounds.Max.Y {
-				break
-			}
-			if isGreenish(img.At(sx, sy)) {
-				// Found green behind the frame — seed flood fill here
-				i := idx(sx, sy)
-				if !visited[i] {
-					visited[i] = true
-					queue = append(queue, point{sx, sy})
+
+			// Check if this pixel borders a transparent pixel
+			isEdge := false
+			for d := 0; d < 8; d++ {
+				nx, ny := x+dx[d], y+dy[d]
+				if nx >= 0 && nx < w && ny >= 0 && ny < h && mask[ny*w+nx] {
+					isEdge = true
+					break
 				}
-				// Mark all pixels from edge to here as frame (to be removed)
-				for d := 0; d < depth; d++ {
-					fx := startX + stepX*d
-					fy := startY + stepY*d
-					framePixels = append(framePixels, point{fx, fy})
-				}
-				return
 			}
-		}
-		// No green found within scan depth — likely character extends to edge.
-		// Don't remove anything on this scan line.
-	}
-
-	// Scan from all 4 borders
-	for x := bounds.Min.X; x < bounds.Max.X; x++ {
-		scanAndSeed(x, bounds.Min.Y, 0, 1)    // Top edge, scan downward
-		scanAndSeed(x, bounds.Max.Y-1, 0, -1)  // Bottom edge, scan upward
-	}
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		scanAndSeed(bounds.Min.X, y, 1, 0)    // Left edge, scan rightward
-		scanAndSeed(bounds.Max.X-1, y, -1, 0)  // Right edge, scan leftward
-	}
-
-	// BFS flood fill — expand to neighboring green pixels
-	ddx := []int{-1, 1, 0, 0}
-	ddy := []int{0, 0, -1, 1}
-
-	for len(queue) > 0 {
-		p := queue[0]
-		queue = queue[1:]
-
-		// Mark this pixel as transparent
-		result.SetNRGBA(p.x, p.y, color.NRGBA{0, 0, 0, 0})
-
-		for d := 0; d < 4; d++ {
-			nx, ny := p.x+ddx[d], p.y+ddy[d]
-			if nx < bounds.Min.X || nx >= bounds.Max.X || ny < bounds.Min.Y || ny >= bounds.Max.Y {
+			if !isEdge {
 				continue
 			}
-			ni := idx(nx, ny)
-			if visited[ni] {
+
+			idx := y*result.Stride + x*4
+			r8 := int(result.Pix[idx])
+			g8 := int(result.Pix[idx+1])
+			b8 := int(result.Pix[idx+2])
+
+			contrib := magentaContribution(r8, g8, b8)
+			alpha := 1.0 - contrib
+			if alpha < 0.12 {
+				// Almost fully magenta — force transparent
+				result.Pix[idx] = 0
+				result.Pix[idx+1] = 0
+				result.Pix[idx+2] = 0
+				result.Pix[idx+3] = 0
+				mask[y*w+x] = true
 				continue
 			}
-			if isGreenish(img.At(nx, ny)) {
-				visited[ni] = true
-				queue = append(queue, point{nx, ny})
+
+			// Despill magenta contamination from RGB
+			dr, dg, db := despillMagenta(r8, g8, b8)
+			result.Pix[idx] = uint8(dr)
+			result.Pix[idx+1] = uint8(dg)
+			result.Pix[idx+2] = uint8(db)
+			result.Pix[idx+3] = uint8(alpha * 255)
+		}
+	}
+
+	// ── Pass 3: 1-pixel erosion — remove orphan fringe pixels ──
+	// Clone alpha channel to avoid read-write conflicts during erosion
+	alphaSnap := make([]uint8, w*h)
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			alphaSnap[y*w+x] = result.Pix[y*result.Stride+x*4+3]
+		}
+	}
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			if alphaSnap[y*w+x] == 0 {
+				continue
+			}
+			transparentCount := 0
+			for d := 0; d < 8; d++ {
+				nx, ny := x+dx[d], y+dy[d]
+				if nx < 0 || nx >= w || ny < 0 || ny >= h {
+					transparentCount++ // out-of-bounds counts as transparent
+					continue
+				}
+				if alphaSnap[ny*w+nx] == 0 {
+					transparentCount++
+				}
+			}
+			if transparentCount >= 6 {
+				idx := y*result.Stride + x*4
+				result.Pix[idx] = 0
+				result.Pix[idx+1] = 0
+				result.Pix[idx+2] = 0
+				result.Pix[idx+3] = 0
 			}
 		}
 	}
 
-	// Mark frame pixels as transparent (these were between the border and the green)
-	for _, fp := range framePixels {
-		result.SetNRGBA(fp.x, fp.y, color.NRGBA{0, 0, 0, 0})
-	}
-
+	// ── Pass 4: Encode as transparent PNG ──
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, result); err != nil {
-		return "", fmt.Errorf("encode png: %w", err)
+		return "", fmt.Errorf("png encode: %w", err)
 	}
-
 	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
 }
 
-// isGreenish checks if a color is clearly in the green-screen family.
-// Used by the flood fill to decide whether to expand into a neighboring pixel.
-// Thresholds are strict so the flood fill stops at the character boundary even
-// when the AI doesn't render a dark ink outline — transition pixels between
-// green background and character colors won't pass these checks, acting as a
-// natural barrier. The solid green background still gets fully removed because
-// all its pixels are well above these thresholds.
-func isGreenish(c color.Color) bool {
-	r, g, b, _ := c.RGBA()
-	r8, g8, b8 := int(r>>8), int(g>>8), int(b>>8)
-
-	// Primary check: green channel must clearly dominate both red and blue.
-	// Strict margins (+50) prevent leaking through semi-green transition pixels.
-	if g8 > 120 && g8 > r8+50 && g8 > b8+50 {
-		return true
+// isMagenta checks if a color is in the magenta chroma-key family (#FF00FF).
+// Uses a dual-gate approach: RGB dominance + R/B symmetry check, then HSV fallback.
+// Critical: protects Artisan pink (#EC4899 = 236,72,153) via the symmetry gate.
+func isMagenta(r8, g8, b8 int) bool {
+	// Primary: R and B both high, both dominate G by 50+
+	if r8 > 120 && b8 > 120 && r8 > g8+50 && b8 > g8+50 {
+		// Symmetry check: true magenta has R ≈ B.
+		// Artisan pink (236,72,153): |236-153|=83, max=236, 83/236=0.35 → FAILS
+		// Pure magenta (255,0,255): |255-255|=0 → PASSES
+		maxRB := r8
+		if b8 > maxRB {
+			maxRB = b8
+		}
+		diff := r8 - b8
+		if diff < 0 {
+			diff = -diff
+		}
+		if float64(diff) < float64(maxRB)*0.35 {
+			return true
+		}
 	}
 
-	// Secondary: HSV hue in narrow green range with strong saturation
-	h, s, _ := rgbToHSV(uint8(r8), uint8(g8), uint8(b8))
-	if h >= 90 && h <= 150 && s > 0.35 {
+	// Secondary: HSV hue in [285, 320], saturation > 0.35
+	// Pure magenta hue = 300. Artisan pink hue ≈ 330 → outside. Wizard purple ≈ 270 → outside.
+	hue, sat, _ := rgbToHSV(uint8(r8), uint8(g8), uint8(b8))
+	if hue >= 285 && hue <= 320 && sat > 0.35 {
 		return true
 	}
 
 	return false
+}
+
+// magentaContribution estimates how much a pixel's color comes from the magenta
+// background vs the foreground character, returning 0.0 (no magenta) to 1.0 (pure magenta).
+// Used only for edge pixels to compute soft alpha blending.
+func magentaContribution(r8, g8, b8 int) float64 {
+	// Magenta = high R + high B, low G. Contribution based on (R+B)/2 excess over G.
+	avgRB := float64(r8+b8) / 2.0
+	gf := float64(g8)
+	if avgRB <= gf {
+		return 0.0
+	}
+	excess := (avgRB - gf) / 255.0
+	contrib := excess * excess // quadratic for sharper transition
+	if contrib < 0.02 {
+		return 0.0
+	}
+	if contrib > 0.90 {
+		return 1.0
+	}
+	return contrib
+}
+
+// despillMagenta removes magenta contamination from edge pixel RGB channels.
+// Clamps R and B so neither exceeds the luminance-preserving limit based on G.
+func despillMagenta(r8, g8, b8 int) (int, int, int) {
+	avg := (r8 + g8 + b8) / 3
+	limit := g8
+	if avg > limit {
+		limit = avg
+	}
+	if r8 > limit {
+		r8 = limit
+	}
+	if b8 > limit {
+		b8 = limit
+	}
+	return r8, g8, b8
 }
 
 // rgbToHSV converts 8-bit RGB values to HSV. Hue is returned in degrees (0-360),
@@ -930,7 +967,7 @@ func buildFallbackProfile(concept, charType string) *AgentProfile {
 			"Inspired and passionate",
 		},
 		"bard": {
-			"Emerald Green", "Cream", "Lime Green",
+			"Emerald Green", "Cream", "Golden Yellow",
 			"a wide-brimmed feathered hat with a jaunty emerald plume",
 			"a velvet doublet over a billowing white shirt with an embroidered green travelling cloak",
 			"shimmering musical notes drifting visibly through the air",
@@ -1048,7 +1085,7 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 	imagePrompt := "A " + agent.CharacterType + " character with unique abilities and tools"
 	generatedImage := s.generateImageWithFallback(&sanitized, imagePrompt, agent.CharacterType)
 
-	// Apply chroma key to remove green screen background
+	// Apply chroma key to remove magenta screen background
 	if generatedImage != "" {
 		raw := generatedImage
 		if idx := strings.Index(raw, ","); idx != -1 {

@@ -24,3 +24,21 @@ type UserLegendWorkflow struct {
 	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 }
+
+// WorkflowExecution records a single run of a legend workflow.
+type WorkflowExecution struct {
+	ID             uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserWallet     string     `gorm:"column:user_wallet;not null;index" json:"user_wallet"`
+	WorkflowID     string     `gorm:"column:workflow_id;not null;index" json:"workflow_id"`
+	WorkflowName   string     `gorm:"column:workflow_name;not null" json:"workflow_name"`
+	Status         string     `gorm:"column:status;not null;default:'running'" json:"status"`
+	InputMessage   string     `gorm:"column:input_message;type:text" json:"input_message"`
+	FinalOutput    string     `gorm:"column:final_output;type:text" json:"final_output"`
+	NodeResults    string     `gorm:"column:node_results;type:jsonb;not null;default:'[]'" json:"-"`
+	TotalNodes     int        `gorm:"column:total_nodes;default:0" json:"total_nodes"`
+	CompletedNodes int        `gorm:"column:completed_nodes;default:0" json:"completed_nodes"`
+	CreditsUsed    int64      `gorm:"column:credits_used;default:0" json:"credits_used"`
+	ErrorMessage   string     `gorm:"column:error_message;type:text" json:"error_message,omitempty"`
+	StartedAt      time.Time  `gorm:"column:started_at;autoCreateTime" json:"started_at"`
+	FinishedAt     *time.Time `gorm:"column:finished_at" json:"finished_at,omitempty"`
+}

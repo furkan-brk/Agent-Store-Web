@@ -36,7 +36,7 @@ func NewPollinationsService() *PollinationsService {
 // GenerateImage generates a pixel-art image using the Pollinations API and returns base64-encoded PNG.
 // The profile parameter provides visual characteristics (colors, features) that are merged into the prompt.
 func (p *PollinationsService) GenerateImage(profile *AgentProfile) (string, error) {
-	fullPrompt := BuildAvatarPrompt(profile)
+	fullPrompt := "Digital character design, " + BuildAvatarPrompt(profile)
 
 	imageURL, err := p.callPollinationsAPI(fullPrompt)
 	if err != nil {
@@ -87,10 +87,10 @@ func (p *PollinationsService) attemptPollinationsRequest(prompt string) (string,
 		"model":     "flux",
 		"width":     512,
 		"height":    512,
-		"steps":     20,
-		"guidance":  7.5,
+		"steps":     28,
+		"guidance":  8.5,
 		"seed":      -1,
-		"negative":  "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon",
+		"negative":  "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon, frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, mat board, gilded frame, ornamental border, Celtic knot, scroll border, magenta clothing, pink clothing, fuchsia",
 		"sampler":   "euler",
 		"scheduler": "normal",
 		"upscale":   false,
@@ -236,7 +236,7 @@ func (p *PollinationsService) attemptDownloadImage(imageURL string) (string, err
 // GenerateImageSync is a simpler synchronous method that uses Pollinations' direct image endpoint.
 // It returns a direct image URL without needing to handle base64 encoding.
 func (p *PollinationsService) GenerateImageSync(profile *AgentProfile) (string, error) {
-	fullPrompt := BuildAvatarPrompt(profile)
+	fullPrompt := "Digital character design, " + BuildAvatarPrompt(profile)
 
 	// Use the direct image endpoint: https://image.pollinations.ai
 	params := url.Values{}
@@ -244,7 +244,7 @@ func (p *PollinationsService) GenerateImageSync(profile *AgentProfile) (string, 
 	params.Set("width", "512")
 	params.Set("height", "512")
 	params.Set("model", "flux")
-	params.Set("negative", "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon")
+	params.Set("negative", "text, letters, words, numbers, symbols, watermark, signature, modern, sci-fi, futuristic, robot, neon, frame, border, vignette, ornament, decorative edge, card border, trading card, rounded corners, picture frame, filigree, mat board, gilded frame, ornamental border, Celtic knot, scroll border, magenta clothing, pink clothing, fuchsia")
 
 	directURL := "https://image.pollinations.ai/?" + params.Encode()
 	return directURL, nil

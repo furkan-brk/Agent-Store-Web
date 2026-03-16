@@ -53,17 +53,26 @@ var charTypeStyles = map[string]string{
 
 // avatarPrompt is the shared prompt template for medieval fantasy avatar generation.
 // Uses 7 %s placeholders: PrimaryColor, SecondaryColor, headwear, outfit, uniqueFeature, glowColor, heldItem.
-const avatarPrompt = `Detailed 2D medieval fantasy character portrait illustration, rich painterly style, warm parchment tones, ` +
-	`consistent storybook RPG art. Upper-body portrait from the belly upward, centered in frame, three-quarter view. ` +
-	`The character fills most of the frame vertically. ` +
+//
+// Design notes (chroma key + frame elimination optimized):
+// - Background/composition instructions front-loaded for maximum model attention
+// - Magenta (#FF00FF) background: zero overlap with any character type color palette
+// - Edge-bleed instruction makes frames structurally impossible
+// - "portrait"/"illustration" removed (top frame-triggering words in training data)
+// - "backdrop" instead of "background" avoids canvas/mat-board framing associations
+const avatarPrompt = `Single character on a solid flat magenta backdrop (#FF00FF). ` +
+	`The entire backdrop must be uniform bright magenta with no gradients, no scenery, no patterns. ` +
+	`The magenta color extends to every pixel of all four edges of the image with no margin, no border, no frame. ` +
+	`Upper-body depiction from the belly upward, centered in the image, square 1:1 composition. ` +
+	`The character's head may be slightly cropped by the top edge of the image. ` +
+	`Detailed 2D medieval fantasy character, clean digital painting style with defined edges, warm rich colors. ` +
+	`The character fills most of the image vertically. Arms close to the body, held items overlap the torso, compact silhouette. ` +
 	`Outfit color: %s with %s trim and accents. ` +
 	`Head: %s. Attire: %s. %s. ` +
 	`A soft %s magical glow emanates from their hands. Holds %s. ` +
-	`Background MUST be solid flat bright green color (#00FF00). The entire background must be uniform #00FF00 with no gradients, no scenery, no patterns. ` +
-	`The character itself MUST NOT contain any bright green, lime green, neon green, or #00FF00 colored elements anywhere — no green-screen green in clothing, skin, accessories, or effects. ` +
-	`No decorative frames, borders, vignettes, or ornamental edges around the image. The character should be directly on the flat green background with nothing between them. ` +
-	`The character must have a thin dark ink outline along all edges of their silhouette, separating them clearly from the background. ` +
-	`Square 1:1 composition. No text, letters, numbers, words, or symbols anywhere in the image.`
+	`The character must have a thin dark ink outline along all edges of their silhouette, separating them clearly from the magenta backdrop. ` +
+	`The character itself MUST NOT contain any magenta, hot pink, fuchsia, or #FF00FF colored elements anywhere — no magenta in clothing, skin, accessories, hair, or effects. ` +
+	`No text, letters, numbers, words, or symbols anywhere in the image.`
 
 // Randomized prompt modifiers to ensure visual diversity across generated characters.
 // Since Imagen does not support a seed parameter, we inject random variety into the prompt text itself.
@@ -337,7 +346,7 @@ Rules:
 // Imagen to generate the avatar. The character is an upper-body portrait (belly upward) in
 // three-quarter view with a solid magenta (#FF00FF) background for chroma key removal.
 func (g *GeminiService) GenerateAvatarImage(profile *AgentProfile) (string, error) {
-	return g.callImagen(BuildAvatarPrompt(profile))
+	return g.callImagen("Game character asset, " + BuildAvatarPrompt(profile))
 }
 
 // callImagen sends a text-to-image request to Imagen and returns a base64-encoded PNG.
