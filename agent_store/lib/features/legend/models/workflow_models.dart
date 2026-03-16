@@ -226,5 +226,5 @@ class WorkflowExecution {
   bool get isRunning => status == 'running';
 
   Duration? get duration =>
-      finishedAt != null ? finishedAt!.difference(startedAt) : null;
+      finishedAt?.difference(startedAt);
 }

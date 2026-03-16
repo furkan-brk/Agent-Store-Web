@@ -734,12 +734,12 @@ class _LegendScreenState extends State<LegendScreen>
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.card,
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.rocket_launch_outlined,
+            Icon(Icons.rocket_launch_outlined,
                 color: AppTheme.gold, size: 20),
-            const SizedBox(width: 8),
-            const Text('Execute Workflow',
+            SizedBox(width: 8),
+            Text('Execute Workflow',
                 style: TextStyle(color: AppTheme.textH, fontSize: 16)),
           ],
         ),
@@ -3051,7 +3051,9 @@ class _RenameNodeDialogWithMentionsState
   void _hideMentions() {
     if (!_showMentions &&
         _agentSuggestions.isEmpty &&
-        _missionSuggestions.isEmpty) return;
+        _missionSuggestions.isEmpty) {
+      return;
+    }
     setState(() {
       _showMentions = false;
       _activeTrigger = '';
@@ -3069,7 +3071,9 @@ class _RenameNodeDialogWithMentionsState
         selection.baseOffset >= 0 ? selection.baseOffset : text.length;
     if (_mentionStart < 0 ||
         _mentionStart >= cursor ||
-        cursor > text.length) return;
+        cursor > text.length) {
+      return;
+    }
 
     final before = text.substring(0, _mentionStart);
     final after = text.substring(cursor);
@@ -3090,7 +3094,9 @@ class _RenameNodeDialogWithMentionsState
         selection.baseOffset >= 0 ? selection.baseOffset : text.length;
     if (_mentionStart < 0 ||
         _mentionStart >= cursor ||
-        cursor > text.length) return;
+        cursor > text.length) {
+      return;
+    }
 
     final before = text.substring(0, _mentionStart);
     final after = text.substring(cursor);
