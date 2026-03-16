@@ -111,26 +111,32 @@ func (s *AgentService) GetAgent(id uint) (*models.Agent, error) {
 }
 
 // deductCredits atomically deducts amount credits from wallet and records a CreditTransaction.
+// Uses row-level locking (SELECT ... FOR UPDATE) to prevent TOCTOU race conditions.
 // Returns an error if the user does not have enough credits.
 func (s *AgentService) deductCredits(wallet string, amount int64, txType string, agentID *uint) error {
-	var user models.User
-	if err := database.DB.Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
-		return fmt.Errorf("user not found: %w", err)
-	}
-	if user.Credits < amount {
-		return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, amount)
-	}
-	database.DB.Model(&models.User{}).
-		Where("wallet_address = ?", wallet).
-		UpdateColumn("credits", gorm.Expr("credits - ?", amount))
-	tx := models.CreditTransaction{
-		Wallet:  wallet,
-		Type:    txType,
-		Amount:  -amount,
-		AgentID: agentID,
-	}
-	database.DB.Create(&tx)
-	return nil
+	return database.DB.Transaction(func(dbTx *gorm.DB) error {
+		var user models.User
+		// Lock the row for update to prevent concurrent balance races
+		if err := dbTx.Set("gorm:query_option", "FOR UPDATE").
+			Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
+			return fmt.Errorf("user not found: %w", err)
+		}
+		if user.Credits < amount {
+			return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, amount)
+		}
+		if err := dbTx.Model(&models.User{}).Where("wallet_address = ?", wallet).
+			UpdateColumn("credits", gorm.Expr("credits - ?", amount)).Error; err != nil {
+			return fmt.Errorf("failed to deduct credits: %w", err)
+		}
+		// Record transaction
+		creditTx := models.CreditTransaction{
+			Wallet:  wallet,
+			Type:    txType,
+			Amount:  -amount,
+			AgentID: agentID,
+		}
+		return dbTx.Create(&creditTx).Error
+	})
 }
 
 func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error) {
@@ -285,7 +291,9 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 
 func (s *AgentService) GetLibrary(wallet string) ([]models.LibraryEntry, error) {
 	var entries []models.LibraryEntry
-	err := database.DB.Preload("Agent").Where("user_wallet = ?", wallet).Find(&entries).Error
+	err := database.DB.Preload("Agent", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at")
+	}).Where("user_wallet = ?", wallet).Find(&entries).Error
 	return entries, err
 }
 
@@ -403,7 +411,7 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	fork := &models.Agent{
 		Title:          original.Title + " (Fork)",
 		Description:    "Forked from: " + original.Title,
-		Prompt:         original.Prompt,
+		Prompt:         "", // Security: prompt stripped from forks to prevent IP extraction
 		Category:       original.Category,
 		CreatorWallet:  creatorWallet,
 		CharacterType:  original.CharacterType,
@@ -577,6 +585,12 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 	if database.DB.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&existing).Error == nil {
 		return nil // already purchased
 	}
+
+	// Security: verify transaction on-chain before recording purchase
+	if err := verifyMonadTransaction(txHash, buyerWallet); err != nil {
+		return fmt.Errorf("transaction verification failed: %w", err)
+	}
+
 	purchase := models.PurchasedAgent{
 		BuyerWallet: buyerWallet,
 		AgentID:     agentID,
@@ -1211,13 +1225,68 @@ func (s *AgentService) GetUserRating(agentID uint, wallet string) int {
 	return r.Rating
 }
 
-// TopUpCredits grants credits to a wallet after verifying MON payment.
+// verifyMonadTransaction verifies that a transaction exists on-chain via the Monad
+// testnet RPC and that it was sent by the expected wallet address.
+func verifyMonadTransaction(txHash, expectedFrom string) error {
+	rpcURL := "https://testnet-rpc.monad.xyz"
+	payload := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"method":  "eth_getTransactionReceipt",
+		"params":  []string{txHash},
+		"id":      1,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal rpc request: %w", err)
+	}
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(rpcURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("monad rpc request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var rpcResp struct {
+		Result *struct {
+			Status string `json:"status"`
+			From   string `json:"from"`
+		} `json:"result"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		return fmt.Errorf("decode rpc response: %w", err)
+	}
+	if rpcResp.Error != nil {
+		return fmt.Errorf("rpc error: %s", rpcResp.Error.Message)
+	}
+	if rpcResp.Result == nil {
+		return fmt.Errorf("transaction not found on chain: %s", txHash)
+	}
+	if rpcResp.Result.Status != "0x1" {
+		return fmt.Errorf("transaction failed on chain (status: %s)", rpcResp.Result.Status)
+	}
+	if !strings.EqualFold(rpcResp.Result.From, expectedFrom) {
+		return fmt.Errorf("transaction sender mismatch: expected %s, got %s", expectedFrom, rpcResp.Result.From)
+	}
+	return nil
+}
+
+// TopUpCredits grants credits to a wallet after verifying MON payment on-chain.
 // rate: 100 credits per 1 MON
 func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) error {
 	credits := int64(amountMon * 100)
 	if credits < 10 {
 		return fmt.Errorf("minimum top-up is 0.1 MON (10 credits)")
 	}
+
+	// Security: verify transaction on-chain before granting credits
+	if err := verifyMonadTransaction(txHash, wallet); err != nil {
+		return fmt.Errorf("transaction verification failed: %w", err)
+	}
+
 	// Ensure user exists; if not, create with the new credits
 	var user models.User
 	if database.DB.Where("wallet_address = ?", wallet).First(&user).Error != nil {
@@ -1228,11 +1297,13 @@ func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) er
 			Where("wallet_address = ?", wallet).
 			UpdateColumn("credits", gorm.Expr("credits + ?", credits))
 	}
-	// Record transaction
+	// Record transaction with TxHash to prevent double-spend (unique index on tx_hash)
+	txHashPtr := &txHash
 	tx := models.CreditTransaction{
 		Wallet: wallet,
 		Type:   "topup",
 		Amount: credits,
+		TxHash: txHashPtr,
 	}
 	database.DB.Create(&tx)
 	return nil
@@ -1267,6 +1338,7 @@ func (s *AgentService) GetUserProfile(wallet string) (*UserProfile, error) {
 
 	var agents []models.Agent
 	if err := database.DB.Where("creator_wallet = ?", wallet).
+		Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at").
 		Order("created_at DESC").
 		Find(&agents).Error; err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -47,7 +48,8 @@ func (h *AgentHandler) ListAgents(c *gin.Context) {
 	sort := c.DefaultQuery("sort", "newest")
 	agents, total, err := h.agentSvc.ListAgents(c.Query("category"), search, sort, page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.ListAgents] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"agents": agents, "total": total, "page": page, "limit": limit})
@@ -123,7 +125,8 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 	input.CreatorWallet = c.GetString("wallet")
 	agent, err := h.agentSvc.CreateAgent(input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.CreateAgent] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusCreated, agent)
@@ -132,7 +135,8 @@ func (h *AgentHandler) CreateAgent(c *gin.Context) {
 func (h *AgentHandler) GetLibrary(c *gin.Context) {
 	entries, err := h.agentSvc.GetLibrary(c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetLibrary] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"entries": entries})
@@ -145,7 +149,8 @@ func (h *AgentHandler) AddToLibrary(c *gin.Context) {
 		return
 	}
 	if err := h.agentSvc.AddToLibrary(c.GetString("wallet"), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.AddToLibrary] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "added to library"})
@@ -158,7 +163,8 @@ func (h *AgentHandler) RemoveFromLibrary(c *gin.Context) {
 		return
 	}
 	if err := h.agentSvc.RemoveFromLibrary(c.GetString("wallet"), uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.RemoveFromLibrary] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "removed"})
@@ -167,7 +173,8 @@ func (h *AgentHandler) RemoveFromLibrary(c *gin.Context) {
 func (h *AgentHandler) GetCredits(c *gin.Context) {
 	credits, err := h.agentSvc.GetUserCredits(c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetCredits] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"credits": credits, "wallet": c.GetString("wallet")})
@@ -177,7 +184,8 @@ func (h *AgentHandler) GetCredits(c *gin.Context) {
 func (h *AgentHandler) TrendingAgents(c *gin.Context) {
 	agents, err := h.agentSvc.GetTrending()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.TrendingAgents] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"agents": agents, "count": len(agents)})
@@ -192,7 +200,8 @@ func (h *AgentHandler) ForkAgent(c *gin.Context) {
 	}
 	agent, err := h.agentSvc.ForkAgent(uint(id), c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.ForkAgent] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusCreated, agent)
@@ -232,7 +241,8 @@ func (h *AgentHandler) ChatWithAgent(c *gin.Context) {
 
 	reply, err := h.agentSvc.ChatWithAgent(uint(id), body.Message)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.ChatWithAgent] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"reply": reply, "agent_id": id})
@@ -873,7 +883,8 @@ func (h *AgentHandler) UpdateAgent(c *gin.Context) {
 		} else if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Printf("[AgentHandler.UpdateAgent] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		}
 		return
 	}
@@ -898,7 +909,8 @@ func (h *AgentHandler) RegenerateImage(c *gin.Context) {
 		} else if strings.Contains(err.Error(), "not found") {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			log.Printf("[AgentHandler.RegenerateImage] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		}
 		return
 	}
@@ -923,7 +935,8 @@ func (h *AgentHandler) UpdateProfile(c *gin.Context) {
 func (h *AgentHandler) GetUserProfile(c *gin.Context) {
 	profile, err := h.agentSvc.GetUserProfile(c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetUserProfile] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, profile)
@@ -938,7 +951,8 @@ func (h *AgentHandler) GetPublicProfile(c *gin.Context) {
 	}
 	profile, err := h.agentSvc.GetUserProfile(wallet)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetPublicProfile] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, profile)
@@ -948,7 +962,8 @@ func (h *AgentHandler) GetPublicProfile(c *gin.Context) {
 func (h *AgentHandler) GetCreditHistory(c *gin.Context) {
 	txs, err := h.agentSvc.GetCreditHistory(c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetCreditHistory] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	// Include current balance
@@ -960,7 +975,8 @@ func (h *AgentHandler) GetCreditHistory(c *gin.Context) {
 func (h *AgentHandler) GetLeaderboard(c *gin.Context) {
 	rankings, err := h.agentSvc.GetLeaderboard()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetLeaderboard] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"rankings": rankings, "count": len(rankings)})
@@ -986,7 +1002,8 @@ func (h *AgentHandler) RecordPurchase(c *gin.Context) {
 		return
 	}
 	if err := h.agentSvc.RecordPurchase(c.GetString("wallet"), uint(id), body.TxHash, body.AmountMon); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.RecordPurchase] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"purchased": true, "agent_id": id})
@@ -1038,7 +1055,8 @@ func (h *AgentHandler) GetRatings(c *gin.Context) {
 	}
 	ratings, avg, count, err := h.agentSvc.GetRatings(uint(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AgentHandler.GetRatings] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	wallet := c.GetString("wallet")

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -23,7 +24,8 @@ func NewWorkspaceHandler(missionSvc *services.MissionService, legendSvc *service
 func (h *WorkspaceHandler) GetMissions(c *gin.Context) {
 	missions, err := h.missionSvc.ListUserMissions(c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[WorkspaceHandler.GetMissions] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"missions": missions})
@@ -47,7 +49,8 @@ func (h *WorkspaceHandler) SaveMission(c *gin.Context) {
 // DeleteMission deletes a mission by client ID.
 func (h *WorkspaceHandler) DeleteMission(c *gin.Context) {
 	if err := h.missionSvc.DeleteUserMission(c.GetString("wallet"), c.Param("id")); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[WorkspaceHandler.DeleteMission] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "mission deleted"})
@@ -62,7 +65,8 @@ func (h *WorkspaceHandler) ExpandMissions(c *gin.Context) {
 	}
 	result, err := h.missionSvc.ExpandMissionTags(c.GetString("wallet"), input.Text)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[WorkspaceHandler.ExpandMissions] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, result)
@@ -72,7 +76,8 @@ func (h *WorkspaceHandler) ExpandMissions(c *gin.Context) {
 func (h *WorkspaceHandler) GetLegendWorkflows(c *gin.Context) {
 	workflows, err := h.legendSvc.ListUserWorkflows(c.GetString("wallet"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[WorkspaceHandler.GetLegendWorkflows] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"workflows": workflows})
@@ -96,7 +101,8 @@ func (h *WorkspaceHandler) SaveLegendWorkflow(c *gin.Context) {
 // DeleteLegendWorkflow deletes a workflow by client ID.
 func (h *WorkspaceHandler) DeleteLegendWorkflow(c *gin.Context) {
 	if err := h.legendSvc.DeleteUserWorkflow(c.GetString("wallet"), c.Param("id")); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[WorkspaceHandler.DeleteLegendWorkflow] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "workflow deleted"})
@@ -145,7 +151,8 @@ func (h *WorkspaceHandler) ListExecutions(c *gin.Context) {
 	workflowID := c.Query("workflow_id")
 	executions, total, err := h.legendSvc.ListExecutions(c.GetString("wallet"), workflowID, page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[WorkspaceHandler.ListExecutions] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{

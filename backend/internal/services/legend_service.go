@@ -296,24 +296,30 @@ func topologicalSort(nodes []WorkflowNodeParsed, adj map[string][]string, inDegr
 }
 
 // deductCredits atomically deducts credits and records a CreditTransaction.
+// Uses row-level locking (SELECT ... FOR UPDATE) to prevent TOCTOU race conditions.
 func (s *LegendService) deductCredits(wallet string, amount int64, executionID uint) error {
-	var user models.User
-	if err := database.DB.Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
-		return fmt.Errorf("user not found: %w", err)
-	}
-	if user.Credits < amount {
-		return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, amount)
-	}
-	database.DB.Model(&models.User{}).
-		Where("wallet_address = ?", wallet).
-		UpdateColumn("credits", gorm.Expr("credits - ?", amount))
-	tx := models.CreditTransaction{
-		Wallet: wallet,
-		Type:   "workflow_execute",
-		Amount: -amount,
-	}
-	database.DB.Create(&tx)
-	return nil
+	return database.DB.Transaction(func(dbTx *gorm.DB) error {
+		var user models.User
+		// Lock the row for update to prevent concurrent balance races
+		if err := dbTx.Set("gorm:query_option", "FOR UPDATE").
+			Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
+			return fmt.Errorf("user not found: %w", err)
+		}
+		if user.Credits < amount {
+			return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, amount)
+		}
+		if err := dbTx.Model(&models.User{}).Where("wallet_address = ?", wallet).
+			UpdateColumn("credits", gorm.Expr("credits - ?", amount)).Error; err != nil {
+			return fmt.Errorf("failed to deduct credits: %w", err)
+		}
+		// Record transaction
+		creditTx := models.CreditTransaction{
+			Wallet: wallet,
+			Type:   "workflow_execute",
+			Amount: -amount,
+		}
+		return dbTx.Create(&creditTx).Error
+	})
 }
 
 // executeNode runs a single workflow node and returns its output.

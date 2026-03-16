@@ -56,7 +56,8 @@
       "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\backend\" && go get github.com/google/uuid && go vet ./... 2>&1)",
       "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && flutter pub get 2>&1 | tail -5)",
       "Bash(grep:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(docker-compose build:*)"
     ]
   }
 }

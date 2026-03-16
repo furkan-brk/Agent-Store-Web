@@ -89,7 +89,7 @@ Agent prompt:
 
 Return ONLY the JSON object. No markdown, no explanation.`, excerpt)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, s.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent", geminiBase, flashModel)
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -106,7 +106,8 @@ Return ONLY the JSON object. No markdown, no explanation.`, excerpt)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", s.apiKey)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
@@ -383,7 +384,7 @@ Be specific about their roles — do not be generic.
 
 Return ONLY the narrative text. No JSON, no markdown, no bullet points.`, agentList)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, s.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent", geminiBase, flashModel)
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -400,7 +401,8 @@ Return ONLY the narrative text. No JSON, no markdown, no bullet points.`, agentL
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", s.apiKey)
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {

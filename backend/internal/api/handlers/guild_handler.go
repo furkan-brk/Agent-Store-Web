@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -26,7 +27,8 @@ func (h *GuildHandler) ListGuilds(c *gin.Context) {
 	}
 	guilds, total, err := h.guildSvc.ListGuilds(page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[GuildHandler.ListGuilds] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"guilds": guilds, "total": total, "page": page, "limit": limit})
@@ -45,7 +47,8 @@ func (h *GuildHandler) CreateGuild(c *gin.Context) {
 	input.CreatorWallet = c.GetString("wallet")
 	guild, err := h.guildSvc.CreateGuild(input)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[GuildHandler.CreateGuild] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusCreated, guild)

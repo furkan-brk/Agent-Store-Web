@@ -14,7 +14,10 @@ RUN set -eux; \
 
 FROM alpine:3.19
 RUN apk --no-cache add ca-certificates tzdata
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/server .
+RUN chown appuser:appgroup ./server
+USER appuser
 EXPOSE 8080
 CMD ["./server"]

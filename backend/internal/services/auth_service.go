@@ -81,6 +81,13 @@ func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, er
 	expected := common.HexToAddress(wallet)
 	match := strings.EqualFold(recovered.Hex(), expected.Hex())
 	log.Printf("[AUTH] recovered=%s expected=%s match=%v msg_len=%d", recovered.Hex(), expected.Hex(), match, len(signable))
+
+	// Rotate nonce after successful verification to prevent replay attacks
+	if match {
+		newNonce, _ := generateNonce()
+		database.DB.Model(&user).Update("nonce", newNonce)
+	}
+
 	return match, nil
 }
 

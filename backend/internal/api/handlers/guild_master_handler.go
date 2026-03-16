@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/agentstore/backend/internal/services"
@@ -28,7 +29,8 @@ func (h *GuildMasterHandler) Suggest(c *gin.Context) {
 	}
 	suggestion, err := h.gmSvc.SuggestGuild(body.Problem)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[GuildMasterHandler.Suggest] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, suggestion)
@@ -48,7 +50,8 @@ func (h *GuildMasterHandler) TeamChat(c *gin.Context) {
 	}
 	responses, err := h.gmSvc.TeamChat(body.Message, body.AgentIDs)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[GuildMasterHandler.TeamChat] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"responses": responses})

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -14,6 +16,12 @@ import (
 
 func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembgURL string) *gin.Engine {
 	r := gin.Default()
+
+	// Request body size limit — 2MB to prevent OOM from oversized requests
+	r.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2<<20) // 2MB
+		c.Next()
+	})
 
 	// Parse comma-separated origins from config.
 	allowed := map[string]struct{}{}
@@ -32,12 +40,19 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembg
 		if _, ok := allowed[origin]; ok {
 			return true
 		}
-		// Allow preview/staging domains used by this project.
-		if strings.HasSuffix(origin, ".vercel.app") || strings.HasSuffix(origin, ".up.railway.app") {
+		// Only allow our specific Vercel deployments, not any *.vercel.app
+		if strings.Contains(origin, "agent-store") && strings.HasSuffix(origin, ".vercel.app") {
 			return true
 		}
-		if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
+		// Allow our specific Railway deployments
+		if strings.Contains(origin, "agent-store") && strings.HasSuffix(origin, ".up.railway.app") {
 			return true
+		}
+		// Only allow localhost in non-production
+		if os.Getenv("RAILWAY_ENVIRONMENT") != "production" {
+			if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
+				return true
+			}
 		}
 		return false
 	}
@@ -70,6 +85,12 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembg
 	// Rate limiter: 20 requests per minute on auth endpoints to mitigate brute-force
 	authRL := middleware.NewRateLimiter(20, 1*time.Minute)
 
+	// Per-user rate limiters for expensive AI endpoints
+	createRL := middleware.NewRateLimiter(10, 1*time.Hour)    // Agent creation: 10/hour
+	chatRL := middleware.NewRateLimiter(30, 1*time.Minute)    // Chat: 30/min
+	forkRL := middleware.NewRateLimiter(10, 1*time.Hour)      // Fork: 10/hour
+	gmRL := middleware.NewRateLimiter(20, 1*time.Minute)      // Guild master: 20/min
+
 	authH := handlers.NewAuthHandler(authSvc)
 	agentH := handlers.NewAgentHandler(agentSvc)
 	guildH := handlers.NewGuildHandler(guildSvc)
@@ -88,11 +109,11 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembg
 		agents.GET("", agentH.ListAgents)
 		agents.GET("/trending", agentH.TrendingAgents)
 		agents.GET("/:id", middleware.OptionalAuthMiddleware(authSvc), agentH.GetAgent)
-		agents.POST("", middleware.AuthMiddleware(authSvc), agentH.CreateAgent)
+		agents.POST("", middleware.AuthMiddleware(authSvc), createRL.WalletMiddleware(), agentH.CreateAgent)
 		agents.PUT("/:id", middleware.AuthMiddleware(authSvc), agentH.UpdateAgent)
-		agents.POST("/:id/regenerate-image", middleware.AuthMiddleware(authSvc), agentH.RegenerateImage)
-		agents.POST("/:id/fork", middleware.AuthMiddleware(authSvc), agentH.ForkAgent)
-		agents.POST("/:id/chat", middleware.AuthMiddleware(authSvc), agentH.ChatWithAgent)
+		agents.POST("/:id/regenerate-image", middleware.AuthMiddleware(authSvc), createRL.WalletMiddleware(), agentH.RegenerateImage)
+		agents.POST("/:id/fork", middleware.AuthMiddleware(authSvc), forkRL.WalletMiddleware(), agentH.ForkAgent)
+		agents.POST("/:id/chat", middleware.AuthMiddleware(authSvc), chatRL.WalletMiddleware(), agentH.ChatWithAgent)
 		agents.POST("/:id/trial", middleware.AuthMiddleware(authSvc), agentH.GenerateTrialToken)
 		agents.POST("/:id/purchase", middleware.AuthMiddleware(authSvc), agentH.RecordPurchase)
 		agents.GET("/:id/purchase-status", middleware.AuthMiddleware(authSvc), agentH.GetPurchaseStatus)
@@ -136,7 +157,7 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembg
 		guilds.DELETE("/:id/join", middleware.AuthMiddleware(authSvc), guildH.LeaveGuild)
 		guilds.GET("/:id/compatibility", guildH.GetCompatibility)
 
-		gm := v1.Group("/guild-master")
+		gm := v1.Group("/guild-master", middleware.AuthMiddleware(authSvc), gmRL.WalletMiddleware())
 		gm.POST("/suggest", gmH.Suggest)
 		gm.POST("/chat", gmH.TeamChat)
 	}

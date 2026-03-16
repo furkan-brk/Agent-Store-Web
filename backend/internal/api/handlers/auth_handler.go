@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"regexp"
 
@@ -23,7 +24,8 @@ func (h *AuthHandler) GetNonce(c *gin.Context) {
 	}
 	nonce, err := h.authSvc.GetNonce(wallet)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("[AuthHandler.GetNonce] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"nonce": nonce, "message": "Sign this nonce: " + nonce})

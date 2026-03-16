@@ -1,11 +1,14 @@
+## WARNING: Default credentials below are for LOCAL DEVELOPMENT ONLY.
+## In production, set POSTGRES_USER and POSTGRES_PASSWORD via environment
+## variables or a .env file with strong, unique values. Never deploy with defaults.
 services:
   postgres:
     image: postgres:16-alpine
     container_name: agent_store_db
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-agent_store}
-      POSTGRES_USER: ${POSTGRES_USER:-agent_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_pass}
+      POSTGRES_USER: ${POSTGRES_USER:-agent_user}          # CHANGE IN PRODUCTION
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agent_pass}   # CHANGE IN PRODUCTION
     ports:
       - "5433:5432"
     volumes:

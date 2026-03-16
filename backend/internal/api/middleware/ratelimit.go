@@ -50,7 +50,7 @@ func (rl *RateLimiter) cleanup() {
 	}
 }
 
-// Middleware returns a Gin middleware that enforces the rate limit.
+// Middleware returns a Gin middleware that enforces the rate limit using client IP as the key.
 func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
@@ -62,6 +62,40 @@ func (rl *RateLimiter) Middleware() gin.HandlerFunc {
 		if !exists || now.After(e.windowEnd) {
 			// Start a new window
 			rl.visitors[ip] = &entry{count: 1, windowEnd: now.Add(rl.window)}
+			rl.mu.Unlock()
+			c.Next()
+			return
+		}
+
+		e.count++
+		if e.count > rl.limit {
+			rl.mu.Unlock()
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"error": "rate limit exceeded, try again later",
+			})
+			return
+		}
+		rl.mu.Unlock()
+		c.Next()
+	}
+}
+
+// WalletMiddleware returns a Gin middleware that enforces rate limits per authenticated
+// wallet address (from JWT context). Must be placed AFTER auth middleware so that
+// c.GetString("wallet") is populated. Falls back to IP if wallet is not set.
+func (rl *RateLimiter) WalletMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		key := c.GetString("wallet")
+		if key == "" {
+			key = c.ClientIP()
+		}
+
+		rl.mu.Lock()
+		e, exists := rl.visitors[key]
+		now := time.Now()
+
+		if !exists || now.After(e.windowEnd) {
+			rl.visitors[key] = &entry{count: 1, windowEnd: now.Add(rl.window)}
 			rl.mu.Unlock()
 			c.Next()
 			return

@@ -2,6 +2,7 @@ package database
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/agentstore/backend/internal/models"
@@ -20,9 +21,15 @@ func IsReady() bool {
 // ConnectWithRetry retries DB connection indefinitely until successful.
 // Called in a goroutine so the HTTP server can start (and pass healthcheck) immediately.
 func ConnectWithRetry(dsn string) {
+	// Use Warn level in production to prevent SQL parameter leakage in logs
+	logLevel := logger.Info
+	if os.Getenv("RAILWAY_ENVIRONMENT") == "production" || os.Getenv("GO_ENV") == "production" {
+		logLevel = logger.Warn
+	}
+
 	for attempt := 1; ; attempt++ {
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger: logger.Default.LogMode(logger.Info),
+			Logger: logger.Default.LogMode(logLevel),
 		})
 		if err == nil {
 			DB = db

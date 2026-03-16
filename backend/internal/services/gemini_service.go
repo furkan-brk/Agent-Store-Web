@@ -173,7 +173,7 @@ Rarity: common(<80chars,generic) uncommon(somewhat specific) rare(detailed+perso
 
 Agent prompt: %s`, desc)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent", geminiBase, flashModel)
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -193,7 +193,8 @@ Agent prompt: %s`, desc)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", g.apiKey)
 
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
@@ -279,7 +280,7 @@ Rules:
 - The character should clearly reflect the AI agent's actual domain and purpose
 - If the concept suggests multiple roles, blend them into one cohesive medieval character`, concept)
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent", geminiBase, flashModel)
 
 	reqBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
@@ -302,6 +303,7 @@ Rules:
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", g.apiKey)
 
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
@@ -354,7 +356,7 @@ func (g *GeminiService) callImagen(prompt string) (string, error) {
 	if g.apiKey == "" {
 		return "", fmt.Errorf("gemini api key not configured")
 	}
-	url := fmt.Sprintf("%s/models/%s:predict?key=%s", geminiBase, imagenModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:predict", geminiBase, imagenModel)
 
 	reqBody := map[string]interface{}{
 		"instances": []map[string]interface{}{
@@ -376,7 +378,8 @@ func (g *GeminiService) callImagen(prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", g.apiKey)
 
 	resp, err := g.httpClient.Do(req)
 	if err != nil {
@@ -496,7 +499,7 @@ func (g *GeminiService) Chat(systemPrompt, userMessage string) (string, error) {
 		return "", fmt.Errorf("gemini api key not configured")
 	}
 
-	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", geminiBase, flashModel, g.apiKey)
+	url := fmt.Sprintf("%s/models/%s:generateContent", geminiBase, flashModel)
 
 	reqBody := map[string]interface{}{
 		"systemInstruction": map[string]interface{}{
@@ -523,7 +526,8 @@ func (g *GeminiService) Chat(systemPrompt, userMessage string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("content-type", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", g.apiKey)
 
 	resp, err := g.httpClient.Do(req)
 	if err != nil {

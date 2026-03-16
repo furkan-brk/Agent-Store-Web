@@ -49,7 +49,7 @@ class AgentStoreApp extends StatelessWidget {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           telemetry.markFirstFrame();
         });
-        return child ?? const SizedBox.shrink();
+        return SelectionArea(child: child ?? const SizedBox.shrink());
       },
     );
   }
