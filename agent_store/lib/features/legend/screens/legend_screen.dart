@@ -1655,55 +1655,41 @@ class _RenameNodeDialogWithMentionsState extends State<_RenameNodeDialogWithMent
                             )
                           : ListView.builder(
                               shrinkWrap: true,
+                              padding: EdgeInsets.zero,
                               itemCount: _agentSuggestions.length,
                               itemBuilder: (_, i) {
                                 final agent = _agentSuggestions[i];
                                 final isSelected = i == _selectedSuggestionIndex;
-                                return Material(
-                                  color: Colors.transparent,
-                                  child: ListTile(
-                                    dense: true,
-                                    visualDensity: VisualDensity.compact,
-                                    selected: isSelected,
-                                    selectedTileColor: AppTheme.primary.withValues(alpha: 0.14),
-                                    hoverColor: AppTheme.primary.withValues(alpha: 0.08),
-                                    title: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primary.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: const Text(
-                                            '@',
-                                            style: TextStyle(
-                                              color: AppTheme.primary,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                return Container(
+                                  color: isSelected ? AppTheme.primary.withValues(alpha: 0.2) : Colors.transparent,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: ListTile(
+                                      dense: true,
+                                      visualDensity: VisualDensity.compact,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      hoverColor: AppTheme.primary.withValues(alpha: 0.12),
+                                      title: Text(
+                                        agent.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppTheme.textH,
+                                          fontSize: 12,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            agent.title,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: AppTheme.textH,
-                                              fontSize: 13,
-                                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                      ),
+                                      subtitle: Text(
+                                        agent.characterType.displayName,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: AppTheme.textM, fontSize: 10),
+                                      ),
+                                      trailing: isSelected
+                                          ? const Icon(Icons.check_circle, color: AppTheme.primary, size: 18)
+                                          : null,
+                                      onTap: () => _insertMention(agent),
                                     ),
-                                    subtitle: Text(
-                                      agent.characterType.displayName,
-                                      style: const TextStyle(color: AppTheme.textM, fontSize: 11),
-                                    ),
-                                    onTap: () => _insertMention(agent),
                                   ),
                                 );
                               },
@@ -1718,57 +1704,41 @@ class _RenameNodeDialogWithMentionsState extends State<_RenameNodeDialogWithMent
                             )
                           : ListView.builder(
                               shrinkWrap: true,
+                              padding: EdgeInsets.zero,
                               itemCount: _missionSuggestions.length,
                               itemBuilder: (_, i) {
                                 final mission = _missionSuggestions[i];
                                 final isSelected = i == _selectedSuggestionIndex;
-                                return Material(
-                                  color: Colors.transparent,
-                                  child: ListTile(
-                                    dense: true,
-                                    visualDensity: VisualDensity.compact,
-                                    selected: isSelected,
-                                    selectedTileColor: AppTheme.gold.withValues(alpha: 0.12),
-                                    hoverColor: AppTheme.gold.withValues(alpha: 0.08),
-                                    title: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.gold.withValues(alpha: 0.2),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: const Text(
-                                            '#',
-                                            style: TextStyle(
-                                              color: AppTheme.gold,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                return Container(
+                                  color: isSelected ? AppTheme.gold.withValues(alpha: 0.15) : Colors.transparent,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: ListTile(
+                                      dense: true,
+                                      visualDensity: VisualDensity.compact,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      hoverColor: AppTheme.gold.withValues(alpha: 0.1),
+                                      title: Text(
+                                        '#${mission.slug}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: AppTheme.gold,
+                                          fontSize: 12,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            mission.slug,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: AppTheme.textH,
-                                              fontSize: 13,
-                                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                      ),
+                                      subtitle: Text(
+                                        mission.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: AppTheme.textM, fontSize: 10),
+                                      ),
+                                      trailing: isSelected
+                                          ? const Icon(Icons.check_circle, color: AppTheme.gold, size: 18)
+                                          : null,
+                                      onTap: () => _insertMission(mission),
                                     ),
-                                    subtitle: Text(
-                                      mission.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: AppTheme.textM, fontSize: 11),
-                                    ),
-                                    onTap: () => _insertMission(mission),
                                   ),
                                 );
                               },
