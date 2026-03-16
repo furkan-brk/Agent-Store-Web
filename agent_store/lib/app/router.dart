@@ -39,6 +39,10 @@ class _GoGuildIntent extends Intent {
   const _GoGuildIntent();
 }
 
+class _GoLegendIntent extends Intent {
+  const _GoLegendIntent();
+}
+
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -46,7 +50,7 @@ class AppRouter {
       ShellRoute(
         builder: (_, __, child) => _AppShell(child: child),
         routes: [
-          GoRoute(path: '/',          builder: (_, __) => const StoreScreen()),
+          GoRoute(path: '/', builder: (_, __) => const StoreScreen()),
           GoRoute(
             path: '/agent/:id',
             builder: (ctx, s) {
@@ -58,11 +62,11 @@ class AppRouter {
               return AgentDetailScreen(agentId: id);
             },
           ),
-          GoRoute(path: '/library',       builder: (_, __) => const LibraryScreen()),
-          GoRoute(path: '/create',        builder: (_, __) => const CreateAgentScreen()),
-          GoRoute(path: '/wallet',        builder: (_, __) => const WalletConnectScreen()),
-          GoRoute(path: '/guild',         builder: (_, __) => const GuildScreen()),
-          GoRoute(path: '/guild/create',  builder: (_, __) => const GuildCreateScreen()),
+          GoRoute(path: '/library', builder: (_, __) => const LibraryScreen()),
+          GoRoute(path: '/create', builder: (_, __) => const CreateAgentScreen()),
+          GoRoute(path: '/wallet', builder: (_, __) => const WalletConnectScreen()),
+          GoRoute(path: '/guild', builder: (_, __) => const GuildScreen()),
+          GoRoute(path: '/guild/create', builder: (_, __) => const GuildCreateScreen()),
           GoRoute(
             path: '/guild/:id',
             builder: (ctx, s) {
@@ -87,11 +91,11 @@ class AppRouter {
             },
           ),
           GoRoute(path: '/credits/history', builder: (_, __) => const CreditHistoryScreen()),
-          GoRoute(path: '/leaderboard',     builder: (_, __) => const LeaderboardScreen()),
-          GoRoute(path: '/missions',        builder: (_, __) => const MissionsScreen()),
-          GoRoute(path: '/legend',          builder: (_, __) => const LegendScreen()),
-          GoRoute(path: '/creator',         builder: (_, __) => const CreatorDashboardScreen()),
-          GoRoute(path: '/settings',        builder: (_, __) => const SettingsScreen()),
+          GoRoute(path: '/leaderboard', builder: (_, __) => const LeaderboardScreen()),
+          GoRoute(path: '/missions', builder: (_, __) => const MissionsScreen()),
+          GoRoute(path: '/legend', builder: (_, __) => const LegendScreen()),
+          GoRoute(path: '/creator', builder: (_, __) => const CreatorDashboardScreen()),
+          GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           GoRoute(
             path: '/profile/:wallet',
             builder: (_, s) => PublicProfileScreen(wallet: s.pathParameters['wallet']!),
@@ -124,27 +128,44 @@ class _AppShellState extends State<_AppShell> {
         SingleActivator(LogicalKeyboardKey.keyL, alt: true): _GoLibraryIntent(),
         SingleActivator(LogicalKeyboardKey.keyC, alt: true): _GoCreateIntent(),
         SingleActivator(LogicalKeyboardKey.keyG, alt: true): _GoGuildIntent(),
+        SingleActivator(LogicalKeyboardKey.keyW, alt: true): _GoLegendIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
           _GoStoreIntent: CallbackAction<_GoStoreIntent>(
-            onInvoke: (_) { context.go('/'); return null; },
+            onInvoke: (_) {
+              context.go('/');
+              return null;
+            },
           ),
           _GoLibraryIntent: CallbackAction<_GoLibraryIntent>(
-            onInvoke: (_) { context.go('/library'); return null; },
+            onInvoke: (_) {
+              context.go('/library');
+              return null;
+            },
           ),
           _GoCreateIntent: CallbackAction<_GoCreateIntent>(
-            onInvoke: (_) { context.go('/create'); return null; },
+            onInvoke: (_) {
+              context.go('/create');
+              return null;
+            },
           ),
           _GoGuildIntent: CallbackAction<_GoGuildIntent>(
-            onInvoke: (_) { context.go('/guild'); return null; },
+            onInvoke: (_) {
+              context.go('/guild');
+              return null;
+            },
+          ),
+          _GoLegendIntent: CallbackAction<_GoLegendIntent>(
+            onInvoke: (_) {
+              context.go('/legend');
+              return null;
+            },
           ),
         },
         child: Focus(
           autofocus: true,
-          child: isNarrow
-              ? _NarrowLayout(child: widget.child)
-              : _WideLayout(child: widget.child),
+          child: isNarrow ? _NarrowLayout(child: widget.child) : _WideLayout(child: widget.child),
         ),
       ),
     );
@@ -272,32 +293,79 @@ class _Sidebar extends StatelessWidget {
 
             // ── Primary ──
             _SectionLabel(label: 'EXPLORE', colorScheme: colorScheme),
-            _NavItem(icon: Icons.storefront_outlined,  label: 'Store',   path: '/',        loc: loc, tooltip: 'Alt+S', isDrawer: isDrawer),
-            _NavItem(icon: Icons.bookmarks_outlined,   label: 'Library', path: '/library', loc: loc, tooltip: 'Alt+L', isDrawer: isDrawer),
-            _NavItem(icon: Icons.add_circle_outline,   label: 'Create Agent', path: '/create', loc: loc, tooltip: 'Alt+C', isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.storefront_outlined,
+                label: 'Store',
+                path: '/',
+                loc: loc,
+                tooltip: 'Alt+S',
+                isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.bookmarks_outlined,
+                label: 'Library',
+                path: '/library',
+                loc: loc,
+                tooltip: 'Alt+L',
+                isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.add_circle_outline,
+                label: 'Create Agent',
+                path: '/create',
+                loc: loc,
+                tooltip: 'Alt+C',
+                isDrawer: isDrawer),
 
             const SizedBox(height: 16),
 
             // ── Community ──
             _SectionLabel(label: 'COMMUNITY', colorScheme: colorScheme),
-            _NavItem(icon: Icons.groups_outlined,          label: 'Guilds',        path: '/guild',        loc: loc, tooltip: 'Alt+G', isDrawer: isDrawer),
-            _NavItem(icon: Icons.auto_awesome_outlined,    label: 'Guild Master',  path: '/guild-master', loc: loc, tooltip: 'AI Team Builder', isDrawer: isDrawer),
-            _NavItem(icon: Icons.emoji_events_outlined,    label: 'Leaderboard',   path: '/leaderboard',  loc: loc, isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.groups_outlined,
+                label: 'Guilds',
+                path: '/guild',
+                loc: loc,
+                tooltip: 'Alt+G',
+                isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.auto_awesome_outlined,
+                label: 'Guild Master',
+                path: '/guild-master',
+                loc: loc,
+                tooltip: 'AI Team Builder',
+                isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.emoji_events_outlined,
+                label: 'Leaderboard',
+                path: '/leaderboard',
+                loc: loc,
+                isDrawer: isDrawer),
 
             const SizedBox(height: 16),
 
             // ── Missions ──
             _SectionLabel(label: 'MISSIONS', colorScheme: colorScheme),
-            _NavItem(icon: Icons.flag_outlined,            label: 'Missions',      path: '/missions',     loc: loc, isDrawer: isDrawer),
-            _NavItem(icon: Icons.auto_awesome_outlined,    label: 'Legend',        path: '/legend',       loc: loc, isDrawer: isDrawer),
+            _NavItem(icon: Icons.flag_outlined, label: 'Missions', path: '/missions', loc: loc, isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.account_tree_outlined,
+                label: 'Legend',
+                path: '/legend',
+                loc: loc,
+                tooltip: 'Alt+W',
+                isDrawer: isDrawer),
 
             const SizedBox(height: 16),
 
             // ── Account ──
             _SectionLabel(label: 'ACCOUNT', colorScheme: colorScheme),
-            _NavItem(icon: Icons.analytics_outlined,                label: 'Dashboard', path: '/creator',  loc: loc, isDrawer: isDrawer),
-            _NavItem(icon: Icons.settings_outlined,                 label: 'Settings',  path: '/settings', loc: loc, isDrawer: isDrawer),
-            _NavItem(icon: Icons.account_balance_wallet_outlined,   label: 'Wallet',    path: '/wallet',   loc: loc, isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.analytics_outlined, label: 'Dashboard', path: '/creator', loc: loc, isDrawer: isDrawer),
+            _NavItem(icon: Icons.settings_outlined, label: 'Settings', path: '/settings', loc: loc, isDrawer: isDrawer),
+            _NavItem(
+                icon: Icons.account_balance_wallet_outlined,
+                label: 'Wallet',
+                path: '/wallet',
+                loc: loc,
+                isDrawer: isDrawer),
 
             const Spacer(),
 
@@ -485,9 +553,7 @@ class _NavItem extends StatefulWidget {
 class _NavItemState extends State<_NavItem> {
   bool _hovered = false;
 
-  bool get _selected =>
-      widget.loc == widget.path ||
-      (widget.path != '/' && widget.loc.startsWith(widget.path));
+  bool get _selected => widget.loc == widget.path || (widget.path != '/' && widget.loc.startsWith(widget.path));
 
   @override
   Widget build(BuildContext context) {

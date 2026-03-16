@@ -69,9 +69,7 @@ class _LegendScreenState extends State<LegendScreen> {
 
   Future<void> _loadData() async {
     setState(() => _loadingAgents = true);
-    final agents = ApiService.instance.isAuthenticated
-        ? await ApiService.instance.getLibrary()
-        : <AgentModel>[];
+    final agents = ApiService.instance.isAuthenticated ? await ApiService.instance.getLibrary() : <AgentModel>[];
     if (!mounted) return;
     setState(() {
       _libraryAgents = agents;
@@ -79,6 +77,236 @@ class _LegendScreenState extends State<LegendScreen> {
       _savedWorkflows = LegendService.instance.workflows;
       _loadingAgents = false;
     });
+  }
+
+  bool get _hasCanvasContent => _nodes.isNotEmpty || _edges.isNotEmpty;
+
+  int get _workflowCount => _savedWorkflows.length;
+
+  void _showNotice(String message, {Color background = AppTheme.info}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: background,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  Future<void> _confirmReplaceCanvas(VoidCallback onConfirm) async {
+    if (!_hasCanvasContent) {
+      onConfirm();
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        title: const Text(
+          'Replace current workflow?',
+          style: TextStyle(color: AppTheme.textH),
+        ),
+        content: const Text(
+          'Your current canvas will be cleared before creating a new workflow.',
+          style: TextStyle(color: AppTheme.textM),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textM),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            onPressed: () {
+              Navigator.pop(context);
+              onConfirm();
+            },
+            child: const Text('Replace'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _startWorkflow({String? name}) {
+    final workflowName = name?.trim().isNotEmpty == true ? name!.trim() : 'Workflow ${_workflowCount + 1}';
+    final workflow = LegendService.instance.newWorkflow(workflowName);
+    setState(() {
+      _workflowName = workflow.name;
+      _currentWorkflowId = workflow.id;
+      _nodes = [];
+      _edges = [];
+      _selectedNodeId = null;
+      _connectMode = false;
+      _connectFromId = null;
+      _canvasOffset = Offset.zero;
+    });
+  }
+
+  void _showNewWorkflowDialog() {
+    final ctrl = TextEditingController(
+      text: 'Workflow ${_workflowCount + 1}',
+    );
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        title: const Text(
+          'New Workflow',
+          style: TextStyle(color: AppTheme.textH),
+        ),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: AppTheme.textH),
+          decoration: const InputDecoration(hintText: 'Workflow name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppTheme.textM),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _confirmReplaceCanvas(() => _startWorkflow(name: ctrl.text));
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _buildStarterWorkflow() {
+    final sourceMissions = _missions.take(2).toList();
+    final sourceAgents = _libraryAgents.take(3).toList();
+    if (sourceMissions.isEmpty && sourceAgents.isEmpty) {
+      _showNotice(
+        'Add at least one mission or library agent to create a starter workflow.',
+        background: AppTheme.error,
+      );
+      return;
+    }
+
+    _confirmReplaceCanvas(() {
+      final workflow = LegendService.instance.newWorkflow('Starter Workflow ${_workflowCount + 1}');
+      final nodes = <WorkflowNode>[];
+      final edges = <WorkflowEdge>[];
+      var nextX = 100.0;
+      const rowY = 160.0;
+
+      void addNode(WorkflowNode node) {
+        if (nodes.isNotEmpty) {
+          final previous = nodes.last;
+          edges.add(
+            WorkflowEdge(
+              id: '${previous.id}_${node.id}',
+              fromId: previous.id,
+              toId: node.id,
+            ),
+          );
+        }
+        nodes.add(node);
+        nextX += 240;
+      }
+
+      addNode(
+        WorkflowNode(
+          id: '${workflow.id}_start',
+          type: WorkflowNodeType.start,
+          label: 'START',
+          x: nextX,
+          y: rowY,
+        ),
+      );
+
+      for (final mission in sourceMissions) {
+        addNode(
+          WorkflowNode(
+            id: '${workflow.id}_mission_${mission.slug}',
+            type: WorkflowNodeType.mission,
+            label: mission.title,
+            x: nextX,
+            y: rowY,
+            refId: mission.slug,
+          ),
+        );
+      }
+
+      for (final agent in sourceAgents) {
+        addNode(
+          WorkflowNode(
+            id: '${workflow.id}_agent_${agent.id}',
+            type: WorkflowNodeType.agent,
+            label: agent.title,
+            x: nextX,
+            y: rowY,
+            refId: agent.id.toString(),
+          ),
+        );
+      }
+
+      addNode(
+        WorkflowNode(
+          id: '${workflow.id}_end',
+          type: WorkflowNodeType.end,
+          label: 'END',
+          x: nextX,
+          y: rowY,
+        ),
+      );
+
+      setState(() {
+        _workflowName = workflow.name;
+        _currentWorkflowId = workflow.id;
+        _nodes = nodes;
+        _edges = edges;
+        _selectedNodeId = null;
+        _connectMode = false;
+        _connectFromId = null;
+        _canvasOffset = Offset.zero;
+      });
+      _showNotice('Starter workflow created', background: AppTheme.success);
+    });
+  }
+
+  String? _validateWorkflow() {
+    if (_workflowName.trim().isEmpty) {
+      return 'Workflow name cannot be empty.';
+    }
+    if (_nodes.length < 2) {
+      return 'Add at least two nodes before saving.';
+    }
+
+    final startCount = _nodes.where((node) => node.type == WorkflowNodeType.start).length;
+    final endCount = _nodes.where((node) => node.type == WorkflowNodeType.end).length;
+
+    if (startCount != 1 || endCount != 1) {
+      return 'Each workflow needs exactly one Start and one End node.';
+    }
+    if (_edges.isEmpty) {
+      return 'Create at least one connection before saving.';
+    }
+
+    final nodeIds = _nodes.map((node) => node.id).toSet();
+    final hasBrokenEdge = _edges.any(
+      (edge) => !nodeIds.contains(edge.fromId) || !nodeIds.contains(edge.toId),
+    );
+    if (hasBrokenEdge) {
+      return 'One or more connections reference missing nodes.';
+    }
+
+    return null;
   }
 
   // ── Node creation ──────────────────────────────────────────────────────────
@@ -188,8 +416,13 @@ class _LegendScreenState extends State<LegendScreen> {
   // ── Save / load ────────────────────────────────────────────────────────────
 
   Future<void> _saveWorkflow() async {
-    final id = _currentWorkflowId ??
-        DateTime.now().millisecondsSinceEpoch.toString();
+    final validationError = _validateWorkflow();
+    if (validationError != null) {
+      _showNotice(validationError, background: AppTheme.error);
+      return;
+    }
+
+    final id = _currentWorkflowId ?? DateTime.now().millisecondsSinceEpoch.toString();
     final wf = LegendWorkflow(
       id: id,
       name: _workflowName,
@@ -202,15 +435,7 @@ class _LegendScreenState extends State<LegendScreen> {
       _currentWorkflowId = id;
       _savedWorkflows = LegendService.instance.workflows;
     });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Workflow "$_workflowName" saved'),
-          backgroundColor: AppTheme.success,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+    _showNotice('Workflow "$_workflowName" saved', background: AppTheme.success);
   }
 
   void _loadWorkflow(LegendWorkflow wf) {
@@ -238,8 +463,7 @@ class _LegendScreenState extends State<LegendScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.card,
-        title: const Text('Rename Workflow',
-            style: TextStyle(color: AppTheme.textH)),
+        title: const Text('Rename Workflow', style: TextStyle(color: AppTheme.textH)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -249,12 +473,10 @@ class _LegendScreenState extends State<LegendScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppTheme.textM)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
             onPressed: () {
               final v = ctrl.text.trim();
               if (v.isNotEmpty) setState(() => _workflowName = v);
@@ -274,15 +496,13 @@ class _LegendScreenState extends State<LegendScreen> {
       builder: (_) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
           backgroundColor: AppTheme.card,
-          title: const Text('Load Workflow',
-              style: TextStyle(color: AppTheme.textH)),
+          title: const Text('Load Workflow', style: TextStyle(color: AppTheme.textH)),
           content: SizedBox(
             width: 380,
             child: _savedWorkflows.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(16),
-                    child: Text('No saved workflows.',
-                        style: TextStyle(color: AppTheme.textM)),
+                    child: Text('No saved workflows.', style: TextStyle(color: AppTheme.textM)),
                   )
                 : ListView.builder(
                     shrinkWrap: true,
@@ -290,19 +510,14 @@ class _LegendScreenState extends State<LegendScreen> {
                     itemBuilder: (_, i) {
                       final wf = _savedWorkflows[i];
                       return ListTile(
-                        leading: const Icon(Icons.account_tree_outlined,
-                            color: AppTheme.gold),
-                        title: Text(wf.name,
-                            style:
-                                const TextStyle(color: AppTheme.textH)),
+                        leading: const Icon(Icons.account_tree_outlined, color: AppTheme.gold),
+                        title: Text(wf.name, style: const TextStyle(color: AppTheme.textH)),
                         subtitle: Text(
                           '${wf.nodes.length} nodes · ${wf.edges.length} edges',
-                          style: const TextStyle(
-                              color: AppTheme.textM, fontSize: 11),
+                          style: const TextStyle(color: AppTheme.textM, fontSize: 11),
                         ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              size: 18, color: AppTheme.textM),
+                          icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.textM),
                           onPressed: () async {
                             await _deleteWorkflow(wf.id);
                             setDlg(() {});
@@ -316,8 +531,7 @@ class _LegendScreenState extends State<LegendScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close',
-                  style: TextStyle(color: AppTheme.textM)),
+              child: const Text('Close', style: TextStyle(color: AppTheme.textM)),
             ),
           ],
         ),
@@ -333,8 +547,7 @@ class _LegendScreenState extends State<LegendScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: AppTheme.card,
-        title: const Text('Rename Node',
-            style: TextStyle(color: AppTheme.textH)),
+        title: const Text('Rename Node', style: TextStyle(color: AppTheme.textH)),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -344,12 +557,10 @@ class _LegendScreenState extends State<LegendScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppTheme.textM)),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
             onPressed: () {
               final v = ctrl.text.trim();
               if (v.isNotEmpty) {
@@ -381,8 +592,7 @@ class _LegendScreenState extends State<LegendScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _buildLeftPanel(),
-                const VerticalDivider(
-                    width: 1, color: AppTheme.border),
+                const VerticalDivider(width: 1, color: AppTheme.border),
                 Expanded(child: _buildCanvas()),
               ],
             ),
@@ -434,6 +644,18 @@ class _LegendScreenState extends State<LegendScreen> {
             ),
           ),
           const Spacer(),
+          _ToolbarButton(
+            icon: Icons.add_box_outlined,
+            label: 'New',
+            onTap: _showNewWorkflowDialog,
+          ),
+          const SizedBox(width: 8),
+          _ToolbarButton(
+            icon: Icons.auto_fix_high_outlined,
+            label: 'Starter',
+            onTap: _buildStarterWorkflow,
+          ),
+          const SizedBox(width: 8),
           // Connect mode toggle
           _ToolbarButton(
             icon: Icons.cable_outlined,
@@ -473,8 +695,7 @@ class _LegendScreenState extends State<LegendScreen> {
                 context: context,
                 builder: (_) => AlertDialog(
                   backgroundColor: AppTheme.card,
-                  title: const Text('Clear canvas?',
-                      style: TextStyle(color: AppTheme.textH)),
+                  title: const Text('Clear canvas?', style: TextStyle(color: AppTheme.textH)),
                   content: const Text(
                     'All nodes and edges will be removed.',
                     style: TextStyle(color: AppTheme.textM),
@@ -482,12 +703,10 @@ class _LegendScreenState extends State<LegendScreen> {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel',
-                          style: TextStyle(color: AppTheme.textM)),
+                      child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
                     ),
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
                       onPressed: () {
                         Navigator.pop(context);
                         _clearCanvas();
@@ -513,6 +732,75 @@ class _LegendScreenState extends State<LegendScreen> {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.card,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'WORKFLOW BUILDER',
+                  style: TextStyle(
+                    color: AppTheme.textM,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _workflowName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.textH,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_nodes.length} nodes · ${_edges.length} edges · $_workflowCount saved',
+                  style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _showNewWorkflowDialog,
+                        icon: const Icon(Icons.add, size: 14),
+                        label: const Text('Blank'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.textH,
+                          side: const BorderSide(color: AppTheme.border),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _buildStarterWorkflow,
+                        icon: const Icon(Icons.bolt_outlined, size: 14),
+                        label: const Text('Starter'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: AppTheme.textH,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           const _PaletteSection(label: 'FLOW', children: [
             _DraggablePaletteItem(
               data: _NodeDragData(WorkflowNodeType.start, 'START'),
@@ -552,18 +840,14 @@ class _LegendScreenState extends State<LegendScreen> {
                           padding: EdgeInsets.symmetric(vertical: 6),
                           child: Text(
                             'No library agents.\nAdd agents to library first.',
-                            style: TextStyle(
-                                color: AppTheme.textM, fontSize: 11),
+                            style: TextStyle(color: AppTheme.textM, fontSize: 11),
                           ),
                         )
                       ]
                     : _libraryAgents
                         .map(
                           (a) => _DraggablePaletteItem(
-                            data: _NodeDragData(
-                                WorkflowNodeType.agent,
-                                a.title,
-                                a.id.toString()),
+                            data: _NodeDragData(WorkflowNodeType.agent, a.title, a.id.toString()),
                             color: AppTheme.info,
                             icon: Icons.smart_toy_outlined,
                             label: a.title,
@@ -580,16 +864,14 @@ class _LegendScreenState extends State<LegendScreen> {
                       padding: EdgeInsets.symmetric(vertical: 6),
                       child: Text(
                         'No missions saved.\nCreate missions first.',
-                        style: TextStyle(
-                            color: AppTheme.textM, fontSize: 11),
+                        style: TextStyle(color: AppTheme.textM, fontSize: 11),
                       ),
                     )
                   ]
                 : _missions
                     .map(
                       (m) => _DraggablePaletteItem(
-                        data: _NodeDragData(
-                            WorkflowNodeType.mission, m.title, m.slug),
+                        data: _NodeDragData(WorkflowNodeType.mission, m.title, m.slug),
                         color: AppTheme.gold,
                         icon: Icons.flag_outlined,
                         label: m.title,
@@ -627,9 +909,7 @@ class _LegendScreenState extends State<LegendScreen> {
         return Container(
           decoration: BoxDecoration(
             color: AppTheme.bg,
-            border: highlight
-                ? Border.all(color: AppTheme.primary, width: 2)
-                : null,
+            border: highlight ? Border.all(color: AppTheme.primary, width: 2) : null,
           ),
           child: ClipRect(
             child: GestureDetector(
@@ -685,27 +965,20 @@ class _LegendScreenState extends State<LegendScreen> {
                       top: 12,
                       right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color:
-                              AppTheme.info.withValues(alpha: 0.15),
+                          color: AppTheme.info.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(8),
-                          border:
-                              Border.all(color: AppTheme.info),
+                          border: Border.all(color: AppTheme.info),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.cable_outlined,
-                                size: 14, color: AppTheme.info),
+                            const Icon(Icons.cable_outlined, size: 14, color: AppTheme.info),
                             const SizedBox(width: 6),
                             Text(
-                              _connectFromId == null
-                                  ? 'Tap source node'
-                                  : 'Tap target node',
-                              style: const TextStyle(
-                                  color: AppTheme.info, fontSize: 12),
+                              _connectFromId == null ? 'Tap source node' : 'Tap target node',
+                              style: const TextStyle(color: AppTheme.info, fontSize: 12),
                             ),
                           ],
                         ),
@@ -766,19 +1039,14 @@ class _ToolbarButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-              color: fg.withValues(alpha: active || accent ? 0.5 : 0.25)),
+          border: Border.all(color: fg.withValues(alpha: active || accent ? 0.5 : 0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 14, color: fg),
             const SizedBox(width: 5),
-            Text(label,
-                style: TextStyle(
-                    color: fg,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500)),
+            Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500)),
           ],
         ),
       ),
@@ -833,14 +1101,9 @@ class _DraggablePaletteItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: dragging
-            ? color.withValues(alpha: 0.25)
-            : AppTheme.card,
+        color: dragging ? color.withValues(alpha: 0.25) : AppTheme.card,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: dragging
-                ? color
-                : color.withValues(alpha: 0.4)),
+        border: Border.all(color: dragging ? color : color.withValues(alpha: 0.4)),
       ),
       child: Row(
         children: [
@@ -855,19 +1118,14 @@ class _DraggablePaletteItem extends StatelessWidget {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      color: AppTheme.textH, fontSize: 12),
+                  style: const TextStyle(color: AppTheme.textH, fontSize: 12),
                 ),
                 if (subtitle != null)
-                  Text(subtitle!,
-                      style: TextStyle(
-                          color: color.withValues(alpha: 0.8),
-                          fontSize: 10)),
+                  Text(subtitle!, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
               ],
             ),
           ),
-          const Icon(Icons.drag_indicator,
-              size: 14, color: AppTheme.textM),
+          const Icon(Icons.drag_indicator, size: 14, color: AppTheme.textM),
         ],
       ),
     );
@@ -903,21 +1161,16 @@ class _CanvasEmptyHint extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.account_tree_outlined,
-            size: 56, color: AppTheme.textM.withValues(alpha: 0.3)),
+        Icon(Icons.account_tree_outlined, size: 56, color: AppTheme.textM.withValues(alpha: 0.3)),
         const SizedBox(height: 12),
         Text(
           'Drag agents and missions here',
-          style: TextStyle(
-              color: AppTheme.textM.withValues(alpha: 0.5),
-              fontSize: 14),
+          style: TextStyle(color: AppTheme.textM.withValues(alpha: 0.5), fontSize: 14),
         ),
         const SizedBox(height: 4),
         Text(
           'from the left panel to build your workflow',
-          style: TextStyle(
-              color: AppTheme.textM.withValues(alpha: 0.35),
-              fontSize: 12),
+          style: TextStyle(color: AppTheme.textM.withValues(alpha: 0.35), fontSize: 12),
         ),
       ],
     );
@@ -971,19 +1224,27 @@ class _NodeCard extends StatelessWidget {
 
   Color get _accentColor {
     switch (node.type) {
-      case WorkflowNodeType.start:   return AppTheme.success;
-      case WorkflowNodeType.agent:   return AppTheme.info;
-      case WorkflowNodeType.mission: return AppTheme.gold;
-      case WorkflowNodeType.end:     return AppTheme.primary;
+      case WorkflowNodeType.start:
+        return AppTheme.success;
+      case WorkflowNodeType.agent:
+        return AppTheme.info;
+      case WorkflowNodeType.mission:
+        return AppTheme.gold;
+      case WorkflowNodeType.end:
+        return AppTheme.primary;
     }
   }
 
   IconData get _icon {
     switch (node.type) {
-      case WorkflowNodeType.start:   return Icons.play_arrow_rounded;
-      case WorkflowNodeType.agent:   return Icons.smart_toy_outlined;
-      case WorkflowNodeType.mission: return Icons.flag_outlined;
-      case WorkflowNodeType.end:     return Icons.stop_rounded;
+      case WorkflowNodeType.start:
+        return Icons.play_arrow_rounded;
+      case WorkflowNodeType.agent:
+        return Icons.smart_toy_outlined;
+      case WorkflowNodeType.mission:
+        return Icons.flag_outlined;
+      case WorkflowNodeType.end:
+        return Icons.stop_rounded;
     }
   }
 
@@ -1001,11 +1262,7 @@ class _NodeCard extends StatelessWidget {
           color: AppTheme.card,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: highlighted
-                ? accent
-                : (connectMode
-                    ? accent.withValues(alpha: 0.5)
-                    : AppTheme.border),
+            color: highlighted ? accent : (connectMode ? accent.withValues(alpha: 0.5) : AppTheme.border),
             width: highlighted ? 2 : 1,
           ),
           boxShadow: highlighted
@@ -1033,8 +1290,7 @@ class _NodeCard extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
                       color: accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
@@ -1046,11 +1302,7 @@ class _NodeCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           node.type.label.toUpperCase(),
-                          style: TextStyle(
-                              color: accent,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8),
+                          style: TextStyle(color: accent, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.8),
                         ),
                       ],
                     ),
@@ -1097,11 +1349,9 @@ class _EdgePainter extends CustomPainter {
     this.connectFromId,
   });
 
-  Offset _outputPort(WorkflowNode n) =>
-      Offset(n.x + offset.dx + _kNodeW, n.y + offset.dy + _kNodeH / 2);
+  Offset _outputPort(WorkflowNode n) => Offset(n.x + offset.dx + _kNodeW, n.y + offset.dy + _kNodeH / 2);
 
-  Offset _inputPort(WorkflowNode n) =>
-      Offset(n.x + offset.dx, n.y + offset.dy + _kNodeH / 2);
+  Offset _inputPort(WorkflowNode n) => Offset(n.x + offset.dx, n.y + offset.dy + _kNodeH / 2);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1125,16 +1375,14 @@ class _EdgePainter extends CustomPainter {
       final src = _outputPort(from);
       final dst = _inputPort(to);
 
-      final paint = (connectFromId != null &&
-              (edge.fromId == connectFromId || edge.toId == connectFromId))
+      final paint = (connectFromId != null && (edge.fromId == connectFromId || edge.toId == connectFromId))
           ? activePaint
           : edgePaint;
 
       _drawBezier(canvas, src, dst, paint);
 
       // Arrowhead
-      _drawArrow(canvas, dst,
-          math.atan2(dst.dy - src.dy, dst.dx - src.dx), paint);
+      _drawArrow(canvas, dst, math.atan2(dst.dy - src.dy, dst.dx - src.dx), paint);
     }
 
     // Port circles on every node
@@ -1159,9 +1407,12 @@ class _EdgePainter extends CustomPainter {
     final path = Path()
       ..moveTo(src.dx, src.dy)
       ..cubicTo(
-        src.dx + dx * 0.5, src.dy,
-        dst.dx - dx * 0.5, dst.dy,
-        dst.dx, dst.dy,
+        src.dx + dx * 0.5,
+        src.dy,
+        dst.dx - dx * 0.5,
+        dst.dy,
+        dst.dx,
+        dst.dy,
       );
     canvas.drawPath(path, paint);
   }
@@ -1194,8 +1445,5 @@ class _EdgePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_EdgePainter old) =>
-      old.edges != edges ||
-      old.nodes != nodes ||
-      old.offset != offset ||
-      old.connectFromId != connectFromId;
+      old.edges != edges || old.nodes != nodes || old.offset != offset || old.connectFromId != connectFromId;
 }
