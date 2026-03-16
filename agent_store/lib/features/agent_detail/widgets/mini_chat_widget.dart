@@ -2,7 +2,10 @@
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import '../../../shared/models/agent_model.dart';
+import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/mission_service.dart';
 
 class MiniChatWidget extends StatefulWidget {
   final int agentId;
@@ -31,6 +34,13 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   bool _sending = false;
+  List<AgentModel> _libraryAgents = const [];
+  bool _loadingLibrary = false;
+  List<AgentModel> _agentSuggestions = const [];
+  List<MissionModel> _missionSuggestions = const [];
+  String _activeTrigger = '';
+  bool _showSuggestions = false;
+  int _mentionStart = -1;
 
   // ── Storage helpers ────────────────────────────────────────────────────────
 
@@ -63,21 +73,132 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
   void initState() {
     super.initState();
     _messages = _loadHistory();
+    _ctrl.addListener(_onInputChanged);
+    _loadLibrary();
   }
 
   @override
   void dispose() {
+    _ctrl.removeListener(_onInputChanged);
     _ctrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _loadLibrary() async {
+    if (!ApiService.instance.isAuthenticated) return;
+    setState(() => _loadingLibrary = true);
+    final list = await ApiService.instance.getLibrary();
+    if (!mounted) return;
+    setState(() {
+      _libraryAgents = list;
+      _loadingLibrary = false;
+    });
+  }
+
+  void _onInputChanged() {
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : _ctrl.text.length;
+    final text = _ctrl.text;
+    if (cursor > text.length) return;
+
+    final prefix = text.substring(0, cursor);
+    final at = prefix.lastIndexOf('@');
+    final hash = prefix.lastIndexOf('#');
+    final trigger = at > hash ? '@' : '#';
+    final triggerIndex = trigger == '@' ? at : hash;
+    if (triggerIndex == -1) {
+      _hideSuggestions();
+      return;
+    }
+
+    if (triggerIndex > 0 && !RegExp(r'\s').hasMatch(prefix[triggerIndex - 1])) {
+      _hideSuggestions();
+      return;
+    }
+
+    final query = prefix.substring(triggerIndex + 1);
+    if (query.contains(RegExp(r'\s'))) {
+      _hideSuggestions();
+      return;
+    }
+
+    final q = query.toLowerCase();
+    if (trigger == '@') {
+      final suggestions = _libraryAgents
+          .where((a) => q.isEmpty || a.title.toLowerCase().contains(q))
+          .take(6)
+          .toList();
+      setState(() {
+        _activeTrigger = '@';
+        _mentionStart = triggerIndex;
+        _agentSuggestions = suggestions;
+        _missionSuggestions = const [];
+        _showSuggestions = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _activeTrigger = '#';
+      _mentionStart = triggerIndex;
+      _agentSuggestions = const [];
+      _missionSuggestions = MissionService.instance.search(q);
+      _showSuggestions = true;
+    });
+  }
+
+  void _hideSuggestions() {
+    if (!_showSuggestions) return;
+    setState(() {
+      _showSuggestions = false;
+      _activeTrigger = '';
+      _mentionStart = -1;
+      _agentSuggestions = const [];
+      _missionSuggestions = const [];
+    });
+  }
+
+  void _insertAgent(AgentModel agent) {
+    final text = _ctrl.text;
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '@${agent.title} ';
+    final next = '$before$mention$after';
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideSuggestions();
+  }
+
+  void _insertMission(MissionModel mission) {
+    final text = _ctrl.text;
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '#${mission.slug} ';
+    final next = '$before$mention$after';
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideSuggestions();
+  }
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _send() async {
-    final text = _ctrl.text.trim();
+    final raw = _ctrl.text.trim();
+    final text = await MissionService.instance.expandMissionTags(raw);
     if (text.isEmpty || _sending) return;
 
+    _hideSuggestions();
     _ctrl.clear();
     setState(() {
       _messages.add((role: 'user', text: text));
@@ -243,41 +364,98 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: _panelBorder)),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    style: const TextStyle(color: _inputText, fontSize: 13),
-                    onSubmitted: (_) => _send(),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(color: Color(0xFF6A5C42), fontSize: 13),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      filled: true,
-                      fillColor: _inputBg,
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                        borderSide: BorderSide(color: _panelBorder),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                        borderSide: BorderSide(color: Color(0xFF81231E)),
+                if (_showSuggestions)
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0E2C6),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _panelBorder),
+                    ),
+                    child: _activeTrigger == '@'
+                        ? (_loadingLibrary
+                            ? const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Text('Loading library agents...', style: TextStyle(fontSize: 12, color: _inputText)),
+                              )
+                            : (_agentSuggestions.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Text('No matching agents', style: TextStyle(fontSize: 12, color: _inputText)),
+                                  )
+                                : ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: _agentSuggestions.length,
+                                    itemBuilder: (_, i) {
+                                      final a = _agentSuggestions[i];
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text(a.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                                        onTap: () => _insertAgent(a),
+                                      );
+                                    },
+                                  )))
+                        : (_missionSuggestions.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Text('No matching missions', style: TextStyle(fontSize: 12, color: _inputText)),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _missionSuggestions.length,
+                                itemBuilder: (_, i) {
+                                  final m = _missionSuggestions[i];
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text('#${m.slug}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    subtitle: Text(m.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                                    onTap: () => _insertMission(m),
+                                  );
+                                },
+                              )),
+                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        style: const TextStyle(color: _inputText, fontSize: 13),
+                        onSubmitted: (_) => _send(),
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message... (@agent, #mission)',
+                          hintStyle: TextStyle(color: Color(0xFF6A5C42), fontSize: 13),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          filled: true,
+                          fillColor: _inputBg,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                            borderSide: BorderSide(color: _panelBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                            borderSide: BorderSide(color: Color(0xFF81231E)),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _sending ? null : _send,
-                  icon: const Icon(Icons.send_rounded),
-                  color: const Color(0xFF81231E),
-                  disabledColor: const Color(0xFFC0B490),
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFF81231E).withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _sending ? null : _send,
+                      icon: const Icon(Icons.send_rounded),
+                      color: const Color(0xFF81231E),
+                      disabledColor: const Color(0xFFC0B490),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF81231E).withValues(alpha: 0.1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

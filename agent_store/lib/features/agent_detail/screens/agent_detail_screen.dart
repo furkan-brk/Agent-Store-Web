@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
+import '../../../shared/services/mission_service.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
@@ -1349,8 +1350,9 @@ class _TrialChatPanelState extends State<_TrialChatPanel> {
     super.dispose();
   }
 
-  void _generateTrial() {
-    final text = _messageCtrl.text.trim();
+  Future<void> _generateTrial() async {
+    final raw = _messageCtrl.text.trim();
+    final text = await MissionService.instance.expandMissionTags(raw);
     if (text.isEmpty) return;
     if (widget.ctrl.trialUsed.value || widget.ctrl.isTrialLoading.value) return;
 
@@ -1359,7 +1361,7 @@ class _TrialChatPanelState extends State<_TrialChatPanel> {
       _showConnectWalletDialog();
       return;
     }
-    widget.ctrl.generateTrial(text);
+    await widget.ctrl.generateTrial(text);
   }
 
   void _showConnectWalletDialog() {
@@ -1569,7 +1571,7 @@ class _TrialChatPanelState extends State<_TrialChatPanel> {
             minLines: 1,
             style: const TextStyle(color: AppTheme.textH, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'Type a message to test this agent...',
+              hintText: 'Type a message... (Use #mission and @agent)',
               hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
               counterText: '',
               filled: true,

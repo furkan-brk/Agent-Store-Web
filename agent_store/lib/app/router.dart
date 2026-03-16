@@ -17,6 +17,7 @@ import '../shared/widgets/notification_panel.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
 import '../features/guild_master/screens/guild_master_screen.dart';
+import '../features/missions/screens/missions_screen.dart';
 import '../controllers/auth_controller.dart';
 import '../shared/services/app_telemetry_service.dart';
 
@@ -86,6 +87,7 @@ class AppRouter {
           ),
           GoRoute(path: '/credits/history', builder: (_, __) => const CreditHistoryScreen()),
           GoRoute(path: '/leaderboard',     builder: (_, __) => const LeaderboardScreen()),
+          GoRoute(path: '/missions',        builder: (_, __) => const MissionsScreen()),
           GoRoute(path: '/creator',         builder: (_, __) => const CreatorDashboardScreen()),
           GoRoute(path: '/settings',        builder: (_, __) => const SettingsScreen()),
           GoRoute(
@@ -279,6 +281,12 @@ class _Sidebar extends StatelessWidget {
             _NavItem(icon: Icons.groups_outlined,          label: 'Guilds',        path: '/guild',        loc: loc, tooltip: 'Alt+G', isDrawer: isDrawer),
             _NavItem(icon: Icons.auto_awesome_outlined,    label: 'Guild Master',  path: '/guild-master', loc: loc, tooltip: 'AI Team Builder', isDrawer: isDrawer),
             _NavItem(icon: Icons.emoji_events_outlined,    label: 'Leaderboard',   path: '/leaderboard',  loc: loc, isDrawer: isDrawer),
+
+            const SizedBox(height: 16),
+
+            // ── Missions ──
+            _SectionLabel(label: 'MISSIONS', colorScheme: colorScheme),
+            _NavItem(icon: Icons.flag_outlined,            label: 'Missions',      path: '/missions',     loc: loc, isDrawer: isDrawer),
 
             const SizedBox(height: 16),
 

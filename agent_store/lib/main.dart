@@ -6,6 +6,7 @@ import 'controllers/auth_controller.dart';
 import 'controllers/startup_preload_controller.dart';
 import 'shared/services/api_service.dart';
 import 'shared/services/app_telemetry_service.dart';
+import 'shared/services/mission_service.dart';
 import 'shared/services/wallet_service.dart';
 
 void main() async {
@@ -14,6 +15,7 @@ void main() async {
   // Restore JWT and wallet address from SharedPreferences before anything else.
   // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
   await ApiService.instance.init();
+  await MissionService.instance.init();
   await WalletService.instance.init();
   // Register global AuthController — lives for the entire app lifetime.
   // By this point both services have their persisted state restored,

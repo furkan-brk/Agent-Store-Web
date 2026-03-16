@@ -5,6 +5,9 @@ import 'package:get/get.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/guild_master_controller.dart';
 import '../../../features/character/character_types.dart';
+import '../../../shared/models/agent_model.dart';
+import '../../../shared/models/mission_model.dart';
+import '../../../shared/services/mission_service.dart';
 
 class GuildMasterScreen extends StatelessWidget {
   final List<Map<String, dynamic>>? initialAgents;
@@ -134,7 +137,10 @@ class GuildMasterScreen extends StatelessWidget {
                   'Find My Team',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
-                onPressed: () => ctrl.findTeam(problemCtrl.text),
+                onPressed: () async {
+                  final expanded = await MissionService.instance.expandMissionTags(problemCtrl.text);
+                  ctrl.findTeam(expanded);
+                },
               ),
             ),
           ],
@@ -342,12 +348,125 @@ class _ChatPanel extends StatefulWidget {
 class _ChatPanelState extends State<_ChatPanel> {
   final _chatCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  List<AgentModel> _agentSuggestions = const [];
+  List<MissionModel> _missionSuggestions = const [];
+  String _activeTrigger = '';
+  bool _showMentions = false;
+  int _mentionStart = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    _chatCtrl.addListener(_onChatChanged);
+    widget.ctrl.ensureLibraryLoaded();
+  }
 
   @override
   void dispose() {
+    _chatCtrl.removeListener(_onChatChanged);
     _chatCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
+  }
+
+  void _onChatChanged() {
+    final selection = _chatCtrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : _chatCtrl.text.length;
+    final text = _chatCtrl.text;
+    if (cursor > text.length) return;
+
+    final prefix = text.substring(0, cursor);
+    final at = prefix.lastIndexOf('@');
+    final hash = prefix.lastIndexOf('#');
+    final trigger = at > hash ? '@' : '#';
+    final triggerIndex = trigger == '@' ? at : hash;
+    if (triggerIndex == -1) {
+      _hideMentions();
+      return;
+    }
+
+    if (triggerIndex > 0 && !RegExp(r'\s').hasMatch(prefix[triggerIndex - 1])) {
+      _hideMentions();
+      return;
+    }
+
+    final query = prefix.substring(triggerIndex + 1);
+    if (query.contains(RegExp(r'\s'))) {
+      _hideMentions();
+      return;
+    }
+
+    final q = query.toLowerCase();
+    if (trigger == '@') {
+      final list = widget.ctrl.libraryAgents;
+      final suggestions = list
+          .where((a) => q.isEmpty || a.title.toLowerCase().contains(q))
+          .take(8)
+          .toList();
+      setState(() {
+        _mentionStart = triggerIndex;
+        _activeTrigger = '@';
+        _agentSuggestions = suggestions;
+        _missionSuggestions = const [];
+        _showMentions = true;
+      });
+      return;
+    }
+
+    final missionSuggestions = MissionService.instance.search(q);
+
+    setState(() {
+      _mentionStart = triggerIndex;
+      _activeTrigger = '#';
+      _agentSuggestions = const [];
+      _missionSuggestions = missionSuggestions;
+      _showMentions = true;
+    });
+  }
+
+  void _hideMentions() {
+    if (!_showMentions && _agentSuggestions.isEmpty && _missionSuggestions.isEmpty) return;
+    setState(() {
+      _showMentions = false;
+      _activeTrigger = '';
+      _agentSuggestions = const [];
+      _missionSuggestions = const [];
+      _mentionStart = -1;
+    });
+  }
+
+  void _insertMention(AgentModel agent) {
+    final text = _chatCtrl.text;
+    final selection = _chatCtrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '@${agent.title} ';
+    final next = '$before$mention$after';
+    _chatCtrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideMentions();
+  }
+
+  void _insertMission(MissionModel mission) {
+    final text = _chatCtrl.text;
+    final selection = _chatCtrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '#${mission.slug} ';
+    final next = '$before$mention$after';
+    _chatCtrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideMentions();
   }
 
   void _scrollToBottom() {
@@ -363,8 +482,10 @@ class _ChatPanelState extends State<_ChatPanel> {
   }
 
   Future<void> _sendMessage() async {
-    final text = _chatCtrl.text.trim();
+    final raw = _chatCtrl.text.trim();
+    final text = await MissionService.instance.expandMissionTags(raw);
     if (text.isEmpty) return;
+    _hideMentions();
     _chatCtrl.clear();
     await widget.ctrl.sendChat(text);
     _scrollToBottom();
@@ -480,49 +601,137 @@ class _ChatPanelState extends State<_ChatPanel> {
             color: AppTheme.surface,
             border: Border(top: BorderSide(color: AppTheme.border)),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _chatCtrl,
-                  style: const TextStyle(color: AppTheme.textH, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Message your team...',
-                    hintStyle: const TextStyle(color: AppTheme.textM),
-                    filled: true,
-                    fillColor: AppTheme.card,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppTheme.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppTheme.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              if (_showMentions) ...[
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 180),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.card,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppTheme.border),
                   ),
-                  onSubmitted: (_) => _sendMessage(),
+                  child: Obx(() {
+                    if (_activeTrigger == '@' && widget.ctrl.isLibraryLoading.value) {
+                      return const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text(
+                          'Loading library agents...',
+                          style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                        ),
+                      );
+                    }
+                    final hasNoData = _activeTrigger == '@'
+                        ? _agentSuggestions.isEmpty
+                        : _missionSuggestions.isEmpty;
+                    if (hasNoData) {
+                      return const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text(
+                          'No matches found',
+                          style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                        ),
+                      );
+                    }
+                    if (_activeTrigger == '#') {
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _missionSuggestions.length,
+                        itemBuilder: (_, i) {
+                          final mission = _missionSuggestions[i];
+                          return ListTile(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            title: Text(
+                              '#${mission.slug}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: AppTheme.gold, fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              mission.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                            ),
+                            onTap: () => _insertMission(mission),
+                          );
+                        },
+                      );
+                    }
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: _agentSuggestions.length,
+                      itemBuilder: (_, i) {
+                        final agent = _agentSuggestions[i];
+                        return ListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          title: Text(
+                            agent.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+                          ),
+                          subtitle: Text(
+                            agent.characterType.displayName,
+                            style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                          ),
+                          onTap: () => _insertMention(agent),
+                        );
+                      },
+                    );
+                  }),
                 ),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _chatCtrl,
+                      style: const TextStyle(color: AppTheme.textH, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'Message your team... (Use @agent and #mission)',
+                        hintStyle: const TextStyle(color: AppTheme.textM),
+                        filled: true,
+                        fillColor: AppTheme.card,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppTheme.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppTheme.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Obx(() => SizedBox(
+                    height: 46,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: AppTheme.textH,
+                        disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                      ),
+                      onPressed: widget.ctrl.isChatLoading.value ? null : _sendMessage,
+                      child: const Icon(Icons.send, size: 18),
+                    ),
+                  )),
+                ],
               ),
-              const SizedBox(width: 10),
-              Obx(() => SizedBox(
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    foregroundColor: AppTheme.textH,
-                    disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.4),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                  onPressed: widget.ctrl.isChatLoading.value ? null : _sendMessage,
-                  child: const Icon(Icons.send, size: 18),
-                ),
-              )),
             ],
           ),
         ),
