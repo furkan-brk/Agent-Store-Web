@@ -43,7 +43,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		missions.GET("", handler.GetMissions)
 		missions.POST("", handler.SaveMission)
 		missions.DELETE("/:id", handler.DeleteMission)
-		missions.POST("/batch-sync", handler.BatchSyncMissions)
+		missions.POST("/sync", handler.BatchSyncMissions)
 		missions.POST("/expand", handler.ExpandMissions)
 
 		// Legend workflow endpoints
@@ -51,7 +51,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		legend.GET("/workflows", handler.GetLegendWorkflows)
 		legend.POST("/workflows", handler.SaveLegendWorkflow)
 		legend.DELETE("/workflows/:id", handler.DeleteLegendWorkflow)
-		legend.POST("/workflows/batch-sync", handler.BatchSyncLegendWorkflows)
+		legend.POST("/workflows/sync", handler.BatchSyncLegendWorkflows)
 		legend.POST("/workflows/:id/execute", executeRL.WalletMiddleware(), handler.ExecuteWorkflow)
 		legend.GET("/executions", handler.ListExecutions)
 		legend.GET("/executions/:execId", handler.GetExecution)
