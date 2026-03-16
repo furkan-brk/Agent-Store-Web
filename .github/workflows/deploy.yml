@@ -24,13 +24,30 @@ jobs:
           cp .dockerignore .railway-deploy/.dockerignore
           cp .railwayignore .railway-deploy/.railwayignore
           cp -R backend .railway-deploy/backend
+          rm -rf .railway-deploy/backend/vendor
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
         working-directory: .railway-deploy
-        run: railway up --service Agent_Store --detach
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            if railway up --service Agent_Store --detach; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "Railway deploy failed after ${attempt} attempts"
+              exit 1
+            fi
+
+            sleep_seconds=$((attempt * 15))
+            echo "Railway deploy attempt ${attempt} failed, retrying in ${sleep_seconds}s"
+            sleep "$sleep_seconds"
+          done
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
