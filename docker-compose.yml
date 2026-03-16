@@ -37,11 +37,11 @@ services:
     ports:
       - "5000:5000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/remove"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     restart: unless-stopped
 
   backend:
@@ -56,6 +56,8 @@ services:
       REMBG_URL: http://rembg:5000
     ports:
       - "8080:8080"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -79,3 +81,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

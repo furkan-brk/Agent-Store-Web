@@ -364,6 +364,7 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           showRarity: true,
           agentId: agent.id,
           generatedImage: agent.generatedImage,
+          imageUrl: agent.imageUrl,
         ),
         const SizedBox(height: 12),
         const Text(

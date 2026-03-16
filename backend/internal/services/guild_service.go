@@ -8,6 +8,7 @@ import (
 
 	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/models"
+	"gorm.io/gorm"
 )
 
 type GuildService struct {
@@ -68,7 +69,9 @@ func (s *GuildService) ListGuilds(page, limit int) ([]models.Guild, int64, error
 	var total int64
 	database.DB.Model(&models.Guild{}).Count(&total)
 	offset := (page - 1) * limit
-	err := database.DB.Preload("Members.Agent").
+	err := database.DB.Preload("Members.Agent", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at")
+	}).Preload("Members").
 		Offset(offset).Limit(limit).Order("created_at DESC").Find(&guilds).Error
 	if err == nil {
 		if b, jerr := json.Marshal(cachedResult{Guilds: guilds, Total: total}); jerr == nil {
@@ -93,7 +96,9 @@ func (s *GuildService) CreateGuild(input CreateGuildInput) (*models.Guild, error
 
 func (s *GuildService) GetGuild(id uint) (*models.Guild, []SynergyBonus, map[string]int, error) {
 	var guild models.Guild
-	err := database.DB.Preload("Members.Agent").First(&guild, id).Error
+	err := database.DB.Preload("Members.Agent", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at")
+	}).Preload("Members").First(&guild, id).Error
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -204,7 +209,9 @@ func (s *GuildService) RemoveMember(guildID, agentID uint, wallet string) error 
 // CheckCompatibility analyzes how well the agents in a guild complement each other.
 func (s *GuildService) CheckCompatibility(guildID uint) (*GuildCompatibilityResult, error) {
 	var guild models.Guild
-	if err := database.DB.Preload("Members.Agent").First(&guild, guildID).Error; err != nil {
+	if err := database.DB.Preload("Members.Agent", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at")
+	}).Preload("Members").First(&guild, guildID).Error; err != nil {
 		return nil, errors.New("guild not found")
 	}
 

@@ -78,7 +78,7 @@ class LibraryController extends GetxController {
       category: a.category, creatorWallet: a.creatorWallet, characterType: a.characterType,
       subclass: a.subclass, rarity: a.rarity, stats: a.stats, traits: a.traits,
       tags: a.tags, useCount: a.useCount, saveCount: a.saveCount,
-      generatedImage: a.generatedImage, createdAt: a.createdAt, price: newPrice,
+      generatedImage: a.generatedImage, imageUrl: a.imageUrl, createdAt: a.createdAt, price: newPrice,
     );
   }
 }

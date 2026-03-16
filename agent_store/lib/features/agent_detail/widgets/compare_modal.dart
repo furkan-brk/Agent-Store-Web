@@ -219,6 +219,7 @@ class _CompareModalState extends State<CompareModal> {
             showRarity: true,
             agentId: agent.id,
             generatedImage: agent.generatedImage,
+            imageUrl: agent.imageUrl,
           ),
           const SizedBox(height: 12),
           Text(
@@ -406,6 +407,7 @@ class _CompareModalState extends State<CompareModal> {
                                     showRarity: true,
                                     agentId: _compareAgent!.id,
                                     generatedImage: _compareAgent!.generatedImage,
+                                    imageUrl: _compareAgent!.imageUrl,
                                   ),
                                   const SizedBox(height: 12),
                                   Text(

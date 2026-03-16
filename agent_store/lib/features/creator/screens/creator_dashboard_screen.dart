@@ -612,6 +612,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
                             size: 40,
                             agentId: agent.id,
                             generatedImage: agent.generatedImage,
+                            imageUrl: agent.imageUrl,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -944,6 +945,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
                                 size: 36,
                                 agentId: agent.id,
                                 generatedImage: agent.generatedImage,
+                                imageUrl: agent.imageUrl,
                               ),
                             ),
                           ),

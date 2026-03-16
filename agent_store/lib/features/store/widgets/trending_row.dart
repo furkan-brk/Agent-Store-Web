@@ -313,6 +313,7 @@ class _TrendingCardState extends State<_TrendingCard> {
                       size: 72,
                       agentId: widget.agent.id,
                       generatedImage: widget.agent.generatedImage,
+                      imageUrl: widget.agent.imageUrl,
                     ),
                   ),
                   const SizedBox(height: 8),

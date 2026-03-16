@@ -41,12 +41,13 @@ type AgentService struct {
 	replicateSvc    *ReplicateService
 	scoreSvc        *ScoreService
 	pollinationsSvc *PollinationsService
+	imageSvc        *ImageService
 	cache           *CacheStore
 	rembgURL        string
 }
 
-func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService, cache *CacheStore, rembgURL string) *AgentService {
-	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc, cache: cache, rembgURL: rembgURL}
+func NewAgentService(aiSvc *AIService, geminiSvc *GeminiService, replicateSvc *ReplicateService, scoreSvc *ScoreService, pollinationsSvc *PollinationsService, cache *CacheStore, rembgURL string, imageSvc *ImageService) *AgentService {
+	return &AgentService{aiSvc: aiSvc, geminiSvc: geminiSvc, replicateSvc: replicateSvc, scoreSvc: scoreSvc, pollinationsSvc: pollinationsSvc, cache: cache, rembgURL: rembgURL, imageSvc: imageSvc}
 }
 
 type CreateAgentInput struct {
@@ -94,7 +95,7 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 		orderClause = "created_at ASC"
 	}
 	err := query.
-		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at").
 		Offset(offset).Limit(limit).Order(orderClause).Find(&agents).Error
 	if err == nil {
 		if b, jerr := json.Marshal(cachedResult{Agents: agents, Total: total}); jerr == nil {
@@ -211,11 +212,6 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		sanitized := sanitizeProfile(*imageProfile)
 		imagePrompt := "A " + prelimCharType + " character with unique abilities and tools"
 		generatedImage = s.generateImageWithFallback(&sanitized, imagePrompt, prelimCharType)
-
-		// Remove background via ML service (chroma key fallback)
-		if generatedImage != "" {
-			generatedImage = s.removeBackground(generatedImage)
-		}
 	}()
 
 	wg.Wait()
@@ -278,7 +274,15 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		CardVersion:        "2.0",
 	}
 	err = database.DB.Create(agent).Error
-	if err == nil && input.CreatorWallet != "" {
+	if err != nil {
+		return nil, err
+	}
+
+	// Process image: remove background, save to disk, update ImageURL
+	// (requires agent.ID from the DB insert above)
+	s.processAndSaveImage(agent, generatedImage)
+
+	if input.CreatorWallet != "" {
 		entry := models.LibraryEntry{UserWallet: input.CreatorWallet, AgentID: agent.ID}
 		database.DB.Create(&entry)
 		database.DB.Model(&models.Agent{}).Where("id = ?", agent.ID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
@@ -286,13 +290,13 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	// Invalidate agent list + trending caches so new agent appears immediately.
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
-	return agent, err
+	return agent, nil
 }
 
 func (s *AgentService) GetLibrary(wallet string) ([]models.LibraryEntry, error) {
 	var entries []models.LibraryEntry
 	err := database.DB.Preload("Agent", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at")
+		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at, updated_at")
 	}).Where("user_wallet = ?", wallet).Find(&entries).Error
 	return entries, err
 }
@@ -371,9 +375,9 @@ func (s *AgentService) GetTrending() ([]models.Agent, error) {
 		}
 	}
 	var agents []models.Agent
-	// Select only list-view fields, skip heavy prompt and character_data
+	// Select only list-view fields, skip heavy prompt, character_data, and base64 generated_image
 	err := database.DB.
-		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at").
 		Order("(save_count * 3 + use_count * 2) DESC").
 		Limit(6).
 		Find(&agents).Error
@@ -396,11 +400,6 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	forkProfile := buildFallbackProfile(original.Title, original.CharacterType)
 	forkedImage := s.generateImageWithFallback(forkProfile, "A variant of "+original.CharacterType+" agent", original.CharacterType)
 
-	// Remove background via ML service (chroma key fallback)
-	if forkedImage != "" {
-		forkedImage = s.removeBackground(forkedImage)
-	}
-
 	// Deduct 5 credits for forking
 	if creatorWallet != "" {
 		if err := s.deductCredits(creatorWallet, 5, "fork", &original.ID); err != nil {
@@ -409,23 +408,26 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	}
 
 	fork := &models.Agent{
-		Title:          original.Title + " (Fork)",
-		Description:    "Forked from: " + original.Title,
-		Prompt:         "", // Security: prompt stripped from forks to prevent IP extraction
-		Category:       original.Category,
-		CreatorWallet:  creatorWallet,
-		CharacterType:  original.CharacterType,
-		Subclass:       original.Subclass,
-		CharacterData:  original.CharacterData,
-		Rarity:         original.Rarity,
-		Tags:           original.Tags,
-		GeneratedImage: forkedImage,
-		CardVersion:    "2.0",
+		Title:         original.Title + " (Fork)",
+		Description:   "Forked from: " + original.Title,
+		Prompt:        "", // Security: prompt stripped from forks to prevent IP extraction
+		Category:      original.Category,
+		CreatorWallet: creatorWallet,
+		CharacterType: original.CharacterType,
+		Subclass:      original.Subclass,
+		CharacterData: original.CharacterData,
+		Rarity:        original.Rarity,
+		Tags:          original.Tags,
+		CardVersion:   "2.0",
 	}
 
 	if err := database.DB.Create(fork).Error; err != nil {
 		return nil, err
 	}
+
+	// Process image: remove background, save to disk, update ImageURL
+	s.processAndSaveImage(fork, forkedImage)
+
 	// Invalidate caches
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
@@ -655,9 +657,10 @@ func (s *AgentService) generateImageWithFallback(profile *AgentProfile, imagePro
 	}
 }
 
-// removeBackground sends the image to the rembg ML microservice for background removal.
-// On any failure it falls back to chromaKey, and if that also fails it returns the original image unchanged.
-func (s *AgentService) removeBackground(base64Image string) string {
+// removeBackgroundToBytes removes the background from a base64-encoded image and returns
+// raw image bytes plus the format ("webp" from ML service, "png" from chroma key fallback).
+// If all methods fail, returns the original decoded bytes with "png" format.
+func (s *AgentService) removeBackgroundToBytes(base64Image string) ([]byte, string) {
 	raw := base64Image
 	if idx := strings.Index(raw, ","); idx != -1 {
 		raw = raw[idx+1:]
@@ -665,47 +668,79 @@ func (s *AgentService) removeBackground(base64Image string) string {
 
 	imgBytes, err := base64.StdEncoding.DecodeString(raw)
 	if err != nil {
-		log.Printf("[BG-Remove] base64 decode failed, returning original: %v", err)
-		return base64Image
+		log.Printf("[BG-Remove] base64 decode failed: %v", err)
+		return nil, ""
 	}
 
-	// POST raw image bytes to rembg service
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Post(s.rembgURL+"/api/remove", "application/octet-stream", bytes.NewReader(imgBytes))
-	if err != nil {
-		log.Printf("[BG-Remove] ML failed, falling back to chroma key: %v", err)
-		if transparent, ckErr := chromaKey(raw); ckErr != nil {
-			log.Printf("[BG-Remove] chroma key also failed, returning original: %v", ckErr)
-			return base64Image
+	// Try ML removal via rembg (returns WebP with transparency)
+	if s.rembgURL != "" {
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Post(s.rembgURL+"/api/remove", "application/octet-stream", bytes.NewReader(imgBytes))
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == 200 {
+				webpBytes, readErr := io.ReadAll(resp.Body)
+				if readErr == nil && len(webpBytes) > 0 {
+					log.Printf("[BG-Remove] ML removal succeeded (%d bytes, webp)", len(webpBytes))
+					return webpBytes, "webp"
+				}
+				log.Printf("[BG-Remove] ML response read failed: %v", readErr)
+			} else {
+				log.Printf("[BG-Remove] ML returned status %d", resp.StatusCode)
+			}
 		} else {
-			return transparent
+			log.Printf("[BG-Remove] ML service unreachable: %v", err)
+		}
+	} else {
+		log.Printf("[BG-Remove] rembg URL not configured, skipping ML removal")
+	}
+
+	// Fallback: chroma key removal (returns base64 PNG)
+	log.Printf("[BG-Remove] falling back to chroma key")
+	if transparentB64, ckErr := chromaKey(raw); ckErr == nil {
+		pngBytes, decErr := base64.StdEncoding.DecodeString(transparentB64)
+		if decErr == nil && len(pngBytes) > 0 {
+			log.Printf("[BG-Remove] chroma key succeeded (%d bytes, png)", len(pngBytes))
+			return pngBytes, "png"
+		}
+	} else {
+		log.Printf("[BG-Remove] chroma key failed: %v", ckErr)
+	}
+
+	// Last resort: return original image bytes unchanged
+	log.Printf("[BG-Remove] all methods failed, returning original image")
+	return imgBytes, "png"
+}
+
+// processAndSaveImage removes the background from the generated image, saves the
+// result to disk via ImageService, and updates the agent's ImageURL in the database.
+// Also stores a base64 version in GeneratedImage for backwards compatibility.
+func (s *AgentService) processAndSaveImage(agent *models.Agent, generatedImage string) {
+	if generatedImage == "" {
+		return
+	}
+
+	imgBytes, format := s.removeBackgroundToBytes(generatedImage)
+	if len(imgBytes) == 0 {
+		return
+	}
+
+	// Save to disk and set ImageURL
+	if s.imageSvc != nil {
+		relPath, err := s.imageSvc.SaveAgentImage(agent.ID, imgBytes, format)
+		if err == nil {
+			imageURL := s.imageSvc.GetImageURL(relPath)
+			agent.ImageURL = imageURL
+			database.DB.Model(agent).Update("image_url", imageURL)
+			log.Printf("[Image] saved %s (%d bytes) for agent %d", relPath, len(imgBytes), agent.ID)
+		} else {
+			log.Printf("[Image] failed to save file for agent %d: %v", agent.ID, err)
 		}
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		log.Printf("[BG-Remove] ML returned status %d, falling back to chroma key", resp.StatusCode)
-		if transparent, ckErr := chromaKey(raw); ckErr != nil {
-			log.Printf("[BG-Remove] chroma key also failed, returning original: %v", ckErr)
-			return base64Image
-		} else {
-			return transparent
-		}
-	}
-
-	pngBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("[BG-Remove] failed to read ML response, falling back to chroma key: %v", err)
-		if transparent, ckErr := chromaKey(raw); ckErr != nil {
-			log.Printf("[BG-Remove] chroma key also failed, returning original: %v", ckErr)
-			return base64Image
-		} else {
-			return transparent
-		}
-	}
-
-	log.Printf("[BG-Remove] ML removal succeeded (%d bytes)", len(pngBytes))
-	return base64.StdEncoding.EncodeToString(pngBytes)
+	// Keep base64 in GeneratedImage for backwards compatibility
+	agent.GeneratedImage = base64.StdEncoding.EncodeToString(imgBytes)
+	database.DB.Model(agent).Update("generated_image", agent.GeneratedImage)
 }
 
 // chromaKey removes the magenta-screen background (#FF00FF) using global color
@@ -1137,24 +1172,21 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 	imagePrompt := "A " + agent.CharacterType + " character with unique abilities and tools"
 	generatedImage := s.generateImageWithFallback(&sanitized, imagePrompt, agent.CharacterType)
 
-	// Remove background via ML service (chroma key fallback)
-	if generatedImage != "" {
-		generatedImage = s.removeBackground(generatedImage)
-	}
-
 	// Merge new profile into existing character_data
 	charData := MergeProfileIntoCharacterData(agent.CharacterData, profile)
 
-	// Update agent record
+	// Update character_data and regen timestamp
 	now := time.Now()
 	updateErr := database.DB.Model(&agent).Updates(map[string]interface{}{
-		"generated_image":  generatedImage,
 		"character_data":   charData,
 		"last_image_regen": now,
 	}).Error
 	if updateErr != nil {
 		return nil, fmt.Errorf("failed to save regenerated image: %w", updateErr)
 	}
+
+	// Process image: remove background, save to disk, update ImageURL + GeneratedImage
+	s.processAndSaveImage(&agent, generatedImage)
 
 	// Reload to return the full updated agent
 	database.DB.First(&agent, agentID)
@@ -1338,7 +1370,7 @@ func (s *AgentService) GetUserProfile(wallet string) (*UserProfile, error) {
 
 	var agents []models.Agent
 	if err := database.DB.Where("creator_wallet = ?", wallet).
-		Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, generated_image, price, prompt_score, card_version, created_at, updated_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at, updated_at").
 		Order("created_at DESC").
 		Find(&agents).Error; err != nil {
 		return nil, err

@@ -28,7 +28,8 @@ type Agent struct {
 	CharacterData  string          `gorm:"column:character_data;type:jsonb" json:"character_data"`
 	Rarity         CharacterRarity `gorm:"column:rarity;default:'common'" json:"rarity"`
 	Tags           pq.StringArray  `gorm:"column:tags;type:text[]" json:"tags"`
-	GeneratedImage     string          `gorm:"column:generated_image;type:text" json:"generated_image"`
+	GeneratedImage     string          `gorm:"column:generated_image;type:text" json:"generated_image,omitempty"`
+	ImageURL           string          `gorm:"column:image_url;type:text" json:"image_url,omitempty"`
 	UseCount           int64           `gorm:"column:use_count;default:0" json:"use_count"`
 	SaveCount          int64           `gorm:"column:save_count;index;default:0" json:"save_count"`
 	Price              float64         `gorm:"column:price;default:0" json:"price"`

@@ -739,6 +739,7 @@ class _MemberRowState extends State<_MemberRow> {
             size: 36,
             agentId: agent.id,
             generatedImage: agent.generatedImage,
+            imageUrl: agent.imageUrl,
           ),
           const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -209,6 +209,7 @@ class _MemberCardState extends State<_MemberCard> {
               size: widget.size,
               agentId: agent.id,
               generatedImage: agent.generatedImage,
+              imageUrl: agent.imageUrl,
               teamLink: true,
             ),
             if (widget.showRole) ...[

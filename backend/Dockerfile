@@ -17,7 +17,7 @@ RUN apk --no-cache add ca-certificates tzdata
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 COPY --from=builder /app/server .
-RUN chown appuser:appgroup ./server
+RUN mkdir -p ./uploads/agents && chown -R appuser:appgroup ./server ./uploads
 USER appuser
 EXPOSE 8080
 CMD ["./server"]

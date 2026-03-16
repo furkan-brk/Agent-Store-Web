@@ -21,9 +21,18 @@ On 2026-03-16, replaced chroma key (magenta #FF00FF) with ML-based background re
 - Magenta background still requested in prompts (helps ML contrast + fallback)
 - Prompt constraint relaxed: characters can now include pink/fuchsia/purple freely
 
-**Files changed:**
-- Created: `rembg/Dockerfile`
-- Modified: `docker-compose.yml`, `config.go` (RembgURL), `agent_service.go` (removeBackground method + 3 call sites DRY'd), `gemini_service.go` (relaxed prompt), `pollinations_service.go` (cleaned negative prompt)
-- Also touched: `router.go`, `main.go` (pass rembgURL through)
+**v4.0 Phase 1 (rembg service):**
+- Created: `rembg/Dockerfile`, `rembg/server.py` (FastAPI)
+- Modified: `docker-compose.yml`, `config.go`, `agent_service.go`, `gemini_service.go`, `pollinations_service.go`, `router.go`, `main.go`
+
+**v4.0 Phase 2 (Image CDN + WebP):**
+- Custom FastAPI server in rembg: bg removal + WebP output in one call
+- New `ImageService` in Go: saves WebP to `uploads/agents/{id}.webp`
+- New endpoint: `GET /api/v1/images/*filepath` (1-year cache headers, traversal protection)
+- New `image_url` field on Agent model (omitempty), list queries exclude `generated_image`
+- `processAndSaveImage()` orchestrates: bg removal → disk save → DB update
+- Docker: `uploads_data` named volume for persistent image storage
+- Frontend: 12 files updated, `Image.network(url)` with shimmer loading + base64 fallback
+- Backwards compatible: old agents without image_url still work via base64
 
 **How to apply:** For Railway/production, deploy rembg as separate service or set REMBG_URL to Replicate API. Env var `REMBG_URL` makes deployment transparent.

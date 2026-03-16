@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../../core/constants/api_constants.dart';
 import '../../features/character/character_types.dart';
 
 class PixelCharacterWidget extends StatefulWidget {
@@ -19,6 +20,9 @@ class PixelCharacterWidget extends StatefulWidget {
   /// Base64-encoded PNG from Gemini Imagen. When present, shown as the agent's avatar.
   /// When null, a shimmer loading skeleton is displayed instead.
   final String? generatedImage;
+  /// Relative URL to the server-hosted image (e.g. "/api/v1/images/agents/123.webp").
+  /// Preferred over [generatedImage] when available.
+  final String? imageUrl;
 
   const PixelCharacterWidget({
     super.key,
@@ -34,6 +38,7 @@ class PixelCharacterWidget extends StatefulWidget {
     this.stats,
     this.agentId = 0,
     this.generatedImage,
+    this.imageUrl,
   });
 
   @override
@@ -45,6 +50,8 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
   Uint8List? _imageBytes;
+  /// Full URL resolved from the relative [PixelCharacterWidget.imageUrl].
+  String? _resolvedImageUrl;
 
   static Duration _animDuration(CharacterRarity r) {
     switch (r) {
@@ -76,7 +83,8 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   @override
   void didUpdateWidget(PixelCharacterWidget old) {
     super.didUpdateWidget(old);
-    if (old.generatedImage != widget.generatedImage) {
+    if (old.generatedImage != widget.generatedImage ||
+        old.imageUrl != widget.imageUrl) {
       _decodeImage();
       _refreshAnimation();
     }
@@ -86,23 +94,32 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   }
 
   void _decodeImage() {
-    if (widget.generatedImage != null && widget.generatedImage!.isNotEmpty) {
+    // Prefer URL-based loading when available
+    if (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) {
+      _resolvedImageUrl = '${ApiConstants.baseUrl}${widget.imageUrl}';
+      _imageBytes = null; // not needed when URL is available
+    } else if (widget.generatedImage != null && widget.generatedImage!.isNotEmpty) {
+      _resolvedImageUrl = null;
       try {
         _imageBytes = base64Decode(widget.generatedImage!);
       } catch (_) {
         _imageBytes = null;
       }
     } else {
+      _resolvedImageUrl = null;
       _imageBytes = null;
     }
   }
+
+  /// Whether the widget has a resolved image source (URL or base64 bytes).
+  bool get _hasImage => _resolvedImageUrl != null || _imageBytes != null;
 
   /// Manages the animation controller lifecycle:
   /// - No image: always loop (drives shimmer skeleton).
   /// - Image loaded + rare+: loop with rarity-specific duration (drives effects).
   /// - Image loaded + common/uncommon: stop (static, no wasted CPU).
   void _refreshAnimation() {
-    if (_imageBytes == null) {
+    if (!_hasImage) {
       // Shimmer mode — fast loop regardless of rarity
       _ctrl.duration = const Duration(milliseconds: 1200);
       if (!_ctrl.isAnimating) _ctrl.repeat();
@@ -170,7 +187,7 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
         child: AnimatedBuilder(
           animation: _anim,
           builder: (_, __) {
-            if (_imageBytes != null) return _buildImageWithEffects(_anim.value);
+            if (_hasImage) return _buildImageWithEffects(_anim.value);
             return _loadingShimmer(_anim.value);
           },
         ),
@@ -189,13 +206,42 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
 
     Widget img = ClipRRect(
       borderRadius: BorderRadius.circular(4),
-      child: Image.memory(
-        _imageBytes!,
-        width: widget.size,
-        height: widget.size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _errorPlaceholder(),
-      ),
+      child: _resolvedImageUrl != null
+          ? Image.network(
+              _resolvedImageUrl!,
+              width: widget.size,
+              height: widget.size,
+              fit: BoxFit.cover,
+              loadingBuilder: (_, child, progress) {
+                if (progress == null) return child;
+                return _loadingShimmer(v);
+              },
+              errorBuilder: (_, __, ___) {
+                // Fall back to base64 if URL fails and base64 is available
+                if (widget.generatedImage != null && widget.generatedImage!.isNotEmpty) {
+                  try {
+                    final bytes = base64Decode(widget.generatedImage!);
+                    return Image.memory(
+                      bytes,
+                      width: widget.size,
+                      height: widget.size,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _errorPlaceholder(),
+                    );
+                  } catch (_) {
+                    return _errorPlaceholder();
+                  }
+                }
+                return _errorPlaceholder();
+              },
+            )
+          : Image.memory(
+              _imageBytes!,
+              width: widget.size,
+              height: widget.size,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _errorPlaceholder(),
+            ),
     );
 
     // Legendary shimmer overlay

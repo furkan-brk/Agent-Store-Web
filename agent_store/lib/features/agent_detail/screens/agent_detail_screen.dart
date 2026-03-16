@@ -415,6 +415,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
             size: 148, showName: true, showRarity: true,
             showStats: false, stats: a.stats, agentId: a.id,
             generatedImage: a.generatedImage,
+            imageUrl: a.imageUrl,
           ),
           const SizedBox(height: 12),
 
@@ -2365,7 +2366,8 @@ class _SimilarAgentCardState extends State<_SimilarAgentCard> {
           child: Column(children: [
             PixelCharacterWidget(
               characterType: agent.characterType, rarity: agent.rarity,
-              size: 72, agentId: agent.id, generatedImage: agent.generatedImage),
+              size: 72, agentId: agent.id, generatedImage: agent.generatedImage,
+              imageUrl: agent.imageUrl),
             const SizedBox(height: 10),
             Text(agent.title,
               style: const TextStyle(color: AppTheme.textH, fontSize: 12, fontWeight: FontWeight.w600),

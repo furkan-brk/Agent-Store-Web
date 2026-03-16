@@ -92,6 +92,7 @@ func (h *AgentHandler) GetAgent(c *gin.Context) {
 		"rarity":              agent.Rarity,
 		"tags":                agent.Tags,
 		"generated_image":     agent.GeneratedImage,
+		"image_url":           agent.ImageURL,
 		"use_count":           agent.UseCount,
 		"save_count":          agent.SaveCount,
 		"price":               agent.Price,

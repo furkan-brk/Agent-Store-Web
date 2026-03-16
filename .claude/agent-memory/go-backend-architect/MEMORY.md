@@ -4,3 +4,4 @@
 - [project_audit_v2_6.md](project_audit_v2_6.md) — Follow-up audit: GORM v2 locking, CreditTransaction TxHash uniqueIndex, TOCTOU race fixes, error handling cleanup
 - [project_chroma_key_pipeline.md](project_chroma_key_pipeline.md) — v2.7 avatar pipeline: magenta chroma key removal, portrait framing, card_version field
 - [project_rembg_ml_bg_removal.md](project_rembg_ml_bg_removal.md) — ML background removal via rembg Docker sidecar, chroma key as fallback, relaxed avatar color constraints
+- [project_image_cdn_service.md](project_image_cdn_service.md) — v2.8: images saved to disk as WebP, served via URL (not base64), rembg FastAPI rewrite, ImageService abstraction

@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -76,7 +77,8 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembg
 	replicateSvc := services.NewReplicateService(replicateAPIKey)
 	scoreSvc := services.NewScoreService(geminiAPIKey)
 	pollinationsSvc := services.NewPollinationsService()
-	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache, rembgURL)
+	imageSvc := services.NewImageService("./uploads", "")
+	agentSvc := services.NewAgentService(aiSvc, geminiSvc, replicateSvc, scoreSvc, pollinationsSvc, cache, rembgURL, imageSvc)
 	guildSvc := services.NewGuildService(scoreSvc, cache)
 	gmSvc := services.NewGuildMasterService(aiSvc)
 	missionSvc := services.NewMissionService()
@@ -161,6 +163,24 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey, rembg
 		gm.POST("/suggest", gmH.Suggest)
 		gm.POST("/chat", gmH.TeamChat)
 	}
+
+	// Serve uploaded images with long-lived cache headers
+	r.GET("/api/v1/images/*filepath", func(c *gin.Context) {
+		fp := c.Param("filepath")
+		// Security: prevent directory traversal
+		if strings.Contains(fp, "..") {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		fullPath := filepath.Join("./uploads", fp)
+		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		if strings.HasSuffix(fp, ".webp") {
+			c.Header("Content-Type", "image/webp")
+		} else if strings.HasSuffix(fp, ".png") {
+			c.Header("Content-Type", "image/png")
+		}
+		c.File(fullPath)
+	})
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "service": "agent-store-backend", "db_ready": database.IsReady()})

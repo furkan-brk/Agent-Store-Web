@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../shared/models/agent_model.dart';
 import '../data/background_data.dart';
 
@@ -333,35 +334,71 @@ class _CharacterPortrait extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (agent.generatedImage == null || agent.generatedImage!.isEmpty) {
+    final hasUrl = agent.imageUrl != null && agent.imageUrl!.isNotEmpty;
+    final hasBase64 = agent.generatedImage != null && agent.generatedImage!.isNotEmpty;
+
+    if (!hasUrl && !hasBase64) {
       return _portraitPlaceholder();
     }
 
+    return Container(
+      width: 100,
+      height: 120,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: hasUrl
+            ? Image.network(
+                '${ApiConstants.baseUrl}${agent.imageUrl}',
+                fit: BoxFit.contain,
+                width: 100,
+                height: 120,
+                loadingBuilder: (_, child, progress) {
+                  if (progress == null) return child;
+                  return _portraitPlaceholder();
+                },
+                errorBuilder: (_, __, ___) {
+                  // Fall back to base64 if URL fails
+                  if (hasBase64) {
+                    try {
+                      final bytes = base64Decode(agent.generatedImage!);
+                      return Image.memory(
+                        bytes,
+                        fit: BoxFit.contain,
+                        width: 100,
+                        height: 120,
+                        errorBuilder: (_, __, ___) => _portraitPlaceholder(),
+                      );
+                    } catch (_) {
+                      return _portraitPlaceholder();
+                    }
+                  }
+                  return _portraitPlaceholder();
+                },
+              )
+            : _buildBase64Image(),
+      ),
+    );
+  }
+
+  Widget _buildBase64Image() {
     try {
       final bytes = base64Decode(agent.generatedImage!);
-      return Container(
+      return Image.memory(
+        bytes,
+        fit: BoxFit.contain,
         width: 100,
         height: 120,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.5),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.contain,
-            width: 100,
-            height: 120,
-            errorBuilder: (_, __, ___) => _portraitPlaceholder(),
-          ),
-        ),
+        errorBuilder: (_, __, ___) => _portraitPlaceholder(),
       );
     } catch (_) {
       return _portraitPlaceholder();

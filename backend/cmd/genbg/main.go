@@ -115,7 +115,7 @@ func main() {
 }
 
 func callImagen(apiKey, prompt string) (string, error) {
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key=%s", apiKey)
+	url := "https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict"
 
 	reqBody := map[string]interface{}{
 		"instances":  []map[string]interface{}{{"prompt": prompt}},
@@ -124,7 +124,13 @@ func callImagen(apiKey, prompt string) (string, error) {
 
 	body, _ := json.Marshal(reqBody)
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Post(url, "application/json", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
