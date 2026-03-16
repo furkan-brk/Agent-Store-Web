@@ -17,10 +17,16 @@ class GuildMasterScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(GuildMasterController(
-      initialAgents: initialAgents,
-      initialGuildName: initialGuildName,
-    ));
+    // If opened with pre-loaded agents (from guild detail), create a fresh instance.
+    // Otherwise reuse the preloaded controller if available.
+    final ctrl = (initialAgents != null && initialAgents!.isNotEmpty)
+        ? Get.put(GuildMasterController(
+            initialAgents: initialAgents,
+            initialGuildName: initialGuildName,
+          ), tag: 'guild_from_detail')
+        : (Get.isRegistered<GuildMasterController>()
+            ? Get.find<GuildMasterController>()
+            : Get.put(GuildMasterController()));
 
     return Obx(() => switch (ctrl.phase.value) {
       GuildMasterPhase.input   => _buildInput(context, ctrl),

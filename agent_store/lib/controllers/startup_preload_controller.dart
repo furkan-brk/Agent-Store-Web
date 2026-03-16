@@ -5,8 +5,10 @@ import 'package:get/get.dart';
 import 'create_agent_controller.dart';
 import 'creator_controller.dart';
 import 'guild_controller.dart';
+import 'guild_master_controller.dart';
 import 'leaderboard_controller.dart';
 import 'library_controller.dart';
+import 'settings_controller.dart';
 import 'store_controller.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/app_telemetry_service.dart';
@@ -45,9 +47,11 @@ class StartupPreloadController extends GetxService {
       case _PreloadTier.slow:
         _schedule(const Duration(milliseconds: 600), () {
           _ensure<CreateAgentController>(() => CreateAgentController());
+          _ensure<SettingsController>(() => SettingsController());
         });
         _schedule(const Duration(milliseconds: 1400), () {
           _ensure<LeaderboardController>(() => LeaderboardController());
+          _ensure<GuildMasterController>(() => GuildMasterController());
         });
         _schedule(const Duration(milliseconds: 2200), _preloadAuthHeavy);
     }
@@ -65,6 +69,8 @@ class StartupPreloadController extends GetxService {
   void _preloadSecondary() {
     _ensure<CreateAgentController>(() => CreateAgentController());
     _ensure<LeaderboardController>(() => LeaderboardController());
+    _ensure<SettingsController>(() => SettingsController());
+    _ensure<GuildMasterController>(() => GuildMasterController());
     _preloadAuthHeavy();
   }
 

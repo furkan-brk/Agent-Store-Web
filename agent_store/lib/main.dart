@@ -8,6 +8,7 @@ import 'shared/services/api_service.dart';
 import 'shared/services/app_telemetry_service.dart';
 import 'shared/services/mission_service.dart';
 import 'shared/services/wallet_service.dart';
+import 'features/legend/services/legend_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,7 @@ void main() async {
   // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
   await ApiService.instance.init();
   await MissionService.instance.init();
+  await LegendService.instance.init();
   await WalletService.instance.init();
   // Register global AuthController — lives for the entire app lifetime.
   // By this point both services have their persisted state restored,
