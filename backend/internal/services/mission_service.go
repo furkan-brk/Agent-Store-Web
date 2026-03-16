@@ -8,6 +8,7 @@ import (
 
 	"github.com/agentstore/backend/internal/database"
 	"github.com/agentstore/backend/internal/models"
+	"gorm.io/gorm"
 )
 
 // MissionService handles mission CRUD and tag expansion.
@@ -110,6 +111,47 @@ func (s *MissionService) SaveUserMission(wallet string, input SaveMissionInput) 
 	return mission, nil
 }
 
+// BatchSyncMissions upserts multiple missions in one request and returns the
+// full list of all user missions from the DB. This replaces the N sequential
+// save calls the frontend had to make during local→remote sync.
+func (s *MissionService) BatchSyncMissions(wallet string, inputs []SaveMissionInput) ([]models.UserMission, error) {
+	wallet = strings.ToLower(wallet)
+
+	for _, input := range inputs {
+		if err := validateMissionInput(input); err != nil {
+			return nil, fmt.Errorf("invalid mission %q: %w", input.ID, err)
+		}
+
+		mission := &models.UserMission{}
+		err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(mission).Error
+		if err != nil {
+			mission = &models.UserMission{
+				UserWallet: wallet,
+				ClientID:   input.ID,
+				CreatedAt:  input.CreatedAt,
+			}
+		}
+		if mission.CreatedAt.IsZero() {
+			mission.CreatedAt = time.Now()
+		}
+		if !input.CreatedAt.IsZero() {
+			mission.CreatedAt = input.CreatedAt
+		}
+		mission.Title = input.Title
+		mission.Slug = input.Slug
+		mission.Prompt = input.Prompt
+		if input.UseCount > mission.UseCount {
+			mission.UseCount = input.UseCount
+		}
+
+		if err := database.DB.Save(mission).Error; err != nil {
+			return nil, fmt.Errorf("failed to save mission %q: %w", input.ID, err)
+		}
+	}
+
+	return s.ListUserMissions(wallet)
+}
+
 // DeleteUserMission removes a mission by wallet and client ID.
 func (s *MissionService) DeleteUserMission(wallet, clientID string) error {
 	return database.DB.Where("user_wallet = ? AND client_id = ?", strings.ToLower(wallet), clientID).Delete(&models.UserMission{}).Error
@@ -183,7 +225,7 @@ func (s *MissionService) ExpandMissionTags(wallet, text string) (*ExpandMissionO
 	for _, slug := range usedSlugs {
 		database.DB.Model(&models.UserMission{}).
 			Where("user_wallet = ? AND slug = ?", wallet, slug).
-			UpdateColumn("use_count", database.DB.Raw("use_count + 1"))
+			UpdateColumn("use_count", gorm.Expr("use_count + 1"))
 	}
 
 	return &ExpandMissionOutput{ExpandedText: expanded, UsedSlugs: usedSlugs}, nil

@@ -160,6 +160,42 @@ func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflow
 	}, nil
 }
 
+// BatchSyncWorkflows upserts multiple workflows in one request and returns the
+// full list of all user workflows from the DB. This replaces N sequential save
+// calls during local→remote sync.
+func (s *LegendService) BatchSyncWorkflows(wallet string, inputs []SaveLegendWorkflowInput) ([]LegendWorkflowDTO, error) {
+	wallet = strings.ToLower(wallet)
+
+	for _, input := range inputs {
+		if err := validateWorkflowInput(input); err != nil {
+			return nil, fmt.Errorf("invalid workflow %q: %w", input.ID, err)
+		}
+
+		record := &models.UserLegendWorkflow{}
+		err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(record).Error
+		if err != nil {
+			record = &models.UserLegendWorkflow{
+				UserWallet: wallet,
+				ClientID:   input.ID,
+			}
+		}
+		updatedAt := input.UpdatedAt
+		if updatedAt.IsZero() {
+			updatedAt = time.Now()
+		}
+		record.Name = input.Name
+		record.NodesJSON = string(input.Nodes)
+		record.EdgesJSON = string(input.Edges)
+		record.UpdatedAt = updatedAt
+
+		if err := database.DB.Save(record).Error; err != nil {
+			return nil, fmt.Errorf("failed to save workflow %q: %w", input.ID, err)
+		}
+	}
+
+	return s.ListUserWorkflows(wallet)
+}
+
 // DeleteUserWorkflow removes a workflow by wallet and client ID.
 func (s *LegendService) DeleteUserWorkflow(wallet, clientID string) error {
 	return database.DB.Where("user_wallet = ? AND client_id = ?", strings.ToLower(wallet), clientID).Delete(&models.UserLegendWorkflow{}).Error

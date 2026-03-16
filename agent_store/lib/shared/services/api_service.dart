@@ -331,6 +331,26 @@ class ApiService {
     return false;
   }
 
+  /// Sends all local missions to the backend in a single request. The backend
+  /// upserts each one and returns the full list from the DB.
+  Future<List<MissionModel>> batchSyncMissions(List<MissionModel> missions) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userMissionsSync),
+        headers: _headers,
+        body: jsonEncode({'missions': missions.map((m) => m.toJson()).toList()}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['missions'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      debugPrint('batchSyncMissions: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('batchSyncMissions: $e'); }
+    return [];
+  }
+
   Future<List<LegendWorkflow>> getLegendWorkflows() async {
     try {
       final res = await http.get(Uri.parse(ApiConstants.userLegendWorkflows), headers: _headers);
@@ -365,6 +385,77 @@ class ApiService {
       return res.statusCode == 200;
     } catch (e) { debugPrint('deleteLegendWorkflow: $e'); }
     return false;
+  }
+
+  /// Sends all local workflows to the backend in a single request. The backend
+  /// upserts each one and returns the full list from the DB.
+  Future<List<LegendWorkflow>> batchSyncLegendWorkflows(List<LegendWorkflow> workflows) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userLegendWorkflowsSync),
+        headers: _headers,
+        body: jsonEncode({'workflows': workflows.map((w) => w.toJson()).toList()}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['workflows'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      debugPrint('batchSyncLegendWorkflows: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('batchSyncLegendWorkflows: $e'); }
+    return [];
+  }
+
+  Future<WorkflowExecution?> executeWorkflow(String workflowId, String inputMessage) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.userLegendWorkflows}/$workflowId/execute'),
+        headers: _headers,
+        body: jsonEncode({'input_message': inputMessage}),
+      ).timeout(const Duration(seconds: 180));
+      if (res.statusCode == 200) {
+        return WorkflowExecution.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('executeWorkflow: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('executeWorkflow: $e'); }
+    return null;
+  }
+
+  Future<WorkflowExecution?> getExecution(int execId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.userLegendExecutions}/$execId'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        return WorkflowExecution.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+    } catch (e) { debugPrint('getExecution: $e'); }
+    return null;
+  }
+
+  Future<({List<WorkflowExecution> executions, int total})> listExecutions({
+    String? workflowId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final uri = Uri.parse(ApiConstants.userLegendExecutions).replace(queryParameters: {
+        'page': '$page',
+        'limit': '$limit',
+        if (workflowId != null) 'workflow_id': workflowId,
+      });
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final list = (data['executions'] as List<dynamic>? ?? [])
+            .map((e) => WorkflowExecution.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return (executions: list, total: data['total'] as int? ?? 0);
+      }
+    } catch (e) { debugPrint('listExecutions: $e'); }
+    return (executions: <WorkflowExecution>[], total: 0);
   }
 
   // ── Trial ─────────────────────────────────────────────────────────────────

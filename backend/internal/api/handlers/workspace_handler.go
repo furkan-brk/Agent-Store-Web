@@ -56,6 +56,25 @@ func (h *WorkspaceHandler) DeleteMission(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "mission deleted"})
 }
 
+// BatchSyncMissions receives an array of missions from the frontend and upserts
+// them all, then returns the complete mission list from the DB. This is the
+// primary sync mechanism used on login / page refresh.
+func (h *WorkspaceHandler) BatchSyncMissions(c *gin.Context) {
+	var body struct {
+		Missions []services.SaveMissionInput `json:"missions" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	missions, err := h.missionSvc.BatchSyncMissions(c.GetString("wallet"), body.Missions)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"missions": missions})
+}
+
 // ExpandMissions expands #slug references in a text body.
 func (h *WorkspaceHandler) ExpandMissions(c *gin.Context) {
 	var input services.ExpandMissionInput
@@ -70,6 +89,24 @@ func (h *WorkspaceHandler) ExpandMissions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+// BatchSyncLegendWorkflows receives an array of workflows from the frontend and
+// upserts them all, then returns the complete workflow list from the DB.
+func (h *WorkspaceHandler) BatchSyncLegendWorkflows(c *gin.Context) {
+	var body struct {
+		Workflows []services.SaveLegendWorkflowInput `json:"workflows" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	workflows, err := h.legendSvc.BatchSyncWorkflows(c.GetString("wallet"), body.Workflows)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"workflows": workflows})
 }
 
 // GetLegendWorkflows returns all workflows for the authenticated user.

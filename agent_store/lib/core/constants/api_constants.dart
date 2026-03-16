@@ -11,7 +11,10 @@ class ApiConstants {
   static const String userCredits = '$apiV1/user/credits';
   static const String userProfile = '$apiV1/user/profile';
   static const String userMissions = '$apiV1/user/missions';
+  static const String userMissionsSync = '$apiV1/user/missions/sync';
   static const String userLegendWorkflows = '$apiV1/user/legend/workflows';
+  static const String userLegendWorkflowsSync = '$apiV1/user/legend/workflows/sync';
+  static const String userLegendExecutions = '$apiV1/user/legend/executions';
   static const String guilds            = '$apiV1/guilds';
   static const String userCreditHistory = '$apiV1/user/credits/history';
   static const String leaderboard       = '$apiV1/leaderboard';

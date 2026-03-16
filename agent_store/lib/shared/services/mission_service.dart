@@ -19,17 +19,18 @@ class MissionService {
   Future<void> refresh() async {
     final local = await _loadLocal();
     if (ApiService.instance.isAuthenticated) {
-      var remote = await ApiService.instance.getUserMissions();
+      // If there are local missions, batch-sync them to the backend in one
+      // request instead of N sequential POSTs. The backend upserts each and
+      // returns the complete list from the DB.
+      List<MissionModel> remote;
       if (local.isNotEmpty) {
-        final remoteIds = remote.map((m) => m.id).toSet();
-        for (final mission in local) {
-          if (remoteIds.contains(mission.id)) continue;
-          final saved = await ApiService.instance.saveMission(mission);
-          if (saved != null) {
-            remoteIds.add(saved.id);
-            remote = [...remote, saved];
-          }
+        remote = await ApiService.instance.batchSyncMissions(local);
+        // If batch sync returned empty (e.g. network error), fall back to GET.
+        if (remote.isEmpty) {
+          remote = await ApiService.instance.getUserMissions();
         }
+      } else {
+        remote = await ApiService.instance.getUserMissions();
       }
       _missions
         ..clear()

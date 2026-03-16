@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import '../shared/services/api_service.dart';
+import '../shared/services/mission_service.dart';
 import '../shared/services/wallet_service.dart';
 import '../shared/services/notification_service.dart';
+import '../features/legend/services/legend_service.dart';
 
 class AuthController extends GetxController {
   static AuthController get to => Get.find();
@@ -41,9 +45,10 @@ class AuthController extends GetxController {
       isConnected.value = true;
       await loadCredits();
     } else if (hasToken && !hasWallet) {
-      // JWT exists but MetaMask no longer has the account — clear the session
-      // because we cannot make authenticated requests without wallet context.
-      ApiService.instance.clearToken();
+      // JWT exists but MetaMask no longer has the account.
+      // Keep the token alive so background data sync (missions, legend
+      // workflows) can still read/write the DB. The user just can't
+      // perform wallet-specific actions until they reconnect MetaMask.
       isConnected.value = false;
     }
     // If neither token nor wallet, user is simply not logged in — nothing to do.
@@ -98,6 +103,12 @@ class AuthController extends GetxController {
 
     NotificationService.instance.add('Wallet connected successfully!', type: 'save');
     await loadCredits();
+
+    // Sync local-only missions & legend workflows to the backend now that we
+    // have a valid JWT. This handles data created while the user was offline
+    // or when MetaMask was disconnected on a previous page refresh.
+    unawaited(MissionService.instance.refresh());
+    unawaited(LegendService.instance.refresh());
   }
 
   void disconnect() {

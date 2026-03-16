@@ -21,17 +21,17 @@ class LegendService {
   Future<void> refresh() async {
     final local = await _loadLocal();
     if (ApiService.instance.isAuthenticated) {
-      var remote = await ApiService.instance.getLegendWorkflows();
+      // Batch-sync all local workflows to the backend in a single request.
+      // The backend upserts each and returns the complete DB list.
+      List<LegendWorkflow> remote;
       if (local.isNotEmpty) {
-        final remoteIds = remote.map((w) => w.id).toSet();
-        for (final workflow in local) {
-          if (remoteIds.contains(workflow.id)) continue;
-          final saved = await ApiService.instance.saveLegendWorkflow(workflow);
-          if (saved != null) {
-            remoteIds.add(saved.id);
-            remote = [...remote, saved];
-          }
+        remote = await ApiService.instance.batchSyncLegendWorkflows(local);
+        // If batch sync returned empty (e.g. network error), fall back to GET.
+        if (remote.isEmpty) {
+          remote = await ApiService.instance.getLegendWorkflows();
         }
+      } else {
+        remote = await ApiService.instance.getLegendWorkflows();
       }
       _workflows = _mergeWorkflows(local, remote);
       _sortWorkflows();
