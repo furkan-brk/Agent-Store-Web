@@ -3,6 +3,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
+import '../../../features/character/character_types.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
@@ -573,38 +574,20 @@ class _LegendScreenState extends State<LegendScreen> {
   // ── Node name editing ──────────────────────────────────────────────────────
 
   void _showRenameNodeDialog(WorkflowNode node) {
-    final ctrl = TextEditingController(text: node.label);
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('Rename Node', style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(hintText: 'Node label'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              final v = ctrl.text.trim();
-              if (v.isNotEmpty) {
-                final idx = _nodes.indexWhere((n) => n.id == node.id);
-                if (idx >= 0) {
-                  setState(() => _nodes[idx] = _nodes[idx].copyWith(label: v));
-                }
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Rename'),
-          ),
-        ],
+      builder: (_) => _RenameNodeDialogWithMentions(
+        initialLabel: node.label,
+        libraryAgents: _libraryAgents,
+        missions: _missions,
+        onRename: (newLabel) {
+          if (newLabel.trim().isNotEmpty) {
+            final idx = _nodes.indexWhere((n) => n.id == node.id);
+            if (idx >= 0) {
+              setState(() => _nodes[idx] = _nodes[idx].copyWith(label: newLabel.trim()));
+            }
+          }
+        },
       ),
     );
   }
@@ -1481,4 +1464,400 @@ class _EdgePainter extends CustomPainter {
   @override
   bool shouldRepaint(_EdgePainter old) =>
       old.edges != edges || old.nodes != nodes || old.offset != offset || old.dragFromPort != dragFromPort || old.dragOffset != dragOffset;
+}
+
+// ── Rename Node Dialog with Mentions ──────────────────────────────────────────
+
+class _RenameNodeDialogWithMentions extends StatefulWidget {
+  final String initialLabel;
+  final List<AgentModel> libraryAgents;
+  final List<MissionModel> missions;
+  final Function(String) onRename;
+
+  const _RenameNodeDialogWithMentions({
+    required this.initialLabel,
+    required this.libraryAgents,
+    required this.missions,
+    required this.onRename,
+  });
+
+  @override
+  State<_RenameNodeDialogWithMentions> createState() => _RenameNodeDialogWithMentionsState();
+}
+
+class _RenameNodeDialogWithMentionsState extends State<_RenameNodeDialogWithMentions> {
+  late final TextEditingController _ctrl;
+  List<AgentModel> _agentSuggestions = const [];
+  List<MissionModel> _missionSuggestions = const [];
+  String _activeTrigger = '';
+  bool _showMentions = false;
+  int _mentionStart = -1;
+  int _selectedSuggestionIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialLabel);
+    _ctrl.addListener(_onTextChanged);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.removeListener(_onTextChanged);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onTextChanged() {
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : _ctrl.text.length;
+    final text = _ctrl.text;
+    if (cursor > text.length) return;
+
+    final prefix = text.substring(0, cursor);
+    final at = prefix.lastIndexOf('@');
+    final hash = prefix.lastIndexOf('#');
+    final trigger = at > hash ? '@' : '#';
+    final triggerIndex = trigger == '@' ? at : hash;
+    if (triggerIndex == -1) {
+      _hideMentions();
+      return;
+    }
+
+    if (triggerIndex > 0 && !RegExp(r'\s').hasMatch(prefix[triggerIndex - 1])) {
+      _hideMentions();
+      return;
+    }
+
+    final query = prefix.substring(triggerIndex + 1);
+    if (query.contains(RegExp(r'\s'))) {
+      _hideMentions();
+      return;
+    }
+
+    final q = query.toLowerCase();
+    if (trigger == '@') {
+      final suggestions = widget.libraryAgents
+          .where((a) => q.isEmpty || a.title.toLowerCase().contains(q))
+          .take(8)
+          .toList();
+      setState(() {
+        _mentionStart = triggerIndex;
+        _activeTrigger = '@';
+        _agentSuggestions = suggestions;
+        _missionSuggestions = const [];
+        _showMentions = true;
+        _selectedSuggestionIndex = 0;
+      });
+      return;
+    }
+
+    final missionSuggestions = widget.missions
+        .where((m) => q.isEmpty || m.title.toLowerCase().contains(q) || m.slug.toLowerCase().contains(q))
+        .take(8)
+        .toList();
+    setState(() {
+      _mentionStart = triggerIndex;
+      _activeTrigger = '#';
+      _agentSuggestions = const [];
+      _missionSuggestions = missionSuggestions;
+      _showMentions = true;
+      _selectedSuggestionIndex = 0;
+    });
+  }
+
+  void _hideMentions() {
+    if (!_showMentions && _agentSuggestions.isEmpty && _missionSuggestions.isEmpty) return;
+    setState(() {
+      _showMentions = false;
+      _activeTrigger = '';
+      _agentSuggestions = const [];
+      _missionSuggestions = const [];
+      _mentionStart = -1;
+      _selectedSuggestionIndex = 0;
+    });
+  }
+
+  void _insertMention(AgentModel agent) {
+    final text = _ctrl.text;
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '@${agent.title}';
+    final next = '$before$mention$after';
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideMentions();
+  }
+
+  void _insertMission(MissionModel mission) {
+    final text = _ctrl.text;
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '#${mission.slug}';
+    final next = '$before$mention$after';
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideMentions();
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppTheme.card,
+      surfaceTintColor: Colors.transparent,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Rename Node',
+                style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              _MentionTextField(
+                controller: _ctrl,
+                onChanged: _onTextChanged,
+              ),
+              if (_showMentions) ...[
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 200),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surface,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  child: _activeTrigger == '@'
+                      ? _agentSuggestions.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Text(
+                                'No agents found',
+                                style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _agentSuggestions.length,
+                              itemBuilder: (_, i) {
+                                final agent = _agentSuggestions[i];
+                                final isSelected = i == _selectedSuggestionIndex;
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: ListTile(
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    selected: isSelected,
+                                    selectedTileColor: AppTheme.primary.withValues(alpha: 0.14),
+                                    hoverColor: AppTheme.primary.withValues(alpha: 0.08),
+                                    title: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primary.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            '@',
+                                            style: TextStyle(
+                                              color: AppTheme.primary,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            agent.title,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: AppTheme.textH,
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      agent.characterType.displayName,
+                                      style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                                    ),
+                                    onTap: () => _insertMention(agent),
+                                  ),
+                                );
+                              },
+                            )
+                      : _missionSuggestions.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Text(
+                                'No missions found',
+                                style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: _missionSuggestions.length,
+                              itemBuilder: (_, i) {
+                                final mission = _missionSuggestions[i];
+                                final isSelected = i == _selectedSuggestionIndex;
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: ListTile(
+                                    dense: true,
+                                    visualDensity: VisualDensity.compact,
+                                    selected: isSelected,
+                                    selectedTileColor: AppTheme.gold.withValues(alpha: 0.12),
+                                    hoverColor: AppTheme.gold.withValues(alpha: 0.08),
+                                    title: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.gold.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text(
+                                            '#',
+                                            style: TextStyle(
+                                              color: AppTheme.gold,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            mission.slug,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: AppTheme.textH,
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      mission.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                                    ),
+                                    onTap: () => _insertMission(mission),
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+                    onPressed: () {
+                      final v = _ctrl.text.trim();
+                      if (v.isNotEmpty) {
+                        widget.onRename(v);
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: const Text('Rename'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mention-aware text field ──────────────────────────────────────────────
+
+class _MentionTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+
+  const _MentionTextField({
+    required this.controller,
+    required this.onChanged,
+  });
+
+  @override
+  State<_MentionTextField> createState() => _MentionTextFieldState();
+}
+
+class _MentionTextFieldState extends State<_MentionTextField> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(widget.onChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(widget.onChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: widget.controller,
+      autofocus: true,
+      style: const TextStyle(color: AppTheme.textH),
+      decoration: InputDecoration(
+        hintText: 'Node label (type @ for agents, # for missions)',
+        hintStyle: TextStyle(color: AppTheme.textM.withValues(alpha: 0.6)),
+        filled: true,
+        fillColor: AppTheme.bg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppTheme.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: AppTheme.primary, width: 2),
+        ),
+      ),
+    );
+  }
 }
