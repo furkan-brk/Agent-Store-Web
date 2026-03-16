@@ -42,9 +42,9 @@ class _LegendScreenState extends State<LegendScreen> {
   Offset _canvasOffset = Offset.zero;
   String? _selectedNodeId;
 
-  // Connect mode
-  bool _connectMode = false;
-  String? _connectFromId;
+  // Port dragging (format: "nodeId_output" or "nodeId_input")
+  String? _dragFromPort;
+  Offset _dragCurrentOffset = Offset.zero;
 
   // Canvas key to convert global offsets to local
   final GlobalKey _canvasKey = GlobalKey();
@@ -158,8 +158,8 @@ class _LegendScreenState extends State<LegendScreen> {
       _nodes = [];
       _edges = [];
       _selectedNodeId = null;
-      _connectMode = false;
-      _connectFromId = null;
+      _dragFromPort = null;
+      _dragCurrentOffset = Offset.zero;
       _canvasOffset = Offset.zero;
     });
   }
@@ -288,8 +288,8 @@ class _LegendScreenState extends State<LegendScreen> {
         _nodes = nodes;
         _edges = edges;
         _selectedNodeId = null;
-        _connectMode = false;
-        _connectFromId = null;
+        _dragFromPort = null;
+        _dragCurrentOffset = Offset.zero;
         _canvasOffset = Offset.zero;
       });
       _showNotice('Starter workflow created', background: AppTheme.success);
@@ -363,8 +363,8 @@ class _LegendScreenState extends State<LegendScreen> {
       _nodes.clear();
       _edges.clear();
       _selectedNodeId = null;
-      _connectMode = false;
-      _connectFromId = null;
+      _dragFromPort = null;
+      _dragCurrentOffset = Offset.zero;
     });
   }
 
@@ -389,37 +389,52 @@ class _LegendScreenState extends State<LegendScreen> {
   // ── Connect mode ───────────────────────────────────────────────────────────
 
   void _onNodeTap(WorkflowNode node) {
-    if (!_connectMode) {
-      setState(() => _selectedNodeId = node.id);
-      return;
-    }
-    if (_connectFromId == null) {
-      setState(() => _connectFromId = node.id);
-      return;
-    }
-    if (_connectFromId != node.id) {
-      // Prevent duplicate edges
-      final alreadyExists = _edges.any(
-        (e) => e.fromId == _connectFromId && e.toId == node.id,
-      );
-      if (!alreadyExists) {
-        setState(() {
-          _edges.add(WorkflowEdge(
-            id: '${_connectFromId}_${node.id}',
-            fromId: _connectFromId!,
-            toId: node.id,
-          ));
-        });
-      }
-    }
-    setState(() => _connectFromId = null);
+    setState(() => _selectedNodeId = node.id);
   }
 
-  void _toggleConnectMode() {
+  void _onPortDragStart(String portId) {
     setState(() {
-      _connectMode = !_connectMode;
-      _connectFromId = null;
-      _selectedNodeId = null;
+      _dragFromPort = portId;
+      _dragCurrentOffset = Offset.zero;
+    });
+  }
+
+  void _onPortDragUpdate(Offset globalOffset) {
+    final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final local = box.globalToLocal(globalOffset);
+    setState(() => _dragCurrentOffset = local);
+  }
+
+  void _onPortDragEnd(String? toPortId) {
+    if (_dragFromPort != null && toPortId != null && _dragFromPort != toPortId) {
+      final fromParts = _dragFromPort!.split('_');
+      final toParts = toPortId.split('_');
+      if (fromParts.length == 2 && toParts.length == 2) {
+        final fromNodeId = fromParts[0];
+        final toNodeId = toParts[0];
+        if (fromNodeId != toNodeId) {
+          // Only allow output -> input connections
+          if (fromParts[1] == 'output' && toParts[1] == 'input') {
+            final alreadyExists = _edges.any(
+              (e) => e.fromId == fromNodeId && e.toId == toNodeId,
+            );
+            if (!alreadyExists) {
+              setState(() {
+                _edges.add(WorkflowEdge(
+                  id: '${fromNodeId}_$toNodeId',
+                  fromId: fromNodeId,
+                  toId: toNodeId,
+                ));
+              });
+            }
+          }
+        }
+      }
+    }
+    setState(() {
+      _dragFromPort = null;
+      _dragCurrentOffset = Offset.zero;
     });
   }
 
@@ -461,8 +476,8 @@ class _LegendScreenState extends State<LegendScreen> {
       _workflowName = wf.name;
       _currentWorkflowId = wf.id;
       _selectedNodeId = null;
-      _connectMode = false;
-      _connectFromId = null;
+      _dragFromPort = null;
+      _dragCurrentOffset = Offset.zero;
       _canvasOffset = Offset.zero;
     });
     Navigator.of(context).pop();
@@ -673,15 +688,8 @@ class _LegendScreenState extends State<LegendScreen> {
           ),
           const SizedBox(width: 8),
           // Connect mode toggle
-          _ToolbarButton(
-            icon: Icons.cable_outlined,
-            label: _connectMode ? 'Connecting…' : 'Connect',
-            active: _connectMode,
-            onTap: _toggleConnectMode,
-          ),
-          const SizedBox(width: 8),
           // Delete selected
-          if (_selectedNodeId != null) ...[
+          if (_selectedNodeId != null) ...[            
             _ToolbarButton(
               icon: Icons.delete_outline,
               label: 'Delete',
@@ -929,7 +937,10 @@ class _LegendScreenState extends State<LegendScreen> {
           ),
           child: ClipRect(
             child: GestureDetector(
-              onPanUpdate: _onCanvasPan,
+              onPanUpdate: (d) {
+                _onCanvasPan(d);
+                if (_dragFromPort != null) _onPortDragUpdate(d.globalPosition);
+              },
               behavior: HitTestBehavior.opaque,
               child: Stack(
                 key: _canvasKey,
@@ -945,7 +956,8 @@ class _LegendScreenState extends State<LegendScreen> {
                         nodes: _nodes,
                         edges: _edges,
                         offset: _canvasOffset,
-                        connectFromId: _connectFromId,
+                        dragFromPort: _dragFromPort,
+                        dragOffset: _dragCurrentOffset,
                       ),
                     ),
                   ),
@@ -963,8 +975,9 @@ class _LegendScreenState extends State<LegendScreen> {
                         child: _NodeCard(
                           node: node,
                           isSelected: _selectedNodeId == node.id,
-                          isConnectSource: _connectFromId == node.id,
-                          connectMode: _connectMode,
+                          onPortDragStart: _onPortDragStart,
+                          onPortDragUpdate: _onPortDragUpdate,
+                          onPortDragEnd: _onPortDragEnd,
                         ),
                       ),
                     ),
@@ -973,32 +986,6 @@ class _LegendScreenState extends State<LegendScreen> {
                   if (_nodes.isEmpty)
                     const Center(
                       child: _CanvasEmptyHint(),
-                    ),
-
-                  // Connect mode banner
-                  if (_connectMode)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.info.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.info),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.cable_outlined, size: 14, color: AppTheme.info),
-                            const SizedBox(width: 6),
-                            Text(
-                              _connectFromId == null ? 'Tap source node' : 'Tap target node',
-                              style: const TextStyle(color: AppTheme.info, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                 ],
               ),
@@ -1018,7 +1005,6 @@ class _ToolbarButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final bool active;
   final bool accent;
   final bool danger;
 
@@ -1026,7 +1012,6 @@ class _ToolbarButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.active = false,
     this.accent = false,
     this.danger = false,
   });
@@ -1035,18 +1020,14 @@ class _ToolbarButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color fg = danger
         ? AppTheme.error
-        : active
-            ? AppTheme.info
-            : accent
-                ? AppTheme.gold
-                : AppTheme.textB;
+        : accent
+            ? AppTheme.gold
+            : AppTheme.textB;
     final Color bg = danger
         ? AppTheme.error.withValues(alpha: 0.12)
-        : active
-            ? AppTheme.info.withValues(alpha: 0.15)
-            : accent
-                ? AppTheme.gold.withValues(alpha: 0.12)
-                : AppTheme.card;
+        : accent
+            ? AppTheme.gold.withValues(alpha: 0.12)
+            : AppTheme.card;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
@@ -1055,14 +1036,17 @@ class _ToolbarButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: fg.withValues(alpha: active || accent ? 0.5 : 0.25)),
+          border: Border.all(color: fg.withValues(alpha: accent ? 0.5 : 0.25)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 14, color: fg),
             const SizedBox(width: 5),
-            Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500)),
+            Text(
+              label,
+              style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       ),
@@ -1228,14 +1212,16 @@ class _GridPainter extends CustomPainter {
 class _NodeCard extends StatelessWidget {
   final WorkflowNode node;
   final bool isSelected;
-  final bool isConnectSource;
-  final bool connectMode;
+  final Function(String)? onPortDragStart;
+  final Function(Offset)? onPortDragUpdate;
+  final Function(String?)? onPortDragEnd;
 
   const _NodeCard({
     required this.node,
     required this.isSelected,
-    required this.isConnectSource,
-    required this.connectMode,
+    this.onPortDragStart,
+    this.onPortDragUpdate,
+    this.onPortDragEnd,
   });
 
   Color get _accentColor {
@@ -1267,7 +1253,7 @@ class _NodeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _accentColor;
-    final highlighted = isSelected || isConnectSource;
+    final portId = node.id;
 
     return SizedBox(
       width: _kNodeW,
@@ -1278,10 +1264,10 @@ class _NodeCard extends StatelessWidget {
           color: AppTheme.card,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: highlighted ? accent : (connectMode ? accent.withValues(alpha: 0.5) : AppTheme.border),
-            width: highlighted ? 2 : 1,
+            color: isSelected ? accent : AppTheme.border,
+            width: isSelected ? 2 : 1,
           ),
-          boxShadow: highlighted
+          boxShadow: isSelected
               ? [
                   BoxShadow(
                     color: accent.withValues(alpha: 0.35),
@@ -1297,14 +1283,14 @@ class _NodeCard extends StatelessWidget {
                   )
                 ],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
           children: [
-            // Type badge row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
+            // Main content (centered)
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  // Type badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                     decoration: BoxDecoration(
@@ -1323,23 +1309,77 @@ class _NodeCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  // Label
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Text(
+                      node.label,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppTheme.textH,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
-            // Label
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                node.label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppTheme.textH,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
+            // Input port (left)
+            Positioned(
+              left: -5,
+              top: _kNodeH / 2 - 5,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onPanStart: (_) => onPortDragStart?.call('${portId}_input'),
+                  onPanUpdate: (d) => onPortDragUpdate?.call(d.globalPosition),
+                  onPanEnd: (_) => onPortDragEnd?.call('${portId}_input'),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.border2,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          blurRadius: 4,
+                        )
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Output port (right)
+            Positioned(
+              right: -5,
+              top: _kNodeH / 2 - 5,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onPanStart: (_) => onPortDragStart?.call('${portId}_output'),
+                  onPanUpdate: (d) => onPortDragUpdate?.call(d.globalPosition),
+                  onPanEnd: (_) => onPortDragEnd?.call('${portId}_output'),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.gold,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppTheme.gold.withValues(alpha: 0.6),
+                          blurRadius: 6,
+                        )
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1356,13 +1396,15 @@ class _EdgePainter extends CustomPainter {
   final List<WorkflowNode> nodes;
   final List<WorkflowEdge> edges;
   final Offset offset;
-  final String? connectFromId;
+  final String? dragFromPort;
+  final Offset dragOffset;
 
   const _EdgePainter({
     required this.nodes,
     required this.edges,
     required this.offset,
-    this.connectFromId,
+    this.dragFromPort,
+    this.dragOffset = Offset.zero,
   });
 
   Offset _outputPort(WorkflowNode n) => Offset(n.x + offset.dx + _kNodeW, n.y + offset.dy + _kNodeH / 2);
@@ -1377,12 +1419,6 @@ class _EdgePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final activePaint = Paint()
-      ..color = AppTheme.gold
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
     for (final edge in edges) {
       final from = _nodeById(edge.fromId);
       final to = _nodeById(edge.toId);
@@ -1391,31 +1427,14 @@ class _EdgePainter extends CustomPainter {
       final src = _outputPort(from);
       final dst = _inputPort(to);
 
-      final paint = (connectFromId != null && (edge.fromId == connectFromId || edge.toId == connectFromId))
-          ? activePaint
-          : edgePaint;
-
-      _drawBezier(canvas, src, dst, paint);
+      _drawBezier(canvas, src, dst, edgePaint);
 
       // Arrowhead
-      _drawArrow(canvas, dst, math.atan2(dst.dy - src.dy, dst.dx - src.dx), paint);
+      _drawArrow(canvas, dst, math.atan2(dst.dy - src.dy, dst.dx - src.dx), edgePaint);
     }
 
-    // Port circles on every node
-    final portPaint = Paint()
-      ..color = AppTheme.border2
-      ..style = PaintingStyle.fill;
-    final fromPortPaint = Paint()
-      ..color = AppTheme.gold
-      ..style = PaintingStyle.fill;
-
-    for (final n in nodes) {
-      final out = _outputPort(n);
-      final inp = _inputPort(n);
-      final p = (connectFromId == n.id) ? fromPortPaint : portPaint;
-      canvas.drawCircle(out, 5, p);
-      canvas.drawCircle(inp, 5, p);
-    }
+    // Ports are now handled by _NodeCard widgets themselves
+    // No need to paint them here
   }
 
   void _drawBezier(Canvas canvas, Offset src, Offset dst, Paint paint) {
@@ -1461,5 +1480,5 @@ class _EdgePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_EdgePainter old) =>
-      old.edges != edges || old.nodes != nodes || old.offset != offset || old.connectFromId != connectFromId;
+      old.edges != edges || old.nodes != nodes || old.offset != offset || old.dragFromPort != dragFromPort || old.dragOffset != dragOffset;
 }
