@@ -16,6 +16,17 @@ class _MissionsScreenState extends State<MissionsScreen> {
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadMissions();
+  }
+
+  Future<void> _loadMissions() async {
+    await MissionService.instance.refresh();
+    if (mounted) setState(() {});
+  }
+
+  @override
   void dispose() {
     _titleCtrl.dispose();
     _promptCtrl.dispose();

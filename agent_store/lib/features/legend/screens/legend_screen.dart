@@ -71,6 +71,8 @@ class _LegendScreenState extends State<LegendScreen> {
   Future<void> _loadData() async {
     setState(() => _loadingAgents = true);
     try {
+      await MissionService.instance.refresh();
+      await LegendService.instance.refresh();
       final agents = ApiService.instance.isAuthenticated ? await ApiService.instance.getLibrary() : <AgentModel>[];
       if (!mounted) return;
       setState(() {

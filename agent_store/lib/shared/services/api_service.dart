@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/legend/models/workflow_models.dart';
 import '../models/agent_model.dart';
+import '../models/mission_model.dart';
 import '../models/guild_model.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -290,6 +292,79 @@ class ApiService {
       );
       return res.statusCode == 200;
     } catch (e) { debugPrint('updateProfile: $e'); return false; }
+  }
+
+  Future<List<MissionModel>> getUserMissions() async {
+    try {
+      final res = await http.get(Uri.parse(ApiConstants.userMissions), headers: _headers);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final missions = (data['missions'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return missions;
+      }
+    } catch (e) { debugPrint('getUserMissions: $e'); }
+    return [];
+  }
+
+  Future<MissionModel?> saveMission(MissionModel mission) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userMissions),
+        headers: _headers,
+        body: jsonEncode(mission.toJson()),
+      );
+      if (res.statusCode == 200) {
+        return MissionModel.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('saveMission: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('saveMission: $e'); }
+    return null;
+  }
+
+  Future<bool> deleteMission(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('${ApiConstants.userMissions}/$id'), headers: _headers);
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('deleteMission: $e'); }
+    return false;
+  }
+
+  Future<List<LegendWorkflow>> getLegendWorkflows() async {
+    try {
+      final res = await http.get(Uri.parse(ApiConstants.userLegendWorkflows), headers: _headers);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['workflows'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) { debugPrint('getLegendWorkflows: $e'); }
+    return [];
+  }
+
+  Future<LegendWorkflow?> saveLegendWorkflow(LegendWorkflow workflow) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userLegendWorkflows),
+        headers: _headers,
+        body: jsonEncode(workflow.toJson()),
+      );
+      if (res.statusCode == 200) {
+        return LegendWorkflow.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('saveLegendWorkflow: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('saveLegendWorkflow: $e'); }
+    return null;
+  }
+
+  Future<bool> deleteLegendWorkflow(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('${ApiConstants.userLegendWorkflows}/$id'), headers: _headers);
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('deleteLegendWorkflow: $e'); }
+    return false;
   }
 
   // ── Trial ─────────────────────────────────────────────────────────────────

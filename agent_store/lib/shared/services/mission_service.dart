@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/mission_model.dart';
+import 'api_service.dart';
+import 'local_kv_store.dart';
 
 class MissionService {
   MissionService._();
@@ -14,21 +14,47 @@ class MissionService {
 
   List<MissionModel> get missions => List.unmodifiable(_missions);
 
-  Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null || raw.isEmpty) return;
+  Future<void> init() async => refresh();
 
-    try {
-      final data = (jsonDecode(raw) as List<dynamic>)
-          .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
-          .toList();
+  Future<void> refresh() async {
+    final local = await _loadLocal();
+    if (ApiService.instance.isAuthenticated) {
+      var remote = await ApiService.instance.getUserMissions();
+      if (local.isNotEmpty) {
+        final remoteIds = remote.map((m) => m.id).toSet();
+        for (final mission in local) {
+          if (remoteIds.contains(mission.id)) continue;
+          final saved = await ApiService.instance.saveMission(mission);
+          if (saved != null) {
+            remoteIds.add(saved.id);
+            remote = [...remote, saved];
+          }
+        }
+      }
       _missions
         ..clear()
-        ..addAll(data);
+        ..addAll(_mergeMissions(local, remote));
       _sort();
+      await _saveLocal();
+      return;
+    }
+
+    _missions
+      ..clear()
+      ..addAll(local);
+    _sort();
+  }
+
+  Future<List<MissionModel>> _loadLocal() async {
+    final raw = await LocalKvStore.instance.getString(_storageKey);
+    if (raw == null || raw.isEmpty) return <MissionModel>[];
+
+    try {
+      return (jsonDecode(raw) as List<dynamic>)
+          .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+          .toList();
     } catch (_) {
-      _missions.clear();
+      return <MissionModel>[];
     }
   }
 
@@ -44,15 +70,23 @@ class MissionService {
       i++;
     }
 
-    _missions.add(MissionModel(
+    final mission = MissionModel(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       title: cleanTitle,
       slug: slug,
       prompt: cleanPrompt,
       useCount: 0,
       createdAt: DateTime.now(),
-    ));
+    );
+    _missions.add(mission);
     _sort();
+    if (ApiService.instance.isAuthenticated) {
+      final saved = await ApiService.instance.saveMission(mission);
+      if (saved != null) {
+        final idx = _missions.indexWhere((m) => m.id == mission.id);
+        if (idx != -1) _missions[idx] = saved;
+      }
+    }
     await _save();
   }
 
@@ -77,11 +111,21 @@ class MissionService {
       prompt: cleanPrompt,
     );
     _sort();
+    if (ApiService.instance.isAuthenticated) {
+      final saved = await ApiService.instance.saveMission(_missions[idx]);
+      if (saved != null) {
+        _missions[idx] = saved;
+        _sort();
+      }
+    }
     await _save();
   }
 
   Future<void> deleteMission(String id) async {
     _missions.removeWhere((m) => m.id == id);
+    if (ApiService.instance.isAuthenticated) {
+      await ApiService.instance.deleteMission(id);
+    }
     await _save();
   }
 
@@ -99,6 +143,14 @@ class MissionService {
     if (idx == -1) return;
     _missions[idx] = _missions[idx].copyWith(useCount: _missions[idx].useCount + 1);
     _sort();
+    if (ApiService.instance.isAuthenticated) {
+      final saved = await ApiService.instance.saveMission(_missions[idx]);
+      if (saved != null) {
+        final savedIdx = _missions.indexWhere((m) => m.id == saved.id);
+        if (savedIdx != -1) _missions[savedIdx] = saved;
+        _sort();
+      }
+    }
     await _save();
   }
 
@@ -128,9 +180,23 @@ class MissionService {
   }
 
   Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
+    await _saveLocal();
+  }
+
+  Future<void> _saveLocal() async {
     final data = jsonEncode(_missions.map((m) => m.toJson()).toList());
-    await prefs.setString(_storageKey, data);
+    await LocalKvStore.instance.setString(_storageKey, data);
+  }
+
+  List<MissionModel> _mergeMissions(List<MissionModel> local, List<MissionModel> remote) {
+    final merged = <String, MissionModel>{};
+    for (final mission in local) {
+      merged[mission.id] = mission;
+    }
+    for (final mission in remote) {
+      merged[mission.id] = mission;
+    }
+    return merged.values.toList();
   }
 
   void _sort() {

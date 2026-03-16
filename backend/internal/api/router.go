@@ -106,6 +106,12 @@ func SetupRouter(jwtSecret, allowedOrigins, geminiAPIKey, replicateAPIKey string
 		user.POST("/credits/topup", agentH.TopUpCredits)
 		user.GET("/profile", agentH.GetUserProfile)
 		user.PATCH("/profile", agentH.UpdateProfile)
+		user.GET("/missions", agentH.GetMissions)
+		user.POST("/missions", agentH.SaveMission)
+		user.DELETE("/missions/:id", agentH.DeleteMission)
+		user.GET("/legend/workflows", agentH.GetLegendWorkflows)
+		user.POST("/legend/workflows", agentH.SaveLegendWorkflow)
+		user.DELETE("/legend/workflows/:id", agentH.DeleteLegendWorkflow)
 
 		// Public trial script endpoint (no auth, token-based)
 		v1.GET("/trial/:token/script", agentH.GetTrialScript)

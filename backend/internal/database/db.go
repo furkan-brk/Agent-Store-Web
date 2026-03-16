@@ -47,6 +47,8 @@ func migrate() {
 		&models.User{},
 		&models.Agent{},
 		&models.LibraryEntry{},
+			&models.UserMission{},
+			&models.UserLegendWorkflow{},
 		&models.Guild{},
 		&models.GuildMember{},
 		&models.CreditTransaction{},

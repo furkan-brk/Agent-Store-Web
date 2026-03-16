@@ -11,7 +11,6 @@ import 'shared/services/app_telemetry_service.dart';
 import 'shared/services/mission_service.dart';
 import 'shared/services/wallet_service.dart';
 import 'features/legend/services/legend_service.dart';
-import 'shared/services/storage_test.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +22,6 @@ void main() async {
   // Restore JWT and wallet address from SharedPreferences before anything else.
   // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
   await ApiService.instance.init();
-  await StorageTest.testLocalStorage(); // Debug: Test if SharedPreferences works
   await MissionService.instance.init();
   await LegendService.instance.init();
   await WalletService.instance.init();

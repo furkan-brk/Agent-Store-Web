@@ -1,9 +1,10 @@
 // lib/features/legend/services/legend_service.dart
 
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:developer' as developer;
+
 import '../models/workflow_models.dart';
+import '../../../shared/services/api_service.dart';
+import '../../../shared/services/local_kv_store.dart';
 
 class LegendService {
   static final LegendService instance = LegendService._();
@@ -15,30 +16,67 @@ class LegendService {
 
   List<LegendWorkflow> get workflows => List.unmodifiable(_workflows);
 
-  Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return;
+  Future<void> init() async => refresh();
+
+  Future<void> refresh() async {
+    final local = await _loadLocal();
+    if (ApiService.instance.isAuthenticated) {
+      var remote = await ApiService.instance.getLegendWorkflows();
+      if (local.isNotEmpty) {
+        final remoteIds = remote.map((w) => w.id).toSet();
+        for (final workflow in local) {
+          if (remoteIds.contains(workflow.id)) continue;
+          final saved = await ApiService.instance.saveLegendWorkflow(workflow);
+          if (saved != null) {
+            remoteIds.add(saved.id);
+            remote = [...remote, saved];
+          }
+        }
+      }
+      _workflows = _mergeWorkflows(local, remote);
+      _sortWorkflows();
+      await _persistLocal();
+      return;
+    }
+    _workflows = local;
+    _sortWorkflows();
+  }
+
+  Future<List<LegendWorkflow>> _loadLocal() async {
+    final raw = await LocalKvStore.instance.getString(_key);
+    if (raw == null || raw.isEmpty) return <LegendWorkflow>[];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      _workflows = list.map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>)).toList();
-      _sortWorkflows();
-    } catch (_) {}
+      return list.map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return <LegendWorkflow>[];
+    }
   }
 
   Future<LegendWorkflow> saveWorkflow(LegendWorkflow wf) async {
-     developer.log('[LegendService] saveWorkflow: name="${wf.name}", id="${wf.id}"');
     _workflows.removeWhere((w) => w.id == wf.id);
     _workflows.insert(0, wf);
     _sortWorkflows();
-     developer.log('[LegendService] Workflow added. Total workflows: ${_workflows.length}');
     await _persist();
+    if (ApiService.instance.isAuthenticated) {
+      final saved = await ApiService.instance.saveLegendWorkflow(wf);
+      if (saved != null) {
+        _workflows.removeWhere((w) => w.id == saved.id);
+        _workflows.insert(0, saved);
+        _sortWorkflows();
+        await _persistLocal();
+        return saved;
+      }
+    }
     return wf;
   }
 
   Future<void> deleteWorkflow(String id) async {
     _workflows.removeWhere((w) => w.id == id);
     _sortWorkflows();
+    if (ApiService.instance.isAuthenticated) {
+      await ApiService.instance.deleteLegendWorkflow(id);
+    }
     await _persist();
   }
 
@@ -47,14 +85,25 @@ class LegendService {
   }
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-     developer.log('[LegendService] Persisting ${_workflows.length} workflows');
-    await prefs.setString(
+    await _persistLocal();
+  }
+
+  Future<void> _persistLocal() async {
+    await LocalKvStore.instance.setString(
       _key,
       jsonEncode(_workflows.map((w) => w.toJson()).toList()),
     );
-     final saved = prefs.getString(_key);
-     developer.log('[LegendService] Persist complete. Verify: ${saved?.length ?? 0} bytes');
+  }
+
+  List<LegendWorkflow> _mergeWorkflows(List<LegendWorkflow> local, List<LegendWorkflow> remote) {
+    final merged = <String, LegendWorkflow>{};
+    for (final workflow in local) {
+      merged[workflow.id] = workflow;
+    }
+    for (final workflow in remote) {
+      merged[workflow.id] = workflow;
+    }
+    return merged.values.toList();
   }
 
   /// Create a brand-new empty workflow.
