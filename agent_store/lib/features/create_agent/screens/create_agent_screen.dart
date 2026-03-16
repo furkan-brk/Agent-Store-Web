@@ -49,7 +49,9 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = Get.put(CreateAgentController());
+    _ctrl = Get.isRegistered<CreateAgentController>()
+        ? Get.find<CreateAgentController>()
+        : Get.put(CreateAgentController(), permanent: true);
     _ctrl.reset();
     _titleCtrl.clear();
     _descCtrl.clear();

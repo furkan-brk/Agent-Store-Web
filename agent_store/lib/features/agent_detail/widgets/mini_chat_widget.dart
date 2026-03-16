@@ -148,7 +148,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           // ── Header ─────────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(bottom: BorderSide(color: _panelBorder)),
             ),
             child: Row(
@@ -240,7 +240,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           // ── Input row ───────────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: _panelBorder)),
             ),
             child: Row(

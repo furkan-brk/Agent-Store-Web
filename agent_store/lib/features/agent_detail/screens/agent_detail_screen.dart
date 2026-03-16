@@ -1,6 +1,6 @@
 // lib/features/agent_detail/screens/agent_detail_screen.dart
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:convert';
+
 import 'dart:html' as html;
 
 import 'package:agent_store/features/character/character_types.dart';
@@ -147,11 +147,11 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppTheme.border2),
         ),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.shopping_cart_outlined, color: AppTheme.gold, size: 20),
-            const SizedBox(width: 10),
-            const Text('Confirm Purchase', style: TextStyle(color: AppTheme.textH)),
+            Icon(Icons.shopping_cart_outlined, color: AppTheme.gold, size: 20),
+            SizedBox(width: 10),
+            Text('Confirm Purchase', style: TextStyle(color: AppTheme.textH)),
           ],
         ),
         content: Column(
@@ -686,7 +686,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Description section
-        _SectionHeader(icon: Icons.description_outlined, title: 'Description'),
+        const _SectionHeader(icon: Icons.description_outlined, title: 'Description'),
         const SizedBox(height: 12),
         Text(a.description,
           style: const TextStyle(color: AppTheme.textB, fontSize: 15, height: 1.7)),
@@ -696,7 +696,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           const SizedBox(height: 28),
           const Divider(color: AppTheme.border, height: 1),
           const SizedBox(height: 24),
-          _SectionHeader(icon: Icons.psychology_outlined, title: 'Character Profile'),
+          const _SectionHeader(icon: Icons.psychology_outlined, title: 'Character Profile'),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
@@ -732,7 +732,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           const SizedBox(height: 28),
           const Divider(color: AppTheme.border, height: 1),
           const SizedBox(height: 24),
-          _SectionHeader(icon: Icons.label_outline_rounded, title: 'Tags'),
+          const _SectionHeader(icon: Icons.label_outline_rounded, title: 'Tags'),
           const SizedBox(height: 12),
           Wrap(spacing: 8, runSpacing: 8, children: a.tags.map((t) => _HoverTagChip(tag: t)).toList()),
         ],
@@ -777,7 +777,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         const SizedBox(height: 28),
         const Divider(color: AppTheme.border, height: 1),
         const SizedBox(height: 24),
-        _SectionHeader(icon: Icons.person_outline_rounded, title: 'Creator'),
+        const _SectionHeader(icon: Icons.person_outline_rounded, title: 'Creator'),
         const SizedBox(height: 12),
         MouseRegion(
           cursor: SystemMouseCursors.click,
@@ -811,7 +811,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         const SizedBox(height: 28),
         const Divider(color: AppTheme.border, height: 1),
         const SizedBox(height: 24),
-        _SectionHeader(icon: Icons.star_outline_rounded, title: 'Ratings'),
+        const _SectionHeader(icon: Icons.star_outline_rounded, title: 'Ratings'),
         const SizedBox(height: 14),
         RatingWidget(agentId: widget.ctrl.agentId),
 
@@ -823,6 +823,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   // ── Stats Row (used only inside Details tab now as expanded view) ─────────
 
+  // ignore: unused_element
   Widget _buildStatsRow(AgentModel a) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1204,7 +1205,7 @@ class _DetailLoadingSkeleton extends StatelessWidget {
             ),
 
             // Right panel skeleton
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

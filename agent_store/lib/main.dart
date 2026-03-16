@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
 import 'controllers/auth_controller.dart';
+import 'controllers/startup_preload_controller.dart';
 import 'shared/services/api_service.dart';
 import 'shared/services/wallet_service.dart';
 
@@ -16,6 +17,8 @@ void main() async {
   // By this point both services have their persisted state restored,
   // so AuthController.onInit() can read isAuthenticated + isConnected.
   Get.put(AuthController(), permanent: true);
+  // Warm up frequently used page controllers in background.
+  Get.put(StartupPreloadController(), permanent: true).start();
   runApp(const AgentStoreApp());
 }
 

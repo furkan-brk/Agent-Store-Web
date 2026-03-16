@@ -40,7 +40,9 @@ class _LibraryScreenState extends State<LibraryScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
-    _ctrl = Get.put(LibraryController());
+    _ctrl = Get.isRegistered<LibraryController>()
+        ? Get.find<LibraryController>()
+        : Get.put(LibraryController(), permanent: true);
   }
 
   @override
@@ -252,9 +254,9 @@ class _LibraryScreenState extends State<LibraryScreen>
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         // Skeleton search bar placeholder
-        SliverToBoxAdapter(
+        const SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: ShimmerBox(
               width: double.infinity,
               height: 44,
