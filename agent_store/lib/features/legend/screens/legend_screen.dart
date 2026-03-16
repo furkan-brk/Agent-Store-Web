@@ -513,15 +513,15 @@ class _LegendScreenState extends State<LegendScreen> {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          _PaletteSection(label: 'FLOW', children: [
+          const _PaletteSection(label: 'FLOW', children: [
             _DraggablePaletteItem(
-              data: const _NodeDragData(WorkflowNodeType.start, 'START'),
+              data: _NodeDragData(WorkflowNodeType.start, 'START'),
               color: AppTheme.success,
               icon: Icons.play_arrow_rounded,
               label: 'Start',
             ),
             _DraggablePaletteItem(
-              data: const _NodeDragData(WorkflowNodeType.end, 'END'),
+              data: _NodeDragData(WorkflowNodeType.end, 'END'),
               color: AppTheme.primary,
               icon: Icons.stop_rounded,
               label: 'End',
