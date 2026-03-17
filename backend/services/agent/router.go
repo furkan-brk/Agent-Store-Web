@@ -50,6 +50,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents := v1.Group("/agents")
 		agents.GET("", handler.ListAgents)
 		agents.GET("/trending", handler.TrendingAgents)
+		agents.GET("/categories", handler.GetCategories)
 		agents.GET("/:id", optionalAuth, handler.GetAgent)
 		agents.POST("", auth, createRL.WalletMiddleware(), handler.CreateAgent)
 		agents.PUT("/:id", auth, handler.UpdateAgent)

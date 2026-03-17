@@ -200,13 +200,48 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
-/// Mobile layout with hamburger drawer
-class _NarrowLayout extends StatelessWidget {
+/// Mobile layout with bottom navigation bar + hamburger drawer for overflow
+class _NarrowLayout extends StatefulWidget {
   final Widget child;
   const _NarrowLayout({required this.child});
 
   @override
+  State<_NarrowLayout> createState() => _NarrowLayoutState();
+}
+
+class _NarrowLayoutState extends State<_NarrowLayout> {
+  /// The five bottom nav destinations and their routes.
+  static const _bottomNavItems = <({IconData icon, IconData activeIcon, String label, String path})>[
+    (icon: Icons.storefront_outlined, activeIcon: Icons.storefront, label: 'Store', path: '/'),
+    (icon: Icons.bookmarks_outlined, activeIcon: Icons.bookmarks, label: 'Library', path: '/library'),
+    (icon: Icons.add_circle_outline, activeIcon: Icons.add_circle, label: 'Create', path: '/create'),
+    (icon: Icons.groups_outlined, activeIcon: Icons.groups, label: 'Guilds', path: '/guild'),
+  ];
+
+  int _selectedIndex(String loc) {
+    for (var i = 0; i < _bottomNavItems.length; i++) {
+      final path = _bottomNavItems[i].path;
+      if (loc == path || (path != '/' && loc.startsWith(path))) return i;
+    }
+    // "More" tab (index 4) for any route not in the bottom nav
+    return 4;
+  }
+
+  void _onNavTap(int index) {
+    if (index == 4) {
+      // Open drawer for "More" items
+      Scaffold.of(context).openDrawer();
+      return;
+    }
+    context.go(_bottomNavItems[index].path);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final loc = GoRouterState.of(context).uri.toString();
+    final currentIndex = _selectedIndex(loc);
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -216,16 +251,16 @@ class _NarrowLayout extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+                color: colorScheme.primary,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.onPrimary, size: 16),
+              child: Icon(Icons.auto_awesome, color: colorScheme.onPrimary, size: 16),
             ),
             const SizedBox(width: 8),
             Text(
               'AgentStore',
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
+                color: colorScheme.onSurface,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -240,7 +275,38 @@ class _NarrowLayout extends StatelessWidget {
         ],
       ),
       drawer: const Drawer(child: _Sidebar(isDrawer: true)),
-      body: child,
+      body: widget.child,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: colorScheme.outline, width: 0.5),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: currentIndex,
+          onTap: _onNavTap,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          selectedItemColor: colorScheme.primary,
+          unselectedItemColor: colorScheme.onSurface.withValues(alpha: 0.5),
+          selectedFontSize: 11,
+          unselectedFontSize: 10,
+          iconSize: 22,
+          elevation: 0,
+          items: [
+            ..._bottomNavItems.map((item) => BottomNavigationBarItem(
+              icon: Icon(item.icon),
+              activeIcon: Icon(item.activeIcon),
+              label: item.label,
+            )),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.menu),
+              activeIcon: Icon(Icons.menu_open),
+              label: 'More',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

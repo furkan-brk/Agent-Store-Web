@@ -26,7 +26,7 @@ class LibraryController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    collections.value = CollectionService.instance.getAll();
+    CollectionService.instance.getAll().then((all) => collections.value = all);
     if (ApiService.instance.isAuthenticated) {
       load();
     } else {
@@ -40,25 +40,25 @@ class LibraryController extends GetxController {
     final wallet = WalletService.instance.connectedWallet ?? '';
     final results = await Future.wait([
       ApiService.instance.getLibrary(),
-      ApiService.instance.listAgents(limit: 50),
+      if (wallet.isNotEmpty)
+        ApiService.instance.listAgents(limit: 50, creatorWallet: wallet)
+      else
+        Future.value((agents: <AgentModel>[], total: 0)),
       ApiService.instance.getCredits(),
     ]);
     final savedList = results[0] as List<AgentModel>;
-    final allAgents = (results[1] as ({List<AgentModel> agents, int total})).agents;
+    final createdResult = results[1] as ({List<AgentModel> agents, int total});
     final c = results[2] as int;
-    final createdList = wallet.isNotEmpty
-        ? allAgents.where((a) => a.creatorWallet.toLowerCase() == wallet.toLowerCase()).toList()
-        : <AgentModel>[];
 
     saved.value = savedList;
-    created.value = createdList;
+    created.value = createdResult.agents;
     credits.value = c;
     refreshCollections();
     isLoading.value = false;
   }
 
-  void refreshCollections() {
-    collections.value = CollectionService.instance.getAll();
+  Future<void> refreshCollections() async {
+    collections.value = await CollectionService.instance.getAll();
     if (selectedCollectionId.value != null &&
         !collections.any((c) => c.id == selectedCollectionId.value)) {
       selectedCollectionId.value = null;

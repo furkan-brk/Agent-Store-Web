@@ -16,8 +16,9 @@ class _NotificationBellState extends State<NotificationBell> {
     _refresh();
   }
 
-  void _refresh() {
-    if (mounted) setState(() => _unread = NotificationService.instance.unreadCount);
+  Future<void> _refresh() async {
+    final count = await NotificationService.instance.unreadCount;
+    if (mounted) setState(() => _unread = count);
   }
 
   void _openPanel() async {
@@ -91,8 +92,13 @@ class _NotificationDialogState extends State<_NotificationDialog> {
   @override
   void initState() {
     super.initState();
-    NotificationService.instance.markAllRead();
-    _notifications = NotificationService.instance.getAll();
+    _initNotifications();
+  }
+
+  Future<void> _initNotifications() async {
+    await NotificationService.instance.markAllRead();
+    final all = await NotificationService.instance.getAll();
+    if (mounted) setState(() => _notifications = all);
   }
 
   IconData _icon(String type) {
@@ -152,8 +158,8 @@ class _NotificationDialogState extends State<_NotificationDialog> {
           const Spacer(),
           if (_notifications.isNotEmpty)
             TextButton.icon(
-              onPressed: () {
-                NotificationService.instance.clear();
+              onPressed: () async {
+                await NotificationService.instance.clear();
                 setState(() => _notifications = []);
               },
               icon: Icon(Icons.delete_sweep_outlined, size: 14, color: colorScheme.onSurface.withValues(alpha: 0.5)),

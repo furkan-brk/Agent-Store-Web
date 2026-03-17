@@ -288,109 +288,242 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       }
 
       final hasAccess = _ctrl.hasAccess;
+      final screenWidth = MediaQuery.of(context).size.width;
+      final isMobile = screenWidth < 768;
 
       return Scaffold(
         backgroundColor: AppTheme.bg,
-        body: Row(children: [
-          // ── Left panel — character ──────────────────────────────────────
-          _buildLeftPanel(a, hasAccess),
+        body: isMobile
+            ? _buildMobileLayout(a, hasAccess)
+            : _buildDesktopLayout(a, hasAccess),
+      );
+    });
+  }
 
-          // ── Right panel — scrollable tabbed content ─────────────────────
+  /// Desktop layout — side-by-side: left character panel + right tabbed content
+  Widget _buildDesktopLayout(AgentModel a, bool hasAccess) {
+    return Row(children: [
+      _buildLeftPanel(a, hasAccess),
+      Expanded(
+        child: Stack(
+          children: [
+            _HeroBackdrop(agent: a),
+            Column(children: [
+              const SizedBox(height: 50),
+              _buildTitleRow(a),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _buildQuickInfoBar(a),
+              ),
+              const SizedBox(height: 16),
+              _buildTabBar(isMobile: false),
+              Expanded(child: _buildTabContent(a, hasAccess, isMobile: false)),
+            ]),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  /// Mobile layout — single column: character banner at top, then tabs below
+  Widget _buildMobileLayout(AgentModel a, bool hasAccess) {
+    return Stack(
+      children: [
+        _HeroBackdrop(agent: a),
+        Column(children: [
+          // Compact character section at the top
+          _buildMobileCharacterBanner(a, hasAccess),
+          // Title row with reduced padding
+          _buildTitleRow(a, isMobile: true),
+          const SizedBox(height: 8),
+          // Quick info bar — horizontally scrollable on mobile
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildMobileQuickInfoBar(a),
+          ),
+          const SizedBox(height: 12),
+          _buildTabBar(isMobile: true),
+          Expanded(child: _buildTabContent(a, hasAccess, isMobile: true)),
+        ]),
+      ],
+    );
+  }
+
+  /// Compact character banner for mobile (replaces the 300px left panel)
+  Widget _buildMobileCharacterBanner(AgentModel a, bool hasAccess) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            a.characterType.primaryColor.withValues(alpha: 0.15),
+            AppTheme.bg,
+          ],
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Character image
+          PixelCharacterWidget(
+            characterType: a.characterType,
+            rarity: a.rarity,
+            size: 80,
+            showName: false,
+            showRarity: false,
+            showStats: false,
+            agentId: a.id,
+            generatedImage: a.generatedImage,
+            imageUrl: a.imageUrl,
+          ),
+          const SizedBox(width: 14),
+          // Badges + traits
           Expanded(
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Background image layer — fills top portion, fades to transparent
-                _HeroBackdrop(agent: a),
-
-                // Actual content on top
-                Column(children: [
-                  // Top breathing room so the backdrop image has space to show
-                  const SizedBox(height: 50),
-
-                  // Title row with breathing room
-                  _buildTitleRow(a),
-
-                  const SizedBox(height: 8),
-
-                  // Quick stats bar — moved here from inside Details tab for visibility
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: _buildQuickInfoBar(a),
+                const SizedBox(height: 4),
+                // Category + rarity badges
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  _BadgeChip(
+                    label: a.category.isNotEmpty ? a.category : a.characterType.displayName,
+                    icon: Icons.category_outlined,
+                    color: a.characterType.primaryColor,
                   ),
-
-                  const SizedBox(height: 16),
-
-                  // Tab bar
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-                    child: TabBar(
-                      controller: _tabCtrl,
-                      tabs: const [
-                        Tab(
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.info_outline_rounded, size: 15),
-                            SizedBox(width: 6),
-                            Text('Details'),
-                          ]),
-                        ),
-                        Tab(
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.play_circle_outline_rounded, size: 15),
-                            SizedBox(width: 6),
-                            Text('Test Agent'),
-                          ]),
-                        ),
-                        Tab(
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.grid_view_rounded, size: 15),
-                            SizedBox(width: 6),
-                            Text('Similar'),
-                          ]),
-                        ),
-                      ],
-                      labelColor: AppTheme.textH,
-                      unselectedLabelColor: AppTheme.textM,
-                      labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      indicator: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.6)],
-                        ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: AppTheme.border,
-                      splashFactory: NoSplash.splashFactory,
-                    ),
-                  ),
-
-                  // Tab content — each tab handles its own scrolling
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabCtrl,
-                      children: [
-                        // Tab 1 — Details
-                        _buildDetailsTab(a, hasAccess),
-
-                        // Tab 2 — Test Agent (Mini Chat) — only for owned, otherwise trial
-                        hasAccess
-                            ? Padding(
-                                padding: const EdgeInsets.all(24),
-                                child: MiniChatWidget(agentId: a.id, agentTitle: a.title),
-                              )
-                            : _buildTrialTab(a),
-
-                        // Tab 3 — Similar
-                        _buildSimilarTab(),
-                      ],
-                    ),
+                  _BadgeChip(
+                    label: a.rarity.displayName,
+                    icon: Icons.auto_awesome,
+                    color: a.rarity.color,
                   ),
                 ]),
+                if (a.subclass != CharacterSubclass.archmage || a.characterType == CharacterType.wizard) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    a.subclass.displayName,
+                    style: TextStyle(
+                      color: a.characterType.accentColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                // Traits (show first 3 on mobile)
+                Wrap(spacing: 4, runSpacing: 4, children: a.traits.take(3).map((t) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: a.characterType.primaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: a.characterType.primaryColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(t, style: TextStyle(color: a.characterType.primaryColor, fontSize: 10)),
+                )).toList()),
               ],
             ),
           ),
-        ]),
-      );
-    });
+        ],
+      ),
+    );
+  }
+
+  /// Horizontally scrollable quick info bar for mobile
+  Widget _buildMobileQuickInfoBar(AgentModel a) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppTheme.card,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppTheme.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _QuickStat(icon: Icons.play_circle_outline_rounded, label: 'Uses', value: '${a.useCount}'),
+            _quickDivider(),
+            _QuickStat(icon: Icons.bookmark_outline_rounded, label: 'Saves', value: '${a.saveCount}'),
+            _quickDivider(),
+            _QuickStat(
+              icon: Icons.speed_outlined, label: 'Score', value: '${a.promptScore}',
+              valueColor: _scoreColor(a.promptScore),
+            ),
+            _quickDivider(),
+            _QuickStat(icon: Icons.calendar_today_outlined, label: 'Created', value: _formatDate(a.createdAt)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tab bar — shared between desktop and mobile with responsive styling
+  Widget _buildTabBar({required bool isMobile}) {
+    final hPad = isMobile ? 12.0 : 24.0;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
+      child: TabBar(
+        controller: _tabCtrl,
+        isScrollable: isMobile,
+        tabAlignment: isMobile ? TabAlignment.start : null,
+        tabs: [
+          Tab(
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.info_outline_rounded, size: 15),
+              const SizedBox(width: 6),
+              Text('Details', style: TextStyle(fontSize: isMobile ? 12 : 13)),
+            ]),
+          ),
+          Tab(
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.play_circle_outline_rounded, size: 15),
+              const SizedBox(width: 6),
+              Text('Test Agent', style: TextStyle(fontSize: isMobile ? 12 : 13)),
+            ]),
+          ),
+          Tab(
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.grid_view_rounded, size: 15),
+              const SizedBox(width: 6),
+              Text('Similar', style: TextStyle(fontSize: isMobile ? 12 : 13)),
+            ]),
+          ),
+        ],
+        labelColor: AppTheme.textH,
+        unselectedLabelColor: AppTheme.textM,
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        indicator: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.6)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: AppTheme.border,
+        splashFactory: NoSplash.splashFactory,
+      ),
+    );
+  }
+
+  /// Tab content — shared between desktop and mobile with responsive padding
+  Widget _buildTabContent(AgentModel a, bool hasAccess, {required bool isMobile}) {
+    final chatPad = isMobile ? 16.0 : 24.0;
+    return TabBarView(
+      controller: _tabCtrl,
+      children: [
+        _buildDetailsTab(a, hasAccess, isMobile: isMobile),
+        hasAccess
+            ? Padding(
+                padding: EdgeInsets.all(chatPad),
+                child: MiniChatWidget(agentId: a.id, agentTitle: a.title),
+              )
+            : _buildTrialTab(a),
+        _buildSimilarTab(isMobile: isMobile),
+      ],
+    );
   }
 
   // ── Left Panel ──────────────────────────────────────────────────────────────
@@ -542,16 +675,101 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   // ── Title Row ──────────────────────────────────────────────────────────────
 
-  Widget _buildTitleRow(AgentModel a) {
+  Widget _buildTitleRow(AgentModel a, {bool isMobile = false}) {
+    final hPad = isMobile ? 16.0 : 24.0;
+    final titleSize = isMobile ? 20.0 : 26.0;
+
+    // Build action buttons
+    final actionButtons = [
+      if (a.price > 0)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.gold.withValues(alpha: 0.3), AppTheme.gold],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.monetization_on_outlined, size: 13, color: AppTheme.bg),
+              const SizedBox(width: 4),
+              Text('${a.price.toStringAsFixed(2)} MON',
+                style: const TextStyle(color: AppTheme.bg, fontSize: 11, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        )
+      else
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: AppTheme.success.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
+          ),
+          child: const Text('Free',
+            style: TextStyle(color: AppTheme.success, fontSize: 11, fontWeight: FontWeight.bold)),
+        ),
+      const SizedBox(width: 8),
+      _HoverIconButton(
+        icon: Icons.compare_arrows,
+        tooltip: 'Compare agents',
+        onPressed: () => showDialog(context: context, builder: (_) => CompareModal(baseAgent: a)),
+      ),
+      _HoverIconButton(
+        icon: Icons.share_outlined,
+        tooltip: 'Share Agent',
+        onPressed: () => _shareAgent(a),
+      ),
+      Obx(() => _HoverIconButton(
+        icon: _ctrl.inLibrary.value ? Icons.bookmark : Icons.bookmark_outline,
+        tooltip: _ctrl.inLibrary.value ? 'Remove from Library' : 'Save to Library',
+        color: _ctrl.inLibrary.value ? AppTheme.primary : AppTheme.textM,
+        onPressed: _toggleLibrary,
+      )),
+    ];
+
+    if (isMobile) {
+      // Mobile: title on top, action buttons row below (scrollable)
+      return Padding(
+        padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(a.title,
+              style: TextStyle(color: AppTheme.textH, fontSize: titleSize, fontWeight: FontWeight.bold)),
+            if (a.serviceDescription != null && a.serviceDescription!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                a.serviceDescription!,
+                style: const TextStyle(color: AppTheme.textM, fontSize: 12, height: 1.4),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: actionButtons),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Desktop: side-by-side title + actions
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 0),
       child: Row(children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(a.title,
-                style: const TextStyle(color: AppTheme.textH, fontSize: 26, fontWeight: FontWeight.bold)),
+                style: TextStyle(color: AppTheme.textH, fontSize: titleSize, fontWeight: FontWeight.bold)),
               if (a.serviceDescription != null && a.serviceDescription!.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(
@@ -565,57 +783,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           ),
         ),
         const SizedBox(width: 12),
-        if (a.price > 0) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.gold.withValues(alpha: 0.3), AppTheme.gold],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.monetization_on_outlined, size: 13, color: AppTheme.bg),
-                const SizedBox(width: 4),
-                Text('${a.price.toStringAsFixed(2)} MON',
-                  style: const TextStyle(color: AppTheme.bg, fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-        ] else ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppTheme.success.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppTheme.success.withValues(alpha: 0.4)),
-            ),
-            child: const Text('Free',
-              style: TextStyle(color: AppTheme.success, fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(width: 8),
-        ],
-        _HoverIconButton(
-          icon: Icons.compare_arrows,
-          tooltip: 'Compare agents',
-          onPressed: () => showDialog(context: context, builder: (_) => CompareModal(baseAgent: a)),
-        ),
-        _HoverIconButton(
-          icon: Icons.share_outlined,
-          tooltip: 'Share Agent',
-          onPressed: () => _shareAgent(a),
-        ),
-        Obx(() => _HoverIconButton(
-          icon: _ctrl.inLibrary.value ? Icons.bookmark : Icons.bookmark_outline,
-          tooltip: _ctrl.inLibrary.value ? 'Remove from Library' : 'Save to Library',
-          color: _ctrl.inLibrary.value ? AppTheme.primary : AppTheme.textM,
-          onPressed: _toggleLibrary,
-        )),
+        ...actionButtons,
       ]),
     );
   }
@@ -683,9 +851,11 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   // ── Details Tab ─────────────────────────────────────────────────────────────
 
-  Widget _buildDetailsTab(AgentModel a, bool hasAccess) {
+  Widget _buildDetailsTab(AgentModel a, bool hasAccess, {bool isMobile = false}) {
+    final hPad = isMobile ? 16.0 : 32.0;
+    final vPad = isMobile ? 20.0 : 28.0;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
+      padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, hPad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Description section
         const _SectionHeader(icon: Icons.description_outlined, title: 'Description'),
@@ -1015,7 +1185,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   // ── Similar Tab ──────────────────────────────────────────────────────────────
 
-  Widget _buildSimilarTab() {
+  Widget _buildSimilarTab({bool isMobile = false}) {
     return Obx(() {
       final sim = _ctrl.similar;
       if (sim.isEmpty) {
@@ -1035,10 +1205,14 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         );
       }
       return Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(isMobile ? 12 : 16),
         child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.75),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: isMobile ? 10 : 12,
+            mainAxisSpacing: isMobile ? 10 : 12,
+            childAspectRatio: 0.75,
+          ),
           itemCount: sim.length,
           itemBuilder: (ctx, i) {
             final agent = sim[i];
@@ -1151,132 +1325,199 @@ class _DetailLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: ShimmerScope(
-        child: Row(
-          children: [
-            // Left panel skeleton
-            Container(
-              width: 300,
-              decoration: const BoxDecoration(
-                color: AppTheme.surface,
-                border: Border(right: BorderSide(color: AppTheme.border)),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(28),
+        child: isMobile ? _buildMobileSkeleton() : _buildDesktopSkeleton(),
+      ),
+    );
+  }
+
+  Widget _buildMobileSkeleton() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Character banner skeleton
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShimmerBox(width: 80, height: 80, radius: 12, color: AppTheme.card2),
+              SizedBox(width: 14),
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 28),
-                    // Character avatar
-                    ShimmerBox(width: 148, height: 148, radius: 14, color: AppTheme.card2),
-                    SizedBox(height: 14),
-                    // Badges
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ShimmerBox(width: 80, height: 24, radius: 12, color: AppTheme.card2),
-                        SizedBox(width: 8),
-                        ShimmerBox(width: 70, height: 24, radius: 12, color: AppTheme.card2),
-                      ],
-                    ),
-                    SizedBox(height: 16),
-                    // Radar chart area
-                    ShimmerBox(width: 200, height: 160, radius: 8, color: AppTheme.card2),
-                    SizedBox(height: 16),
-                    // Description
-                    ShimmerBox(width: 220, height: 12, radius: 4, color: AppTheme.card2),
-                    SizedBox(height: 6),
-                    ShimmerBox(width: 180, height: 12, radius: 4, color: AppTheme.card2),
-                    SizedBox(height: 20),
-                    // Traits
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ShimmerBox(width: 60, height: 22, radius: 12, color: AppTheme.card2),
-                        SizedBox(width: 6),
-                        ShimmerBox(width: 80, height: 22, radius: 12, color: AppTheme.card2),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    // Button
-                    ShimmerBox(width: double.infinity, height: 44, radius: 10, color: AppTheme.card2),
+                    SizedBox(height: 4),
+                    Row(children: [
+                      ShimmerBox(width: 70, height: 22, radius: 12, color: AppTheme.card2),
+                      SizedBox(width: 6),
+                      ShimmerBox(width: 60, height: 22, radius: 12, color: AppTheme.card2),
+                    ]),
+                    SizedBox(height: 8),
+                    Row(children: [
+                      ShimmerBox(width: 50, height: 18, radius: 10, color: AppTheme.card2),
+                      SizedBox(width: 4),
+                      ShimmerBox(width: 60, height: 18, radius: 10, color: AppTheme.card2),
+                    ]),
                   ],
                 ),
               ),
-            ),
-
-            // Right panel skeleton
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Accent strip
-                  ShimmerBox(width: double.infinity, height: 56, radius: 0, color: AppTheme.card2),
-                  // Title row
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(24, 20, 24, 0),
-                    child: Row(
-                      children: [
-                        Expanded(child: ShimmerBox(width: double.infinity, height: 28, radius: 6, color: AppTheme.card2)),
-                        SizedBox(width: 16),
-                        ShimmerBox(width: 80, height: 24, radius: 6, color: AppTheme.card2),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  // Quick info bar
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    child: ShimmerBox(width: double.infinity, height: 48, radius: 10, color: AppTheme.card2),
-                  ),
-                  SizedBox(height: 16),
-                  // Tab bar
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    child: Row(
-                      children: [
-                        ShimmerBox(width: 80, height: 32, radius: 16, color: AppTheme.card2),
-                        SizedBox(width: 12),
-                        ShimmerBox(width: 100, height: 32, radius: 16, color: AppTheme.card2),
-                        SizedBox(width: 12),
-                        ShimmerBox(width: 80, height: 32, radius: 16, color: AppTheme.card2),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 24),
-                  // Content area
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Description lines
-                        ShimmerBox(width: double.infinity, height: 14, radius: 4, color: AppTheme.card2),
-                        SizedBox(height: 8),
-                        ShimmerBox(width: double.infinity, height: 14, radius: 4, color: AppTheme.card2),
-                        SizedBox(height: 8),
-                        ShimmerBox(width: 300, height: 14, radius: 4, color: AppTheme.card2),
-                        SizedBox(height: 28),
-                        // Tags row
-                        Row(
-                          children: [
-                            ShimmerBox(width: 60, height: 24, radius: 6, color: AppTheme.card2),
-                            SizedBox(width: 8),
-                            ShimmerBox(width: 80, height: 24, radius: 6, color: AppTheme.card2),
-                            SizedBox(width: 8),
-                            ShimmerBox(width: 70, height: 24, radius: 6, color: AppTheme.card2),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+        // Title
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: ShimmerBox(width: double.infinity, height: 24, radius: 6, color: AppTheme.card2),
+        ),
+        SizedBox(height: 10),
+        // Quick info bar
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: ShimmerBox(width: double.infinity, height: 40, radius: 10, color: AppTheme.card2),
+        ),
+        SizedBox(height: 12),
+        // Tabs
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Row(children: [
+            ShimmerBox(width: 70, height: 30, radius: 16, color: AppTheme.card2),
+            SizedBox(width: 8),
+            ShimmerBox(width: 90, height: 30, radius: 16, color: AppTheme.card2),
+            SizedBox(width: 8),
+            ShimmerBox(width: 70, height: 30, radius: 16, color: AppTheme.card2),
+          ]),
+        ),
+        SizedBox(height: 20),
+        // Content lines
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShimmerBox(width: double.infinity, height: 14, radius: 4, color: AppTheme.card2),
+              SizedBox(height: 8),
+              ShimmerBox(width: double.infinity, height: 14, radius: 4, color: AppTheme.card2),
+              SizedBox(height: 8),
+              ShimmerBox(width: 200, height: 14, radius: 4, color: AppTheme.card2),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopSkeleton() {
+    return Row(
+      children: [
+        // Left panel skeleton
+        Container(
+          width: 300,
+          decoration: const BoxDecoration(
+            color: AppTheme.surface,
+            border: Border(right: BorderSide(color: AppTheme.border)),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.all(28),
+            child: Column(
+              children: [
+                SizedBox(height: 28),
+                ShimmerBox(width: 148, height: 148, radius: 14, color: AppTheme.card2),
+                SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ShimmerBox(width: 80, height: 24, radius: 12, color: AppTheme.card2),
+                    SizedBox(width: 8),
+                    ShimmerBox(width: 70, height: 24, radius: 12, color: AppTheme.card2),
+                  ],
+                ),
+                SizedBox(height: 16),
+                ShimmerBox(width: 200, height: 160, radius: 8, color: AppTheme.card2),
+                SizedBox(height: 16),
+                ShimmerBox(width: 220, height: 12, radius: 4, color: AppTheme.card2),
+                SizedBox(height: 6),
+                ShimmerBox(width: 180, height: 12, radius: 4, color: AppTheme.card2),
+                SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ShimmerBox(width: 60, height: 22, radius: 12, color: AppTheme.card2),
+                    SizedBox(width: 6),
+                    ShimmerBox(width: 80, height: 22, radius: 12, color: AppTheme.card2),
+                  ],
+                ),
+                SizedBox(height: 20),
+                ShimmerBox(width: double.infinity, height: 44, radius: 10, color: AppTheme.card2),
+              ],
+            ),
+          ),
+        ),
+        // Right panel skeleton
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShimmerBox(width: double.infinity, height: 56, radius: 0, color: AppTheme.card2),
+              Padding(
+                padding: EdgeInsets.fromLTRB(24, 20, 24, 0),
+                child: Row(
+                  children: [
+                    Expanded(child: ShimmerBox(width: double.infinity, height: 28, radius: 6, color: AppTheme.card2)),
+                    SizedBox(width: 16),
+                    ShimmerBox(width: 80, height: 24, radius: 6, color: AppTheme.card2),
+                  ],
+                ),
+              ),
+              SizedBox(height: 12),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: ShimmerBox(width: double.infinity, height: 48, radius: 10, color: AppTheme.card2),
+              ),
+              SizedBox(height: 16),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    ShimmerBox(width: 80, height: 32, radius: 16, color: AppTheme.card2),
+                    SizedBox(width: 12),
+                    ShimmerBox(width: 100, height: 32, radius: 16, color: AppTheme.card2),
+                    SizedBox(width: 12),
+                    ShimmerBox(width: 80, height: 32, radius: 16, color: AppTheme.card2),
+                  ],
+                ),
+              ),
+              SizedBox(height: 24),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: double.infinity, height: 14, radius: 4, color: AppTheme.card2),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: double.infinity, height: 14, radius: 4, color: AppTheme.card2),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 300, height: 14, radius: 4, color: AppTheme.card2),
+                    SizedBox(height: 28),
+                    Row(
+                      children: [
+                        ShimmerBox(width: 60, height: 24, radius: 6, color: AppTheme.card2),
+                        SizedBox(width: 8),
+                        ShimmerBox(width: 80, height: 24, radius: 6, color: AppTheme.card2),
+                        SizedBox(width: 8),
+                        ShimmerBox(width: 70, height: 24, radius: 6, color: AppTheme.card2),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

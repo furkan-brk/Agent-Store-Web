@@ -19,7 +19,7 @@ void main() async {
     usePathUrlStrategy();
   }
   Get.put(AppTelemetryService(), permanent: true);
-  // Restore JWT and wallet address from SharedPreferences before anything else.
+  // Restore JWT and wallet address from LocalKvStore before anything else.
   // WalletService.init() also silently checks MetaMask via eth_accounts (no popup).
   await ApiService.instance.init();
   await MissionService.instance.init();

@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:get/get.dart';
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
+import '../shared/services/local_kv_store.dart';
 
 class StoreController extends GetxController {
   // ── State ─────────────────────────────────────────────────────────────────
@@ -27,10 +29,20 @@ class StoreController extends GetxController {
     return count;
   }
 
+  static const _kRecentSearchesKey = 'recent_searches';
+
   @override
   void onInit() {
     super.onInit();
+    _loadRecentSearches();
     load();
+  }
+
+  Future<void> _loadRecentSearches() async {
+    try {
+      final raw = await LocalKvStore.instance.getString(_kRecentSearchesKey) ?? '[]';
+      recentSearches.value = (jsonDecode(raw) as List).cast<String>().take(8).toList();
+    } catch (_) {}
   }
 
   @override
@@ -115,7 +127,11 @@ class StoreController extends GetxController {
     recentSearches.remove(term);
     recentSearches.insert(0, term);
     if (recentSearches.length > 8) recentSearches.removeRange(8, recentSearches.length);
+    LocalKvStore.instance.setString(_kRecentSearchesKey, jsonEncode(recentSearches.toList()));
   }
 
-  void clearRecentSearches() => recentSearches.clear();
+  void clearRecentSearches() {
+    recentSearches.clear();
+    LocalKvStore.instance.remove(_kRecentSearchesKey);
+  }
 }

@@ -1,18 +1,18 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/local_kv_store.dart';
 
 class OnboardingModal extends StatefulWidget {
   const OnboardingModal({super.key});
 
   /// Returns true if onboarding should be shown (first visit).
-  static bool shouldShow() {
-    return html.window.localStorage['onboarding_done'] != 'true';
+  static Future<bool> shouldShow() async {
+    final val = await LocalKvStore.instance.getString('onboarding_done');
+    return val != 'true';
   }
 
-  static void markDone() {
-    html.window.localStorage['onboarding_done'] = 'true';
+  static Future<void> markDone() async {
+    await LocalKvStore.instance.setString('onboarding_done', 'true');
   }
 
   @override
@@ -111,9 +111,10 @@ class _OnboardingModalState extends State<OnboardingModal> {
                   backgroundColor: const Color(0xFF81231E),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   if (isLast) {
-                    OnboardingModal.markDone();
+                    await OnboardingModal.markDone();
+                    if (!context.mounted) return;
                     Navigator.of(context).pop();
                     // Navigate to wallet to connect
                     context.go('/wallet');
@@ -128,8 +129,9 @@ class _OnboardingModalState extends State<OnboardingModal> {
             const SizedBox(height: 8),
             // Skip
             TextButton(
-              onPressed: () {
-                OnboardingModal.markDone();
+              onPressed: () async {
+                await OnboardingModal.markDone();
+                if (!context.mounted) return;
                 Navigator.of(context).pop();
               },
               child: const Text('Skip', style: TextStyle(color: Color(0xFF4A3826), fontSize: 12)),

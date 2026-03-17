@@ -1,7 +1,7 @@
 import 'dart:js_interop';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'local_kv_store.dart';
 
 // ── Top-level JS interop declarations ────────────────────────────────────────
 // These map directly to window.agentStoreWallet.* functions defined in
@@ -38,12 +38,11 @@ class WalletService {
   bool get isConnected => _wallet != null;
 
   /// Call once at app startup to restore a previously saved wallet address.
-  /// After restoring from SharedPreferences, silently verifies that MetaMask
+  /// After restoring from LocalKvStore, silently verifies that MetaMask
   /// still has the account connected via `eth_accounts` (no popup).
   /// If MetaMask no longer exposes the saved account, clears the stored value.
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedWallet = prefs.getString(_kWalletKey);
+    final savedWallet = await LocalKvStore.instance.getString(_kWalletKey);
     if (savedWallet == null || savedWallet.isEmpty) return;
 
     if (kIsWeb) {
@@ -58,7 +57,7 @@ class WalletService {
         // MetaMask no longer has this account connected — clear stored data
         debugPrint(
             'WalletService.init: MetaMask account mismatch or disconnected, clearing stored wallet');
-        await prefs.remove(_kWalletKey);
+        await LocalKvStore.instance.remove(_kWalletKey);
       }
     } else {
       // Non-web: just restore from prefs (no MetaMask to check)
@@ -79,9 +78,8 @@ class WalletService {
       final addr = await _jsRequestAccounts();
       if (addr == null) return null;
       _wallet = addr.toLowerCase();
-      // Persist to SharedPreferences so it survives page refresh
-      SharedPreferences.getInstance()
-          .then((p) => p.setString(_kWalletKey, _wallet!));
+      // Persist to LocalKvStore so it survives page refresh
+      LocalKvStore.instance.setString(_kWalletKey, _wallet!);
       return _wallet;
     } catch (e) {
       debugPrint('connectWallet: $e');
@@ -130,7 +128,7 @@ class WalletService {
   void disconnect() {
     _wallet = null;
     // Clear persisted wallet address
-    SharedPreferences.getInstance().then((p) => p.remove(_kWalletKey));
+    LocalKvStore.instance.remove(_kWalletKey);
   }
 
   // ── JS bridge implementations ─────────────────────────────────────────────

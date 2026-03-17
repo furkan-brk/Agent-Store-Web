@@ -84,7 +84,7 @@ class AgentDetailController extends GetxController {
       final ok = await ApiService.instance.addToLibrary(agentId);
       if (ok) {
         inLibrary.value = true;
-        NotificationService.instance.add('Agent saved to library!', type: 'save');
+        await NotificationService.instance.add('Agent saved to library!', type: 'save');
       }
     }
     isLibraryLoading.value = false;

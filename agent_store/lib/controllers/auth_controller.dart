@@ -101,7 +101,7 @@ class AuthController extends GetxController {
     isConnected.value = true;
     isConnecting.value = false;
 
-    NotificationService.instance.add('Wallet connected successfully!', type: 'save');
+    await NotificationService.instance.add('Wallet connected successfully!', type: 'save');
     await loadCredits();
 
     // Notify services about the new wallet so they switch to per-wallet

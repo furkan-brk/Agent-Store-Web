@@ -1,6 +1,5 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
 import 'dart:convert';
+import 'local_kv_store.dart';
 
 class AgentCollection {
   final String id;
@@ -70,9 +69,9 @@ class CollectionService {
     '#3B82F6',
   ];
 
-  List<AgentCollection> getAll() {
+  Future<List<AgentCollection>> getAll() async {
     try {
-      final raw = html.window.localStorage[_key];
+      final raw = await LocalKvStore.instance.getString(_key);
       if (raw == null || raw.isEmpty) return [];
       final list = jsonDecode(raw) as List<dynamic>;
       return list
@@ -83,12 +82,12 @@ class CollectionService {
     }
   }
 
-  void _save(List<AgentCollection> collections) {
-    html.window.localStorage[_key] =
-        jsonEncode(collections.map((c) => c.toJson()).toList());
+  Future<void> _save(List<AgentCollection> collections) async {
+    await LocalKvStore.instance.setString(
+        _key, jsonEncode(collections.map((c) => c.toJson()).toList()));
   }
 
-  AgentCollection create(String name, String color) {
+  Future<AgentCollection> create(String name, String color) async {
     final collection = AgentCollection(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name.trim().isEmpty ? 'Unnamed' : name.trim(),
@@ -96,36 +95,36 @@ class CollectionService {
       color: color,
       createdAt: DateTime.now(),
     );
-    final all = getAll()..add(collection);
-    _save(all);
+    final all = await getAll()..add(collection);
+    await _save(all);
     return collection;
   }
 
-  void addAgent(String collectionId, int agentId) {
-    final all = getAll();
+  Future<void> addAgent(String collectionId, int agentId) async {
+    final all = await getAll();
     final idx = all.indexWhere((c) => c.id == collectionId);
     if (idx == -1) return;
     final c = all[idx];
     if (c.agentIds.contains(agentId)) return;
     all[idx] = c.copyWith(agentIds: [...c.agentIds, agentId]);
-    _save(all);
+    await _save(all);
   }
 
-  void removeAgent(String collectionId, int agentId) {
-    final all = getAll();
+  Future<void> removeAgent(String collectionId, int agentId) async {
+    final all = await getAll();
     final idx = all.indexWhere((c) => c.id == collectionId);
     if (idx == -1) return;
     final c = all[idx];
     all[idx] = c.copyWith(
         agentIds: c.agentIds.where((id) => id != agentId).toList());
-    _save(all);
+    await _save(all);
   }
 
-  void delete(String collectionId) {
-    final all = getAll()..removeWhere((c) => c.id == collectionId);
-    _save(all);
+  Future<void> delete(String collectionId) async {
+    final all = await getAll()..removeWhere((c) => c.id == collectionId);
+    await _save(all);
   }
 
-  List<AgentCollection> collectionsForAgent(int agentId) =>
-      getAll().where((c) => c.agentIds.contains(agentId)).toList();
+  Future<List<AgentCollection>> collectionsForAgent(int agentId) async =>
+      (await getAll()).where((c) => c.agentIds.contains(agentId)).toList();
 }

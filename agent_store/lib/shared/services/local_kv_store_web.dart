@@ -16,4 +16,8 @@ class LocalKvStore {
   Future<void> remove(String key) async {
     html.window.localStorage.remove(key);
   }
+
+  Future<void> clear() async {
+    html.window.localStorage.clear();
+  }
 }

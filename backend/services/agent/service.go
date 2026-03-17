@@ -80,12 +80,12 @@ func NewAgentService(aiClient *client.AIClient, imageSvc *ImageService, c *cache
 }
 
 // ListAgents returns a page of agents with optional filtering and sorting.
-func (s *AgentService) ListAgents(category, search, sort string, page, limit int) ([]models.Agent, int64, error) {
+func (s *AgentService) ListAgents(category, search, sort, creatorWallet string, page, limit int) ([]models.Agent, int64, error) {
 	type cachedResult struct {
 		Agents []models.Agent `json:"agents"`
 		Total  int64          `json:"total"`
 	}
-	cacheKey := fmt.Sprintf("agents|%s|%s|%s|%d|%d", category, search, sort, page, limit)
+	cacheKey := fmt.Sprintf("agents|%s|%s|%s|%s|%d|%d", category, search, sort, creatorWallet, page, limit)
 	if data, ok := s.cache.Get(cacheKey); ok {
 		var r cachedResult
 		if err := json.Unmarshal(data, &r); err == nil {
@@ -101,6 +101,9 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 	}
 	if search != "" {
 		query = query.Where("title ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+	if creatorWallet != "" {
+		query = query.Where("creator_wallet = ?", creatorWallet)
 	}
 	query.Count(&total)
 	offset := (page - 1) * limit
@@ -126,6 +129,77 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 		}
 	}
 	return agents, total, err
+}
+
+// CategoryCount holds the name and agent count for a single category.
+type CategoryCount struct {
+	Key   string `json:"key"`
+	Label string `json:"label"`
+	Count int64  `json:"count"`
+}
+
+// categoryLabels maps stored category keys to human-readable labels.
+var categoryLabels = map[string]string{
+	"backend":    "Backend",
+	"frontend":   "Frontend",
+	"data":       "Data",
+	"devops":     "DevOps",
+	"security":   "Security",
+	"marketing":  "Marketing",
+	"writing":    "Writing",
+	"education":  "Education",
+	"general":    "General",
+	"research":   "Research",
+	"design":     "Design",
+	"business":   "Business",
+	"finance":    "Finance",
+	"healthcare": "Healthcare",
+	"legal":      "Legal",
+}
+
+// GetCategories returns all categories with their agent counts.
+func (s *AgentService) GetCategories() ([]CategoryCount, error) {
+	const cacheKey = "categories"
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var cached []CategoryCount
+		if err := json.Unmarshal(data, &cached); err == nil {
+			return cached, nil
+		}
+	}
+
+	var rows []struct {
+		Category string
+		Count    int64
+	}
+	err := database.DB.Model(&models.Agent{}).
+		Select("category, count(*) as count").
+		Where("category != ''").
+		Group("category").
+		Order("count DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("query categories: %w", err)
+	}
+
+	result := make([]CategoryCount, 0, len(rows))
+	for _, r := range rows {
+		label := categoryLabels[r.Category]
+		if label == "" {
+			// Capitalize first letter as fallback
+			label = strings.ToUpper(r.Category[:1]) + r.Category[1:]
+		}
+		result = append(result, CategoryCount{
+			Key:   r.Category,
+			Label: label,
+			Count: r.Count,
+		})
+	}
+
+	if b, jerr := json.Marshal(result); jerr == nil {
+		s.cache.Set(cacheKey, b, 120*time.Second)
+	}
+
+	return result, nil
 }
 
 // GetAgent returns a single agent by ID.
@@ -312,6 +386,7 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	}
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
+	s.cache.Delete("categories")
 	return agent, nil
 }
 
@@ -459,6 +534,7 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
+	s.cache.Delete("categories")
 
 	if creatorWallet != "" {
 		entry := models.LibraryEntry{UserWallet: creatorWallet, AgentID: fork.ID}
@@ -637,6 +713,7 @@ func (s *AgentService) UpdateAgent(agentID uint, wallet string, title, descripti
 
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
+	s.cache.Delete("categories")
 
 	return &agent, nil
 }
@@ -695,6 +772,7 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
+	s.cache.Delete("categories")
 
 	return &agent, nil
 }

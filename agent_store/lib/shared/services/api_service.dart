@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../features/legend/models/workflow_models.dart';
 import '../models/agent_model.dart';
 import '../models/mission_model.dart';
 import '../models/guild_model.dart';
 import '../../core/constants/api_constants.dart';
+import 'local_kv_store.dart';
 
 const _kTokenKey = 'jwt_token';
 
@@ -40,12 +40,12 @@ class ApiService {
   String? _token;
   void setToken(String t) {
     _token = t;
-    SharedPreferences.getInstance().then((p) => p.setString(_kTokenKey, t));
+    LocalKvStore.instance.setString(_kTokenKey, t);
   }
 
   void clearToken() {
     _token = null;
-    SharedPreferences.getInstance().then((p) => p.remove(_kTokenKey));
+    LocalKvStore.instance.remove(_kTokenKey);
     invalidateCache(); // wipe all caches on logout
   }
 
@@ -53,8 +53,7 @@ class ApiService {
 
   /// Call once at app startup to restore a previously saved JWT.
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString(_kTokenKey);
+    _token = await LocalKvStore.instance.getString(_kTokenKey);
   }
 
   Map<String, String> get _headers => {
@@ -101,8 +100,9 @@ class ApiService {
     double? minPrice,
     double? maxPrice,
     List<String>? tags,
+    String? creatorWallet,
   }) async {
-    final cacheKey = 'agents_${category ?? ''}_${search ?? ''}_${sort}_${page}_${limit}_${minPrice ?? 0}_${maxPrice ?? 0}_${tags?.join(',') ?? ''}';
+    final cacheKey = 'agents_${category ?? ''}_${search ?? ''}_${sort}_${page}_${limit}_${minPrice ?? 0}_${maxPrice ?? 0}_${tags?.join(',') ?? ''}_${creatorWallet ?? ''}';
     final cached = _getCache<({List<AgentModel> agents, int total})>(cacheKey);
     if (cached != null) return cached;
     try {
@@ -114,6 +114,7 @@ class ApiService {
         if (minPrice != null) 'min_price': minPrice.toStringAsFixed(2),
         if (maxPrice != null) 'max_price': maxPrice.toStringAsFixed(2),
         if (tags != null && tags.isNotEmpty) 'tags': tags.join(','),
+        if (creatorWallet != null && creatorWallet.isNotEmpty) 'creator_wallet': creatorWallet,
       });
       final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {

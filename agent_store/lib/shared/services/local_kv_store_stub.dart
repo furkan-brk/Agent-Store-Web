@@ -8,4 +8,6 @@ class LocalKvStore {
   Future<void> setString(String key, String value) async {}
 
   Future<void> remove(String key) async {}
+
+  Future<void> clear() async {}
 }

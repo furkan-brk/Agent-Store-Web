@@ -1,6 +1,5 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:convert';
-import 'dart:html' as html;
+import 'local_kv_store.dart';
 
 class AppNotification {
   final String id;
@@ -42,8 +41,8 @@ class NotificationService {
 
   static const _key = 'agent_store_notifications';
 
-  List<AppNotification> getAll() {
-    final raw = html.window.localStorage[_key];
+  Future<List<AppNotification>> getAll() async {
+    final raw = await LocalKvStore.instance.getString(_key);
     if (raw == null || raw.isEmpty) return [];
     try {
       final list = jsonDecode(raw) as List;
@@ -51,10 +50,10 @@ class NotificationService {
     } catch (_) { return []; }
   }
 
-  int get unreadCount => getAll().where((n) => !n.read).length;
+  Future<int> get unreadCount async => (await getAll()).where((n) => !n.read).length;
 
-  void add(String message, {String type = 'info'}) {
-    final notifications = getAll();
+  Future<void> add(String message, {String type = 'info'}) async {
+    final notifications = await getAll();
     notifications.insert(0, AppNotification(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       message: message, type: type,
@@ -62,13 +61,13 @@ class NotificationService {
     ));
     // Keep max 30
     final trimmed = notifications.take(30).toList();
-    html.window.localStorage[_key] = jsonEncode(trimmed.map((n) => n.toJson()).toList());
+    await LocalKvStore.instance.setString(_key, jsonEncode(trimmed.map((n) => n.toJson()).toList()));
   }
 
-  void markAllRead() {
-    final updated = getAll().map((n) => n.copyWith(read: true)).toList();
-    html.window.localStorage[_key] = jsonEncode(updated.map((n) => n.toJson()).toList());
+  Future<void> markAllRead() async {
+    final updated = (await getAll()).map((n) => n.copyWith(read: true)).toList();
+    await LocalKvStore.instance.setString(_key, jsonEncode(updated.map((n) => n.toJson()).toList()));
   }
 
-  void clear() => html.window.localStorage.remove(_key);
+  Future<void> clear() => LocalKvStore.instance.remove(_key);
 }

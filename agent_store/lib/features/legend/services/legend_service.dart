@@ -3,7 +3,6 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/workflow_models.dart';
 import '../../../shared/services/api_service.dart';
@@ -32,8 +31,7 @@ class LegendService {
   List<LegendWorkflow> get workflows => List.unmodifiable(_workflows);
 
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _currentWallet = prefs.getString('wallet_address')?.toLowerCase();
+    _currentWallet = (await LocalKvStore.instance.getString('wallet_address'))?.toLowerCase();
     await _migrateLegacyKey();
     await refresh();
   }
@@ -75,7 +73,7 @@ class LegendService {
       // Detect sync failure: authenticated + remote empty + local non-empty
       if (remote.isEmpty && local.isNotEmpty) {
         debugPrint('LegendService: sync failed — ${local.length} workflows saved locally only');
-        NotificationService.instance.add(
+        await NotificationService.instance.add(
           'Workflow sync failed — ${local.length} workflows saved locally only',
           type: 'info',
         );

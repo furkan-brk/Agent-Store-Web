@@ -1,12 +1,9 @@
 // lib/features/settings/screens/settings_screen.dart
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/auth_controller.dart';
+import '../../../shared/services/local_kv_store.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -298,9 +295,7 @@ class SettingsScreen extends StatelessWidget {
     if (confirmed != true) return;
     if (!context.mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    html.window.localStorage.clear();
+    await LocalKvStore.instance.clear();
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

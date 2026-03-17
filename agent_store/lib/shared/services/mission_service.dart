@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/mission_model.dart';
 import 'api_service.dart';
@@ -32,8 +31,7 @@ class MissionService {
 
   Future<void> init() async {
     // Read saved wallet to scope localStorage per-wallet from the start.
-    final prefs = await SharedPreferences.getInstance();
-    _currentWallet = prefs.getString('wallet_address')?.toLowerCase();
+    _currentWallet = (await LocalKvStore.instance.getString('wallet_address'))?.toLowerCase();
 
     // One-time migration from old global key → per-wallet key.
     await _migrateLegacyKey();
@@ -83,7 +81,7 @@ class MissionService {
       // Detect sync failure: authenticated + remote empty + local non-empty
       if (remote.isEmpty && local.isNotEmpty) {
         debugPrint('MissionService: sync failed — ${local.length} missions saved locally only');
-        NotificationService.instance.add(
+        await NotificationService.instance.add(
           'Mission sync failed — ${local.length} missions saved locally only',
           type: 'info',
         );

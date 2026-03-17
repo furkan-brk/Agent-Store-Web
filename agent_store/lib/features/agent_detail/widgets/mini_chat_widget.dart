@@ -1,10 +1,9 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/services/mission_service.dart';
 
 class MiniChatWidget extends StatefulWidget {
@@ -46,15 +45,15 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
 
   String get _storageKey => 'chat_history_${widget.agentId}';
 
-  /// Serialises the message list and writes it to localStorage.
-  void _saveHistory(List<({String role, String text})> messages) {
+  /// Serialises the message list and writes it to LocalKvStore.
+  Future<void> _saveHistory(List<({String role, String text})> messages) async {
     final encoded = messages.map((m) => '${m.role}|||${m.text}').join(';;;');
-    html.window.localStorage[_storageKey] = encoded;
+    await LocalKvStore.instance.setString(_storageKey, encoded);
   }
 
-  /// Reads and deserialises the message list from localStorage.
-  List<({String role, String text})> _loadHistory() {
-    final raw = html.window.localStorage[_storageKey];
+  /// Reads and deserialises the message list from LocalKvStore.
+  Future<List<({String role, String text})>> _loadHistory() async {
+    final raw = await LocalKvStore.instance.getString(_storageKey);
     if (raw == null || raw.isEmpty) return [];
     return raw
         .split(';;;')
@@ -72,9 +71,11 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
   @override
   void initState() {
     super.initState();
-    _messages = _loadHistory();
     _ctrl.addListener(_onInputChanged);
     _loadLibrary();
+    _loadHistory().then((msgs) {
+      if (mounted) setState(() => _messages = msgs);
+    });
   }
 
   @override
@@ -228,7 +229,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
 
   void _clearHistory() {
     setState(() => _messages = []);
-    html.window.localStorage.remove(_storageKey);
+    LocalKvStore.instance.remove(_storageKey);
   }
 
   void _scrollToBottom() {
@@ -670,6 +671,6 @@ chatWithAgent();''';
   }
 
   void _copyToClipboard(String text) {
-    html.window.navigator.clipboard?.writeText(text);
+    Clipboard.setData(ClipboardData(text: text));
   }
 }

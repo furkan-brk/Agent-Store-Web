@@ -1,7 +1,5 @@
 // lib/features/store/screens/store_screen.dart
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
-import 'dart:html' as html;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -42,17 +40,16 @@ class _StoreScreenState extends State<StoreScreen> {
     _ctrl = Get.isRegistered<StoreController>()
         ? Get.find<StoreController>()
         : Get.put(StoreController(), permanent: true);
-    _loadRecentSearches();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (OnboardingModal.shouldShow() && mounted) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (await OnboardingModal.shouldShow() && mounted) {
         showDialog(context: context, barrierDismissible: false, builder: (_) => const OnboardingModal());
       }
     });
   }
 
-  void _loadRecentSearches() {
+  Future<void> _loadRecentSearches() async {
     try {
-      final raw = html.window.localStorage['recent_searches'] ?? '[]';
+      final raw = await LocalKvStore.instance.getString('recent_searches') ?? '[]';
       _ctrl.recentSearches.value = (jsonDecode(raw) as List).cast<String>().take(8).toList();
     } catch (_) {}
   }
@@ -64,7 +61,7 @@ class _StoreScreenState extends State<StoreScreen> {
       list.remove(term); list.insert(0, term);
       if (list.length > 8) list.removeRange(8, list.length);
       _ctrl.recentSearches.value = list;
-      html.window.localStorage['recent_searches'] = jsonEncode(list);
+      LocalKvStore.instance.setString('recent_searches', jsonEncode(list));
     } catch (_) {}
   }
 
@@ -178,15 +175,48 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
+  // Responsive grid delegate based on available width.
+  SliverGridDelegate _responsiveGridDelegate(double width) {
+    if (width < 400) {
+      // Small phones: 2 columns, tight spacing
+      return const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 0.68,
+      );
+    } else if (width < 768) {
+      // Large phones / small tablets: 2-3 columns
+      return const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.70,
+      );
+    }
+    // Tablet / Desktop: default behavior
+    return const SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 300,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 0.72,
+    );
+  }
+
   // Returns a sliver based on current controller state.
   Widget _buildContentSliver() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    final gridPadding = isMobile
+        ? const EdgeInsets.fromLTRB(12, 0, 12, 12)
+        : const EdgeInsets.fromLTRB(24, 0, 24, 24);
+
     // Skeleton: loading AND no stale data to show
     if (_ctrl.isLoading.value && _ctrl.agents.isEmpty) {
       return SliverPadding(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        padding: gridPadding,
         sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.72),
+          gridDelegate: _responsiveGridDelegate(screenWidth),
           delegate: SliverChildBuilderDelegate(
             (_, __) => const AgentCardSkeleton(),
             childCount: 12,
@@ -197,10 +227,9 @@ class _StoreScreenState extends State<StoreScreen> {
     if (_ctrl.hasError.value) return SliverFillRemaining(child: _buildErrorView());
     if (_ctrl.agents.isEmpty) return SliverFillRemaining(child: _buildEmpty());
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: gridPadding,
       sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 300, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.72),
+        gridDelegate: _responsiveGridDelegate(screenWidth),
         delegate: SliverChildBuilderDelegate(
           (_, i) => RepaintBoundary(
             key: ValueKey(_ctrl.agents[i].id),
@@ -212,13 +241,19 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  Widget _buildHeader(bool showSidebar) => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+  Widget _buildHeader(bool showSidebar) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 768;
+    final hPad = isMobile ? 16.0 : 24.0;
+    final titleSize = isMobile ? 20.0 : 24.0;
+
+    return Padding(
+    padding: EdgeInsets.fromLTRB(hPad, isMobile ? 20 : 28, hPad, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Title row with accent decoration
       Row(children: [
         Container(
-          width: 4, height: 28,
+          width: 4, height: isMobile ? 22 : 28,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               begin: Alignment.topCenter,
@@ -229,12 +264,12 @@ class _StoreScreenState extends State<StoreScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text(
             'Discover Agents',
             style: TextStyle(
               color: AppTheme.textH,
-              fontSize: 24,
+              fontSize: titleSize,
               fontWeight: FontWeight.bold,
               letterSpacing: -0.5,
             ),
@@ -313,7 +348,7 @@ class _StoreScreenState extends State<StoreScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 6), visualDensity: VisualDensity.compact,
             ))),
             TextButton.icon(
-              onPressed: () { html.window.localStorage.remove('recent_searches'); _ctrl.recentSearches.clear(); },
+              onPressed: () { LocalKvStore.instance.remove('recent_searches'); _ctrl.recentSearches.clear(); },
               style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
               icon: const Icon(Icons.close_rounded, size: 11, color: AppTheme.textM),
               label: const Text('Clear', style: TextStyle(fontSize: 10, color: AppTheme.textM)),
@@ -324,6 +359,7 @@ class _StoreScreenState extends State<StoreScreen> {
       const SizedBox(height: 4),
     ]),
   );
+  }
 
   Widget _buildSearchField() => TextField(
     controller: _searchCtrl,
@@ -414,8 +450,11 @@ class _StoreScreenState extends State<StoreScreen> {
       )),
   ]));
 
-  Widget _buildSectionHeader() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
+  Widget _buildSectionHeader() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    final hPad = isMobile ? 16.0 : 24.0;
+    return Padding(
+    padding: EdgeInsets.fromLTRB(hPad, isMobile ? 16 : 24, hPad, 4),
     child: Column(children: [
       Obx(() {
         final IconData icon;
@@ -465,6 +504,7 @@ class _StoreScreenState extends State<StoreScreen> {
       const SizedBox(height: 16),
     ]),
   );
+  }
 
   IconData _getCategoryIcon(String category) => switch (category.toLowerCase()) {
     'backend'  => Icons.code_rounded,
@@ -618,8 +658,11 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   /// End-of-list indicator for long scrollable grids
-  Widget _buildEndOfList() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+  Widget _buildEndOfList() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    final hPad = isMobile ? 12.0 : 24.0;
+    return Padding(
+    padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 32),
     child: Obx(() => Column(children: [
       const Divider(color: AppTheme.border, height: 1, thickness: 1),
       const SizedBox(height: 16),
@@ -633,6 +676,7 @@ class _StoreScreenState extends State<StoreScreen> {
       ]),
     ])),
   );
+  }
 
   static const _kDiscoveryCategories = <(CharacterType, String, IconData)>[
     (CharacterType.wizard,     'backend',   Icons.code_rounded),
@@ -647,8 +691,11 @@ class _StoreScreenState extends State<StoreScreen> {
 
   static const _kPopularTags = ['AI', 'coding', 'writing', 'analysis', 'planning', 'security', 'research', 'marketing', 'automation', 'data'];
 
-  Widget _buildDiscovery() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+  Widget _buildDiscovery() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    final hPad = isMobile ? 16.0 : 24.0;
+    return Padding(
+    padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // "Browse by Category" header
       Row(mainAxisSize: MainAxisSize.min, children: [
@@ -704,6 +751,7 @@ class _StoreScreenState extends State<StoreScreen> {
       const SizedBox(height: 12),
     ]),
   );
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -901,43 +949,50 @@ class _AgentCardWithSaveState extends State<_AgentCardWithSave> {
   bool _saveHovered = false;
 
   @override
-  Widget build(BuildContext context) => Stack(clipBehavior: Clip.none, children: [
-    AgentCard(agent: widget.agent),
-    Positioned(
-      top: 8, right: 8,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _saveHovered = true),
-        onExit: (_) => setState(() => _saveHovered = false),
-        cursor: SystemMouseCursors.click,
-        child: Tooltip(
-          message: 'Save to library',
-          child: GestureDetector(
-            onTap: widget.onSave,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 30, height: 30,
-              decoration: BoxDecoration(
-                color: _saveHovered
-                  ? AppTheme.gold.withValues(alpha: 0.2)
-                  : AppTheme.surface.withValues(alpha: 0.9),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: _saveHovered ? AppTheme.gold : AppTheme.border2,
-                  width: _saveHovered ? 1.5 : 1,
+  Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    // Larger tap target on mobile for touch-friendliness
+    final btnSize = isMobile ? 36.0 : 30.0;
+    final iconSize = isMobile ? 18.0 : 15.0;
+
+    return Stack(clipBehavior: Clip.none, children: [
+      AgentCard(agent: widget.agent),
+      Positioned(
+        top: 8, right: 8,
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _saveHovered = true),
+          onExit: (_) => setState(() => _saveHovered = false),
+          cursor: SystemMouseCursors.click,
+          child: Tooltip(
+            message: 'Save to library',
+            child: GestureDetector(
+              onTap: widget.onSave,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: btnSize, height: btnSize,
+                decoration: BoxDecoration(
+                  color: _saveHovered
+                    ? AppTheme.gold.withValues(alpha: 0.2)
+                    : AppTheme.surface.withValues(alpha: 0.9),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: _saveHovered ? AppTheme.gold : AppTheme.border2,
+                    width: _saveHovered ? 1.5 : 1,
+                  ),
+                  boxShadow: _saveHovered
+                    ? [BoxShadow(color: AppTheme.gold.withValues(alpha: 0.3), blurRadius: 8)]
+                    : [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4)],
                 ),
-                boxShadow: _saveHovered
-                  ? [BoxShadow(color: AppTheme.gold.withValues(alpha: 0.3), blurRadius: 8)]
-                  : [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4)],
-              ),
-              child: Icon(
-                _saveHovered ? Icons.bookmark_add_rounded : Icons.bookmark_add_outlined,
-                size: 15,
-                color: _saveHovered ? AppTheme.gold : AppTheme.textM,
+                child: Icon(
+                  _saveHovered ? Icons.bookmark_add_rounded : Icons.bookmark_add_outlined,
+                  size: iconSize,
+                  color: _saveHovered ? AppTheme.gold : AppTheme.textM,
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  ]);
+    ]);
+  }
 }

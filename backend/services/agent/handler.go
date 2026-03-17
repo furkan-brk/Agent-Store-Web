@@ -51,7 +51,8 @@ func (h *Handler) ListAgents(c *gin.Context) {
 		search = search[:200]
 	}
 	sort := c.DefaultQuery("sort", "newest")
-	agents, total, err := h.agentSvc.ListAgents(c.Query("category"), search, sort, page, limit)
+	creatorWallet := c.Query("creator_wallet")
+	agents, total, err := h.agentSvc.ListAgents(c.Query("category"), search, sort, creatorWallet, page, limit)
 	if err != nil {
 		log.Printf("[AgentHandler.ListAgents] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -199,6 +200,17 @@ func (h *Handler) TrendingAgents(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"agents": agents, "count": len(agents)})
+}
+
+// GetCategories handles GET /api/v1/agents/categories
+func (h *Handler) GetCategories(c *gin.Context) {
+	categories, err := h.agentSvc.GetCategories()
+	if err != nil {
+		log.Printf("[AgentHandler.GetCategories] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, categories)
 }
 
 // ForkAgent handles POST /api/v1/agents/:id/fork

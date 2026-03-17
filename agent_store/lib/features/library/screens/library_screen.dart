@@ -407,11 +407,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         onLongPress: () =>
                             _showAddToCollectionSheet(a),
                         onRemove: () => _confirmRemoveAgent(a),
-                        collectionDots: CollectionService.instance
-                                .collectionsForAgent(a.id)
-                                .isNotEmpty
-                            ? _CollectionDots(agentId: a.id)
-                            : null,
+                        collectionDots: _CollectionDots(agentId: a.id),
                       );
                     },
                     childCount: filtered.length,
@@ -817,9 +813,9 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
         ],
       ),
-    ).then((confirmed) {
+    ).then((confirmed) async {
       if (confirmed == true) {
-        CollectionService.instance.delete(col.id);
+        await CollectionService.instance.delete(col.id);
         _ctrl.refreshCollections();
       }
     });
@@ -1392,27 +1388,32 @@ class _CollectionDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cols = CollectionService.instance.collectionsForAgent(agentId);
-    if (cols.isEmpty) return const SizedBox.shrink();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: cols
-          .take(3)
-          .map((c) => Container(
-                width: 8,
-                height: 8,
-                margin: const EdgeInsets.only(left: 3),
-                decoration: BoxDecoration(
-                  color: _hexToColor(c.color),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                        color: _hexToColor(c.color).withValues(alpha: 0.6),
-                        blurRadius: 4),
-                  ],
-                ),
-              ))
-          .toList(),
+    return FutureBuilder<List<AgentCollection>>(
+      future: CollectionService.instance.collectionsForAgent(agentId),
+      builder: (context, snapshot) {
+        final cols = snapshot.data ?? [];
+        if (cols.isEmpty) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: cols
+              .take(3)
+              .map((c) => Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(left: 3),
+                    decoration: BoxDecoration(
+                      color: _hexToColor(c.color),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                            color: _hexToColor(c.color).withValues(alpha: 0.6),
+                            blurRadius: 4),
+                      ],
+                    ),
+                  ))
+              .toList(),
+        );
+      },
     );
   }
 }
@@ -1434,18 +1435,20 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
   @override
   void initState() {
     super.initState();
-    _collections = CollectionService.instance.getAll();
+    CollectionService.instance.getAll().then((all) {
+      if (mounted) setState(() => _collections = all);
+    });
   }
 
-  void _toggle(AgentCollection col) {
+  Future<void> _toggle(AgentCollection col) async {
     final alreadyIn = col.agentIds.contains(widget.agent.id);
     if (alreadyIn) {
-      CollectionService.instance.removeAgent(col.id, widget.agent.id);
+      await CollectionService.instance.removeAgent(col.id, widget.agent.id);
     } else {
-      CollectionService.instance.addAgent(col.id, widget.agent.id);
+      await CollectionService.instance.addAgent(col.id, widget.agent.id);
     }
-    setState(
-        () => _collections = CollectionService.instance.getAll());
+    final updated = await CollectionService.instance.getAll();
+    if (mounted) setState(() => _collections = updated);
     widget.onChanged();
   }
 
@@ -1483,8 +1486,8 @@ class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
                   await showDialog<void>(
                     context: context,
                     builder: (_) => _NewCollectionDialog(
-                      onCreated: (col) {
-                        CollectionService.instance
+                      onCreated: (col) async {
+                        await CollectionService.instance
                             .addAgent(col.id, widget.agent.id);
                         widget.onChanged();
                       },
@@ -1676,13 +1679,13 @@ class _NewCollectionDialogState extends State<_NewCollectionDialog> {
           FilledButton(
             style: FilledButton.styleFrom(
                 backgroundColor: AppTheme.primary),
-            onPressed: () {
+            onPressed: () async {
               final name = _ctrl.text.trim();
               if (name.isEmpty) return;
-              final col = CollectionService.instance
+              final col = await CollectionService.instance
                   .create(name, _selectedColor);
               widget.onCreated(col);
-              Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             },
             child: const Text('Create'),
           ),
