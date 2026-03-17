@@ -139,6 +139,21 @@ docker compose build && docker compose up -d
 ---
 
 ## Sadece Backend
+### Backend Vendor Altyapisi (opsiyonel ama onerilir)
+
+Go bagimliliklarini repoya sabitlemek icin:
+
+```bash
+cd backend
+go mod tidy
+go mod vendor
+```
+
+Notlar:
+
+- `backend/vendor/` varsa Docker build otomatik `-mod=vendor` ile derler.
+- `vendor/` yoksa build mevcut davranisla `go mod download` yaparak devam eder.
+- Railway'de deterministic build icin `vendor/` klasorunu commit etmeniz onerilir.
 
 Go kurulu değilse Docker ile derle ve test et:
 

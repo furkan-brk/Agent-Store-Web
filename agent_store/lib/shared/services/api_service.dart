@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/legend/models/workflow_models.dart';
 import '../models/agent_model.dart';
+import '../models/mission_model.dart';
 import '../models/guild_model.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -60,11 +62,16 @@ class ApiService {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
+  Map<String, String> get _jsonHeaders => {
+    'Content-Type': 'application/json',
+  };
+
   // ── Auth ──────────────────────────────────────────────────────────────────
 
   Future<String?> getNonce(String wallet) async {
     try {
-      final res = await http.get(Uri.parse('${ApiConstants.authNonce}/$wallet'), headers: _headers);
+      // Public endpoint: keep request simple to avoid browser preflight issues.
+      final res = await http.get(Uri.parse('${ApiConstants.authNonce}/$wallet'));
       if (res.statusCode == 200) {
         return (jsonDecode(res.body) as Map<String, dynamic>)['nonce'] as String?;
       }
@@ -76,7 +83,7 @@ class ApiService {
     required String wallet, required String nonce, required String signature,
   }) async {
     try {
-      final res = await http.post(Uri.parse(ApiConstants.authVerify), headers: _headers,
+      final res = await http.post(Uri.parse(ApiConstants.authVerify), headers: _jsonHeaders,
         body: jsonEncode({'wallet': wallet, 'nonce': nonce, 'signature': signature}));
       if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) { debugPrint('verifySignature: $e'); }
@@ -287,6 +294,190 @@ class ApiService {
     } catch (e) { debugPrint('updateProfile: $e'); return false; }
   }
 
+  Future<List<MissionModel>> getUserMissions() async {
+    try {
+      final res = await http.get(Uri.parse(ApiConstants.userMissions), headers: _headers)
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final missions = (data['missions'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return missions;
+      }
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: getUserMissions — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('getUserMissions: HTTP ${res.statusCode} — ${res.body}');
+      }
+    } catch (e) { debugPrint('getUserMissions: $e'); }
+    return [];
+  }
+
+  Future<MissionModel?> saveMission(MissionModel mission) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userMissions),
+        headers: _headers,
+        body: jsonEncode(mission.toJson()),
+      );
+      if (res.statusCode == 200) {
+        return MissionModel.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('saveMission: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('saveMission: $e'); }
+    return null;
+  }
+
+  Future<bool> deleteMission(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('${ApiConstants.userMissions}/$id'), headers: _headers);
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('deleteMission: $e'); }
+    return false;
+  }
+
+  /// Sends all local missions to the backend in a single request. The backend
+  /// upserts each one and returns the full list from the DB.
+  Future<List<MissionModel>> batchSyncMissions(List<MissionModel> missions) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userMissionsSync),
+        headers: _headers,
+        body: jsonEncode({'missions': missions.map((m) => m.toJson()).toList()}),
+      ).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['missions'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: batchSyncMissions — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('batchSyncMissions: HTTP ${res.statusCode} — ${res.body}');
+      }
+    } catch (e) { debugPrint('batchSyncMissions: $e'); }
+    return [];
+  }
+
+  Future<List<LegendWorkflow>> getLegendWorkflows() async {
+    try {
+      final res = await http.get(Uri.parse(ApiConstants.userLegendWorkflows), headers: _headers)
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['workflows'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: getLegendWorkflows — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('getLegendWorkflows: HTTP ${res.statusCode} — ${res.body}');
+      }
+    } catch (e) { debugPrint('getLegendWorkflows: $e'); }
+    return [];
+  }
+
+  Future<LegendWorkflow?> saveLegendWorkflow(LegendWorkflow workflow) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userLegendWorkflows),
+        headers: _headers,
+        body: jsonEncode(workflow.toJson()),
+      );
+      if (res.statusCode == 200) {
+        return LegendWorkflow.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('saveLegendWorkflow: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('saveLegendWorkflow: $e'); }
+    return null;
+  }
+
+  Future<bool> deleteLegendWorkflow(String id) async {
+    try {
+      final res = await http.delete(Uri.parse('${ApiConstants.userLegendWorkflows}/$id'), headers: _headers);
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('deleteLegendWorkflow: $e'); }
+    return false;
+  }
+
+  /// Sends all local workflows to the backend in a single request. The backend
+  /// upserts each one and returns the full list from the DB.
+  Future<List<LegendWorkflow>> batchSyncLegendWorkflows(List<LegendWorkflow> workflows) async {
+    try {
+      final res = await http.post(
+        Uri.parse(ApiConstants.userLegendWorkflowsSync),
+        headers: _headers,
+        body: jsonEncode({'workflows': workflows.map((w) => w.toJson()).toList()}),
+      ).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['workflows'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: batchSyncLegendWorkflows — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('batchSyncLegendWorkflows: HTTP ${res.statusCode} — ${res.body}');
+      }
+    } catch (e) { debugPrint('batchSyncLegendWorkflows: $e'); }
+    return [];
+  }
+
+  Future<WorkflowExecution?> executeWorkflow(String workflowId, String inputMessage) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.userLegendWorkflows}/$workflowId/execute'),
+        headers: _headers,
+        body: jsonEncode({'input_message': inputMessage}),
+      ).timeout(const Duration(seconds: 180));
+      if (res.statusCode == 200) {
+        return WorkflowExecution.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('executeWorkflow: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) { debugPrint('executeWorkflow: $e'); }
+    return null;
+  }
+
+  Future<WorkflowExecution?> getExecution(int execId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.userLegendExecutions}/$execId'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        return WorkflowExecution.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+    } catch (e) { debugPrint('getExecution: $e'); }
+    return null;
+  }
+
+  Future<({List<WorkflowExecution> executions, int total})> listExecutions({
+    String? workflowId,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final uri = Uri.parse(ApiConstants.userLegendExecutions).replace(queryParameters: {
+        'page': '$page',
+        'limit': '$limit',
+        if (workflowId != null) 'workflow_id': workflowId,
+      });
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final list = (data['executions'] as List<dynamic>? ?? [])
+            .map((e) => WorkflowExecution.fromJson(e as Map<String, dynamic>))
+            .toList();
+        return (executions: list, total: data['total'] as int? ?? 0);
+      }
+    } catch (e) { debugPrint('listExecutions: $e'); }
+    return (executions: <WorkflowExecution>[], total: 0);
+  }
+
   // ── Trial ─────────────────────────────────────────────────────────────────
 
   /// Generates a one-time trial token and returns a CLI command that the user
@@ -362,6 +553,23 @@ class ApiService {
       }
     } catch (e) { debugPrint('getPurchaseStatus: $e'); }
     return false;
+  }
+
+  /// Lightweight network probe used for startup preload tiering.
+  Future<({int elapsedMs, bool success})> probeNetwork() async {
+    final sw = Stopwatch()..start();
+    try {
+      final uri = Uri.parse(ApiConstants.agents).replace(queryParameters: {
+        'page': '1',
+        'limit': '1',
+      });
+      final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 4));
+      sw.stop();
+      return (elapsedMs: sw.elapsedMilliseconds, success: res.statusCode == 200);
+    } catch (_) {
+      sw.stop();
+      return (elapsedMs: sw.elapsedMilliseconds, success: false);
+    }
   }
 
   Future<bool> setAgentPrice(int agentId, double price) async {

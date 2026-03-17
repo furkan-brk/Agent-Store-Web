@@ -54,7 +54,13 @@
       "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && dart analyze lib/app/theme.dart lib/features/store/screens/store_screen.dart lib/features/store/widgets/category_sidebar.dart 2>&1)",
       "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && dart analyze lib/ 2>&1 | tail -10)",
       "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\backend\" && go get github.com/google/uuid && go vet ./... 2>&1)",
-      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && flutter pub get 2>&1 | tail -5)"
+      "Bash(cd \"C:\\\\Users\\\\alpdu\\\\Documents\\\\GitHub\\\\Agent-Store-Web\\\\agent_store\" && flutter pub get 2>&1 | tail -5)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(xxd \"C:\\\\Projeler\\\\Agent-Store-Web\\\\backend\\\\services\\\\workspace\\\\legend_service.go\")",
+      "Bash(dart analyze:*)",
+      "Bash(go build:*)"
     ]
   }
 }

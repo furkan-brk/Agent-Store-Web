@@ -15,7 +15,9 @@ class CreatorDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(CreatorController());
+    final ctrl = Get.isRegistered<CreatorController>()
+        ? Get.find<CreatorController>()
+        : Get.put(CreatorController(), permanent: true);
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: Column(children: [
@@ -400,10 +402,10 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
               borderRadius: BorderRadius.circular(16),
               side: const BorderSide(color: AppTheme.border),
             ),
-            title: Row(children: [
-              const Icon(Icons.edit_outlined, color: AppTheme.gold, size: 20),
-              const SizedBox(width: 12),
-              const Text('Edit Agent', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
+            title: const Row(children: [
+              Icon(Icons.edit_outlined, color: AppTheme.gold, size: 20),
+              SizedBox(width: 12),
+              Text('Edit Agent', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
             ]),
             content: SizedBox(
               width: 500,
@@ -560,34 +562,34 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
             borderRadius: BorderRadius.circular(16),
             side: const BorderSide(color: AppTheme.border),
           ),
-          title: Row(children: [
-            const Icon(Icons.auto_fix_high_rounded, color: AppTheme.gold, size: 20),
-            const SizedBox(width: 12),
-            const Text('Regenerate Avatar', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
+          title: const Row(children: [
+            Icon(Icons.auto_fix_high_rounded, color: AppTheme.gold, size: 20),
+            SizedBox(width: 12),
+            Text('Regenerate Avatar', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
           ]),
           content: SizedBox(
             width: 420,
             child: isRegenerating
-                ? Column(
+                ? const Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(height: 12),
-                      const SizedBox(
+                      SizedBox(height: 12),
+                      SizedBox(
                         width: 40, height: 40,
                         child: CircularProgressIndicator(strokeWidth: 3, color: AppTheme.gold),
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
+                      SizedBox(height: 20),
+                      Text(
                         'Generating new avatar...',
                         style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w500),
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
+                      SizedBox(height: 8),
+                      Text(
                         'This may take 30-60 seconds. Please do not close this dialog.',
                         style: TextStyle(color: AppTheme.textM, fontSize: 12),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                     ],
                   )
                 : Column(
@@ -610,6 +612,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
                             size: 40,
                             agentId: agent.id,
                             generatedImage: agent.generatedImage,
+                            imageUrl: agent.imageUrl,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -703,10 +706,10 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
             borderRadius: BorderRadius.circular(16),
             side: const BorderSide(color: AppTheme.border),
           ),
-          title: Row(children: [
-            const Icon(Icons.monetization_on_outlined, color: AppTheme.gold, size: 20),
-            const SizedBox(width: 12),
-            const Text('Set Price', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
+          title: const Row(children: [
+            Icon(Icons.monetization_on_outlined, color: AppTheme.gold, size: 20),
+            SizedBox(width: 12),
+            Text('Set Price', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
           ]),
           content: SizedBox(
             width: 380,
@@ -942,6 +945,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
                                 size: 36,
                                 agentId: agent.id,
                                 generatedImage: agent.generatedImage,
+                                imageUrl: agent.imageUrl,
                               ),
                             ),
                           ),

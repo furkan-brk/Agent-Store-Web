@@ -102,6 +102,7 @@ class _SimilarCard extends StatelessWidget {
               size: 56,
               agentId: agent.id,
               generatedImage: agent.generatedImage,
+              imageUrl: agent.imageUrl,
             ),
             const SizedBox(width: 14),
             Expanded(

@@ -1,6 +1,7 @@
 // lib/features/agent_detail/widgets/export_agent_widget.dart
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:convert';
+// ignore: deprecated_member_use
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';

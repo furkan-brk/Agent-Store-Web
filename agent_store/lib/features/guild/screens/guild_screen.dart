@@ -23,7 +23,9 @@ class _GuildScreenState extends State<GuildScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = Get.put(GuildController());
+    _ctrl = Get.isRegistered<GuildController>()
+        ? Get.find<GuildController>()
+        : Get.put(GuildController(), permanent: true);
   }
 
   @override

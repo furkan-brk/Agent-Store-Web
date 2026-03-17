@@ -15,14 +15,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Prepare slim Railway deploy directory
+        run: |
+          rm -rf .railway-deploy
+          mkdir -p .railway-deploy
+          cp Dockerfile .railway-deploy/Dockerfile
+          cp entrypoint.sh .railway-deploy/entrypoint.sh
+          cp railway.toml .railway-deploy/railway.toml
+          cp .dockerignore .railway-deploy/.dockerignore
+          cp .railwayignore .railway-deploy/.railwayignore
+          cp -R backend .railway-deploy/backend
+          rm -rf .railway-deploy/backend/vendor
+          cp -R rembg .railway-deploy/rembg
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway
-        run: railway up --service Agent_Store --detach
+      - name: Deploy Monolith to Railway
+        working-directory: .railway-deploy
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if railway up --service Agent_Store --detach; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then echo "Deploy failed after ${attempt} attempts"; exit 1; fi
+            sleep $((attempt * 15))
+          done
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
   # -------------------------------------------------------
   # Frontend → Vercel (Flutter Web static build)

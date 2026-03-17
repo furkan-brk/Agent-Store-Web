@@ -147,11 +147,3 @@ func callImagen(apiKey, prompt string) (string, error) {
 	}
 	return imgResp.Predictions[0].BytesBase64Encoded, nil
 }
-
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}

@@ -30,7 +30,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
-    _ctrl = Get.put(LeaderboardController());
+    _ctrl = Get.isRegistered<LeaderboardController>()
+        ? Get.find<LeaderboardController>()
+        : Get.put(LeaderboardController(), permanent: true);
   }
 
   @override

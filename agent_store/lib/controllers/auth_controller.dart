@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import '../shared/services/api_service.dart';
+import '../shared/services/mission_service.dart';
 import '../shared/services/wallet_service.dart';
 import '../shared/services/notification_service.dart';
+import '../features/legend/services/legend_service.dart';
 
 class AuthController extends GetxController {
   static AuthController get to => Get.find();
@@ -41,9 +45,10 @@ class AuthController extends GetxController {
       isConnected.value = true;
       await loadCredits();
     } else if (hasToken && !hasWallet) {
-      // JWT exists but MetaMask no longer has the account — clear the session
-      // because we cannot make authenticated requests without wallet context.
-      ApiService.instance.clearToken();
+      // JWT exists but MetaMask no longer has the account.
+      // Keep the token alive so background data sync (missions, legend
+      // workflows) can still read/write the DB. The user just can't
+      // perform wallet-specific actions until they reconnect MetaMask.
       isConnected.value = false;
     }
     // If neither token nor wallet, user is simply not logged in — nothing to do.
@@ -98,6 +103,11 @@ class AuthController extends GetxController {
 
     NotificationService.instance.add('Wallet connected successfully!', type: 'save');
     await loadCredits();
+
+    // Notify services about the new wallet so they switch to per-wallet
+    // storage and sync local-only data created while offline.
+    unawaited(MissionService.instance.onWalletChanged(walletAddr));
+    unawaited(LegendService.instance.onWalletChanged(walletAddr));
   }
 
   void disconnect() {
@@ -107,6 +117,10 @@ class AuthController extends GetxController {
     credits.value = 0;
     username.value = '';
     bio.value = '';
+
+    // Clear in-memory missions/workflows so the next wallet doesn't inherit them.
+    MissionService.instance.onWalletChanged(null);
+    LegendService.instance.onWalletChanged(null);
   }
 
   Future<void> loadCredits() async {

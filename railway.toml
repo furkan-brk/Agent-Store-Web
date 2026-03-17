@@ -3,6 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "./server"
+startCommand = "/app/entrypoint.sh"
 healthcheckPath = "/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 120

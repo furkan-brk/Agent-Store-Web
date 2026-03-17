@@ -372,6 +372,7 @@ class _CharacterBanner extends StatelessWidget {
               size: 88,
               agentId: agent.id,
               generatedImage: agent.generatedImage,
+              imageUrl: agent.imageUrl,
             ),
           ),
         ),

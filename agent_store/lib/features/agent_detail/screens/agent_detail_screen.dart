@@ -1,6 +1,6 @@
 // lib/features/agent_detail/screens/agent_detail_screen.dart
 // ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:convert';
+
 import 'dart:html' as html;
 
 import 'package:agent_store/features/character/character_types.dart';
@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
+import '../../../shared/services/mission_service.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
@@ -147,11 +148,11 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppTheme.border2),
         ),
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.shopping_cart_outlined, color: AppTheme.gold, size: 20),
-            const SizedBox(width: 10),
-            const Text('Confirm Purchase', style: TextStyle(color: AppTheme.textH)),
+            Icon(Icons.shopping_cart_outlined, color: AppTheme.gold, size: 20),
+            SizedBox(width: 10),
+            Text('Confirm Purchase', style: TextStyle(color: AppTheme.textH)),
           ],
         ),
         content: Column(
@@ -414,6 +415,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
             size: 148, showName: true, showRarity: true,
             showStats: false, stats: a.stats, agentId: a.id,
             generatedImage: a.generatedImage,
+            imageUrl: a.imageUrl,
           ),
           const SizedBox(height: 12),
 
@@ -686,7 +688,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Description section
-        _SectionHeader(icon: Icons.description_outlined, title: 'Description'),
+        const _SectionHeader(icon: Icons.description_outlined, title: 'Description'),
         const SizedBox(height: 12),
         Text(a.description,
           style: const TextStyle(color: AppTheme.textB, fontSize: 15, height: 1.7)),
@@ -696,7 +698,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           const SizedBox(height: 28),
           const Divider(color: AppTheme.border, height: 1),
           const SizedBox(height: 24),
-          _SectionHeader(icon: Icons.psychology_outlined, title: 'Character Profile'),
+          const _SectionHeader(icon: Icons.psychology_outlined, title: 'Character Profile'),
           const SizedBox(height: 14),
           Container(
             width: double.infinity,
@@ -732,7 +734,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           const SizedBox(height: 28),
           const Divider(color: AppTheme.border, height: 1),
           const SizedBox(height: 24),
-          _SectionHeader(icon: Icons.label_outline_rounded, title: 'Tags'),
+          const _SectionHeader(icon: Icons.label_outline_rounded, title: 'Tags'),
           const SizedBox(height: 12),
           Wrap(spacing: 8, runSpacing: 8, children: a.tags.map((t) => _HoverTagChip(tag: t)).toList()),
         ],
@@ -777,7 +779,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         const SizedBox(height: 28),
         const Divider(color: AppTheme.border, height: 1),
         const SizedBox(height: 24),
-        _SectionHeader(icon: Icons.person_outline_rounded, title: 'Creator'),
+        const _SectionHeader(icon: Icons.person_outline_rounded, title: 'Creator'),
         const SizedBox(height: 12),
         MouseRegion(
           cursor: SystemMouseCursors.click,
@@ -811,7 +813,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         const SizedBox(height: 28),
         const Divider(color: AppTheme.border, height: 1),
         const SizedBox(height: 24),
-        _SectionHeader(icon: Icons.star_outline_rounded, title: 'Ratings'),
+        const _SectionHeader(icon: Icons.star_outline_rounded, title: 'Ratings'),
         const SizedBox(height: 14),
         RatingWidget(agentId: widget.ctrl.agentId),
 
@@ -823,6 +825,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   // ── Stats Row (used only inside Details tab now as expanded view) ─────────
 
+  // ignore: unused_element
   Widget _buildStatsRow(AgentModel a) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1204,7 +1207,7 @@ class _DetailLoadingSkeleton extends StatelessWidget {
             ),
 
             // Right panel skeleton
-            Expanded(
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1348,8 +1351,9 @@ class _TrialChatPanelState extends State<_TrialChatPanel> {
     super.dispose();
   }
 
-  void _generateTrial() {
-    final text = _messageCtrl.text.trim();
+  Future<void> _generateTrial() async {
+    final raw = _messageCtrl.text.trim();
+    final text = await MissionService.instance.expandMissionTags(raw);
     if (text.isEmpty) return;
     if (widget.ctrl.trialUsed.value || widget.ctrl.isTrialLoading.value) return;
 
@@ -1358,7 +1362,7 @@ class _TrialChatPanelState extends State<_TrialChatPanel> {
       _showConnectWalletDialog();
       return;
     }
-    widget.ctrl.generateTrial(text);
+    await widget.ctrl.generateTrial(text);
   }
 
   void _showConnectWalletDialog() {
@@ -1568,7 +1572,7 @@ class _TrialChatPanelState extends State<_TrialChatPanel> {
             minLines: 1,
             style: const TextStyle(color: AppTheme.textH, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'Type a message to test this agent...',
+              hintText: 'Type a message... (Use #mission and @agent)',
               hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
               counterText: '',
               filled: true,
@@ -2362,7 +2366,8 @@ class _SimilarAgentCardState extends State<_SimilarAgentCard> {
           child: Column(children: [
             PixelCharacterWidget(
               characterType: agent.characterType, rarity: agent.rarity,
-              size: 72, agentId: agent.id, generatedImage: agent.generatedImage),
+              size: 72, agentId: agent.id, generatedImage: agent.generatedImage,
+              imageUrl: agent.imageUrl),
             const SizedBox(height: 10),
             Text(agent.title,
               style: const TextStyle(color: AppTheme.textH, fontSize: 12, fontWeight: FontWeight.w600),

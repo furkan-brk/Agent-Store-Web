@@ -2,7 +2,10 @@
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import '../../../shared/models/agent_model.dart';
+import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/mission_service.dart';
 
 class MiniChatWidget extends StatefulWidget {
   final int agentId;
@@ -19,10 +22,25 @@ class MiniChatWidget extends StatefulWidget {
 }
 
 class _MiniChatWidgetState extends State<MiniChatWidget> {
+  static const _panelBg = Color(0xFFD4C6A7);
+  static const _panelBorder = Color(0xFF9B8B66);
+  static const _assistantBubbleBg = Color(0xFF2F3522);
+  static const _assistantText = Color(0xFFF2E8D2);
+  static const _userBubbleBg = Color(0xFF8E2C24);
+  static const _inputBg = Color(0xFFE5D6B5);
+  static const _inputText = Color(0xFF2B2C1E);
+
   List<({String role, String text})> _messages = [];
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   bool _sending = false;
+  List<AgentModel> _libraryAgents = const [];
+  bool _loadingLibrary = false;
+  List<AgentModel> _agentSuggestions = const [];
+  List<MissionModel> _missionSuggestions = const [];
+  String _activeTrigger = '';
+  bool _showSuggestions = false;
+  int _mentionStart = -1;
 
   // ── Storage helpers ────────────────────────────────────────────────────────
 
@@ -30,8 +48,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
 
   /// Serialises the message list and writes it to localStorage.
   void _saveHistory(List<({String role, String text})> messages) {
-    final encoded =
-        messages.map((m) => '${m.role}|||${m.text}').join(';;;');
+    final encoded = messages.map((m) => '${m.role}|||${m.text}').join(';;;');
     html.window.localStorage[_storageKey] = encoded;
   }
 
@@ -56,21 +73,132 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
   void initState() {
     super.initState();
     _messages = _loadHistory();
+    _ctrl.addListener(_onInputChanged);
+    _loadLibrary();
   }
 
   @override
   void dispose() {
+    _ctrl.removeListener(_onInputChanged);
     _ctrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _loadLibrary() async {
+    if (!ApiService.instance.isAuthenticated) return;
+    setState(() => _loadingLibrary = true);
+    final list = await ApiService.instance.getLibrary();
+    if (!mounted) return;
+    setState(() {
+      _libraryAgents = list;
+      _loadingLibrary = false;
+    });
+  }
+
+  void _onInputChanged() {
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : _ctrl.text.length;
+    final text = _ctrl.text;
+    if (cursor > text.length) return;
+
+    final prefix = text.substring(0, cursor);
+    final at = prefix.lastIndexOf('@');
+    final hash = prefix.lastIndexOf('#');
+    final trigger = at > hash ? '@' : '#';
+    final triggerIndex = trigger == '@' ? at : hash;
+    if (triggerIndex == -1) {
+      _hideSuggestions();
+      return;
+    }
+
+    if (triggerIndex > 0 && !RegExp(r'\s').hasMatch(prefix[triggerIndex - 1])) {
+      _hideSuggestions();
+      return;
+    }
+
+    final query = prefix.substring(triggerIndex + 1);
+    if (query.contains(RegExp(r'\s'))) {
+      _hideSuggestions();
+      return;
+    }
+
+    final q = query.toLowerCase();
+    if (trigger == '@') {
+      final suggestions = _libraryAgents
+          .where((a) => q.isEmpty || a.title.toLowerCase().contains(q))
+          .take(6)
+          .toList();
+      setState(() {
+        _activeTrigger = '@';
+        _mentionStart = triggerIndex;
+        _agentSuggestions = suggestions;
+        _missionSuggestions = const [];
+        _showSuggestions = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _activeTrigger = '#';
+      _mentionStart = triggerIndex;
+      _agentSuggestions = const [];
+      _missionSuggestions = MissionService.instance.search(q);
+      _showSuggestions = true;
+    });
+  }
+
+  void _hideSuggestions() {
+    if (!_showSuggestions) return;
+    setState(() {
+      _showSuggestions = false;
+      _activeTrigger = '';
+      _mentionStart = -1;
+      _agentSuggestions = const [];
+      _missionSuggestions = const [];
+    });
+  }
+
+  void _insertAgent(AgentModel agent) {
+    final text = _ctrl.text;
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '@${agent.title} ';
+    final next = '$before$mention$after';
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideSuggestions();
+  }
+
+  void _insertMission(MissionModel mission) {
+    final text = _ctrl.text;
+    final selection = _ctrl.selection;
+    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    if (_mentionStart < 0 || _mentionStart >= cursor || cursor > text.length) return;
+    final before = text.substring(0, _mentionStart);
+    final after = text.substring(cursor);
+    final mention = '#${mission.slug} ';
+    final next = '$before$mention$after';
+    _ctrl.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before + mention).length),
+    );
+    _hideSuggestions();
+  }
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _send() async {
-    final text = _ctrl.text.trim();
+    final raw = _ctrl.text.trim();
+    final text = await MissionService.instance.expandMissionTags(raw);
     if (text.isEmpty || _sending) return;
 
+    _hideSuggestions();
     _ctrl.clear();
     setState(() {
       _messages.add((role: 'user', text: text));
@@ -78,8 +206,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     });
     _scrollToBottom();
 
-    final reply =
-        await ApiService.instance.chatWithAgent(widget.agentId, text);
+    final reply = await ApiService.instance.chatWithAgent(widget.agentId, text);
 
     if (mounted) {
       setState(() {
@@ -133,9 +260,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: const Color(0xFFC8BA9A),
+        color: _panelBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFADA07A)),
+        border: Border.all(color: _panelBorder),
       ),
       child: Column(
         children: [
@@ -143,7 +270,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFADA07A))),
+              border: Border(bottom: BorderSide(color: _panelBorder)),
             ),
             child: Row(
               children: [
@@ -159,8 +286,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 Expanded(
                   child: Text(
                     widget.agentTitle,
-                    style: const TextStyle(
-                        color: Color(0xFF7A6E52), fontSize: 12),
+                    style: const TextStyle(color: Color(0xFF5A4D34), fontSize: 12),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -168,12 +294,10 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF81231E)),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF81231E)),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.terminal,
-                      size: 16, color: Color(0xFF6366F1)),
+                  icon: const Icon(Icons.terminal, size: 16, color: Color(0xFF6366F1)),
                   tooltip: 'Terminal\'den çalıştır',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -182,8 +306,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 const SizedBox(width: 8),
                 if (_messages.isNotEmpty)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        size: 16, color: Color(0xFF7A6E52)),
+                    icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFF7A6E52)),
                     tooltip: 'Clear chat history',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -199,8 +322,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                 ? const Center(
                     child: Text(
                       'Send a message to test this agent...',
-                      style: TextStyle(
-                          color: Color(0xFF5A5038), fontSize: 13),
+                      style: TextStyle(color: Color(0xFF4A4030), fontSize: 13),
                     ),
                   )
                 : ListView.builder(
@@ -211,31 +333,21 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                       final msg = _messages[i];
                       final isUser = msg.role == 'user';
                       return Align(
-                        alignment: isUser
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
+                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
                         child: Container(
-                          margin:
-                              const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.of(context).size.width * 0.6,
+                            maxWidth: MediaQuery.of(context).size.width * 0.6,
                           ),
                           decoration: BoxDecoration(
-                            color: isUser
-                                ? const Color(0xFF81231E)
-                                    .withValues(alpha: 0.8)
-                                : const Color(0xFF282918),
+                            color: isUser ? _userBubbleBg.withValues(alpha: 0.8) : _assistantBubbleBg,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             msg.text,
                             style: TextStyle(
-                              color: isUser
-                                  ? Colors.white
-                                  : const Color(0xFF4A4033),
+                              color: isUser ? Colors.white : _assistantText,
                               fontSize: 13,
                               height: 1.4,
                             ),
@@ -250,52 +362,100 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFADA07A))),
+              border: Border(top: BorderSide(color: _panelBorder)),
             ),
-            child: Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    style:
-                        const TextStyle(color: Color(0xFF2B2C1E), fontSize: 13),
-                    onSubmitted: (_) => _send(),
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      hintStyle: TextStyle(
-                          color: Color(0xFF5A5038), fontSize: 13),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      filled: true,
-                      fillColor: Color(0xFFB8AA88),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(8)),
-                        borderSide:
-                            BorderSide(color: Color(0xFFADA07A)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(8)),
-                        borderSide:
-                            BorderSide(color: Color(0xFF81231E)),
+                if (_showSuggestions)
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0E2C6),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _panelBorder),
+                    ),
+                    child: _activeTrigger == '@'
+                        ? (_loadingLibrary
+                            ? const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Text('Loading library agents...', style: TextStyle(fontSize: 12, color: _inputText)),
+                              )
+                            : (_agentSuggestions.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.all(8),
+                                    child: Text('No matching agents', style: TextStyle(fontSize: 12, color: _inputText)),
+                                  )
+                                : ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: _agentSuggestions.length,
+                                    itemBuilder: (_, i) {
+                                      final a = _agentSuggestions[i];
+                                      return ListTile(
+                                        dense: true,
+                                        title: Text(a.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+                                        onTap: () => _insertAgent(a),
+                                      );
+                                    },
+                                  )))
+                        : (_missionSuggestions.isEmpty
+                            ? const Padding(
+                                padding: EdgeInsets.all(8),
+                                child: Text('No matching missions', style: TextStyle(fontSize: 12, color: _inputText)),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: _missionSuggestions.length,
+                                itemBuilder: (_, i) {
+                                  final m = _missionSuggestions[i];
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text('#${m.slug}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    subtitle: Text(m.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11)),
+                                    onTap: () => _insertMission(m),
+                                  );
+                                },
+                              )),
+                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        style: const TextStyle(color: _inputText, fontSize: 13),
+                        onSubmitted: (_) => _send(),
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message... (@agent, #mission)',
+                          hintStyle: TextStyle(color: Color(0xFF6A5C42), fontSize: 13),
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          filled: true,
+                          fillColor: _inputBg,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                            borderSide: BorderSide(color: _panelBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                            borderSide: BorderSide(color: Color(0xFF81231E)),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _sending ? null : _send,
-                  icon: const Icon(Icons.send_rounded),
-                  color: const Color(0xFF81231E),
-                  disabledColor: const Color(0xFFC0B490),
-                  style: IconButton.styleFrom(
-                    backgroundColor:
-                        const Color(0xFF81231E).withValues(alpha: 0.1),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: _sending ? null : _send,
+                      icon: const Icon(Icons.send_rounded),
+                      color: const Color(0xFF81231E),
+                      disabledColor: const Color(0xFFC0B490),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF81231E).withValues(alpha: 0.1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

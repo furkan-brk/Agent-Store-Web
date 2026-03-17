@@ -39,7 +39,9 @@ class _StoreScreenState extends State<StoreScreen> {
   @override
   void initState() {
     super.initState();
-    _ctrl = Get.put(StoreController());
+    _ctrl = Get.isRegistered<StoreController>()
+        ? Get.find<StoreController>()
+        : Get.put(StoreController(), permanent: true);
     _loadRecentSearches();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (OnboardingModal.shouldShow() && mounted) {

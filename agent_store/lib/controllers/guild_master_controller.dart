@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
 
 enum GuildMasterPhase { input, loading, ready }
@@ -23,6 +24,8 @@ class GuildMasterController extends GetxController {
   final selectedAgentIds = <int>[].obs;
   final messages = <_Msg>[].obs;
   final isChatLoading = false.obs;
+  final isLibraryLoading = false.obs;
+  final libraryAgents = <AgentModel>[].obs;
   final error = RxnString();
 
   @override
@@ -36,6 +39,19 @@ class GuildMasterController extends GetxController {
         'reasoning': 'Team assembled from your guild. Chat to collaborate!',
       };
       phase.value = GuildMasterPhase.ready;
+    }
+    ensureLibraryLoaded();
+  }
+
+  Future<void> ensureLibraryLoaded() async {
+    if (!ApiService.instance.isAuthenticated) return;
+    if (isLibraryLoading.value || libraryAgents.isNotEmpty) return;
+    isLibraryLoading.value = true;
+    try {
+      final result = await ApiService.instance.getLibrary();
+      libraryAgents.value = result;
+    } finally {
+      isLibraryLoading.value = false;
     }
   }
 
