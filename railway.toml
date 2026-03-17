@@ -3,6 +3,6 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "/app/gateway"
+startCommand = "/app/monolith"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
