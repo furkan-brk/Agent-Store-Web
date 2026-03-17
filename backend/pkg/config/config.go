@@ -47,12 +47,12 @@ func Load() *Config {
 		TreasuryWallet:  getEnv("TREASURY_WALLET", ""),
 		RembgURL:        getEnv("REMBG_URL", "http://rembg:5000"),
 
-		// Service URLs default to Docker service names
-		AuthServiceURL:       getEnv("AUTH_SERVICE_URL", "http://authsvc:8081"),
-		AgentServiceURL:      getEnv("AGENT_SERVICE_URL", "http://agentsvc:8082"),
-		AIPipelineServiceURL: getEnv("AIPIPELINE_SERVICE_URL", "http://aipipelinesvc:8083"),
-		GuildServiceURL:      getEnv("GUILD_SERVICE_URL", "http://guildsvc:8084"),
-		WorkspaceServiceURL:  getEnv("WORKSPACE_SERVICE_URL", "http://workspacesvc:8085"),
+		// Service URLs — on Railway use .railway.internal, else Docker service names.
+		AuthServiceURL:       getEnv("AUTH_SERVICE_URL", svcDefault("auth", "8081")),
+		AgentServiceURL:      getEnv("AGENT_SERVICE_URL", svcDefault("agent", "8082")),
+		AIPipelineServiceURL: getEnv("AIPIPELINE_SERVICE_URL", svcDefault("aipipeline", "8083")),
+		GuildServiceURL:      getEnv("GUILD_SERVICE_URL", svcDefault("guild", "8084")),
+		WorkspaceServiceURL:  getEnv("WORKSPACE_SERVICE_URL", svcDefault("workspace", "8085")),
 	}
 }
 
@@ -89,6 +89,16 @@ func buildDSN() string {
 		" password=" + password +
 		" dbname=" + dbName +
 		" sslmode=" + sslMode + " TimeZone=UTC"
+}
+
+// svcDefault returns the default URL for an internal service.
+// On Railway: <name>service.railway.internal  (e.g. authservice.railway.internal)
+// In Docker Compose: <name>svc  (e.g. authsvc)
+func svcDefault(name, port string) string {
+	if os.Getenv("RAILWAY_ENVIRONMENT") != "" {
+		return "http://" + name + "service.railway.internal:" + port
+	}
+	return "http://" + name + "svc:" + port
 }
 
 func getEnv(key, fallback string) string {
