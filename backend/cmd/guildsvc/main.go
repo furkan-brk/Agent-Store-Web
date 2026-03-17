@@ -26,7 +26,7 @@ func main() {
 	handler := guild.NewHandler(guildSvc, gmSvc)
 	router := guild.SetupRouter(handler)
 
-	port := "8084"
+	port := cfg.Port
 	log.Printf("Guild Service starting on :%s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Guild Service error: %v", err)

@@ -31,5 +31,5 @@ COPY --from=builder /app/service .
 RUN chown appuser:appgroup ./service
 USER appuser
 EXPOSE 8084
-ENV GOMEMLIMIT=204MiB GOGC=50
+ENV PORT=8084 GOMEMLIMIT=204MiB GOGC=50
 CMD ["./service"]

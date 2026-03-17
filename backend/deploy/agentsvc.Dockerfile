@@ -31,5 +31,5 @@ COPY --from=builder /app/service .
 RUN mkdir -p ./uploads/agents && chown -R appuser:appgroup ./service ./uploads
 USER appuser
 EXPOSE 8082
-ENV GOMEMLIMIT=204MiB GOGC=50
+ENV PORT=8082 GOMEMLIMIT=204MiB GOGC=50
 CMD ["./service"]

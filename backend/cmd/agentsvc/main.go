@@ -30,7 +30,7 @@ func main() {
 	handler := agent.NewHandler(agentSvc)
 	router := agent.SetupRouter(handler)
 
-	port := "8082"
+	port := cfg.Port
 	log.Printf("Agent Service starting on :%s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Agent Service error: %v", err)

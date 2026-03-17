@@ -20,7 +20,7 @@ func main() {
 	authSvc := auth.NewAuthService(cfg.JWTSecret)
 	router := auth.SetupRouter(authSvc)
 
-	port := "8081"
+	port := cfg.Port
 	log.Printf("Auth Service starting on :%s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Auth service error: %v", err)

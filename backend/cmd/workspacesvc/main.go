@@ -25,7 +25,7 @@ func main() {
 	handler := workspace.NewHandler(missionSvc, legendSvc)
 	router := workspace.SetupRouter(handler)
 
-	port := "8085"
+	port := cfg.Port
 	log.Printf("Workspace Service starting on :%s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Workspace Service error: %v", err)

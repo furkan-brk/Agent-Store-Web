@@ -23,7 +23,7 @@ func main() {
 	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, replicateSvc, pollinationsSvc, scoreSvc, bgRemover)
 	router := aipipeline.SetupRouter(pipeline)
 
-	port := "8083"
+	port := cfg.Port
 	log.Printf("AI Pipeline Service starting on :%s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("AI Pipeline service error: %v", err)
