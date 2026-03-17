@@ -15,7 +15,6 @@ type Config struct {
 	MonadRPCURL     string
 	CreditsContract string
 	TreasuryWallet  string
-	RembgURL        string
 
 	// Inter-service URLs
 	AuthServiceURL      string
@@ -43,7 +42,6 @@ func Load() *Config {
 		MonadRPCURL:     getEnv("MONAD_RPC_URL", "https://testnet-rpc.monad.xyz"),
 		CreditsContract: getEnv("CREDITS_CONTRACT_ADDRESS", ""),
 		TreasuryWallet:  getEnv("TREASURY_WALLET", ""),
-		RembgURL:        getEnv("REMBG_URL", "http://127.0.0.1:5000"),
 
 		// Service URLs — on Railway use .railway.internal, else Docker service names.
 		AuthServiceURL:       getEnv("AUTH_SERVICE_URL", svcDefault("auth", "8081")),
@@ -114,3 +112,4 @@ func firstEnv(keys ...string) string {
 	}
 	return ""
 }
+

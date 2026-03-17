@@ -1,7 +1,6 @@
 package aipipeline
 
 import (
-	"encoding/base64"
 	"net/http"
 
 	"github.com/agentstore/backend/pkg/models"
@@ -117,8 +116,8 @@ func (h *Handler) Score(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// Avatar generates an avatar image with fallback chain and background removal.
-// Returns base64-encoded image bytes and the format.
+// Avatar generates an avatar image with fallback chain.
+// Returns base64-encoded image bytes and format.
 func (h *Handler) Avatar(c *gin.Context) {
 	var req avatarReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,22 +125,15 @@ func (h *Handler) Avatar(c *gin.Context) {
 		return
 	}
 
-	// Generate image via Imagen (Gemini)
-	base64Image := h.pipeline.GenerateImageWithFallback(req.Profile, req.ImagePrompt, req.CharType)
+	// Generate image via Imagen (Gemini) + background removal
+	base64Image, format := h.pipeline.GenerateImageWithFallback(req.Profile, req.ImagePrompt, req.CharType)
 	if base64Image == "" {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "all image providers failed"})
 		return
 	}
 
-	// Remove background
-	imgBytes, format := h.pipeline.BgRemover.RemoveBackground(base64Image)
-	if imgBytes == nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "background removal failed"})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"image_base64": base64.StdEncoding.EncodeToString(imgBytes),
+		"image_base64": base64Image,
 		"format":       format,
 	})
 }
@@ -200,3 +192,4 @@ func (h *Handler) Character(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"character_data": charData})
 }
+

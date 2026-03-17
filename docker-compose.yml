@@ -31,19 +31,6 @@ services:
       timeout: 3s
       retries: 5
 
-  rembg:
-    build: ./rembg
-    container_name: agent_store_rembg
-    ports:
-      - "5000:5000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    restart: unless-stopped
-
   # --- Microservices ---
 
   gateway:
@@ -121,10 +108,6 @@ services:
     env_file: .env
     environment:
       PORT: "8083"
-      REMBG_URL: http://rembg:5000
-    depends_on:
-      rembg:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8083/health"]
       interval: 10s

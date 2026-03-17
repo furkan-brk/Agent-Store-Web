@@ -16,8 +16,8 @@ func main() {
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
 	claudeSvc := aipipeline.NewAIService("") // Claude API key from env if needed
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
-	bgRemover := aipipeline.NewBgRemover(cfg.RembgURL)
 
+	bgRemover := aipipeline.NewBgRemover()
 	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, scoreSvc, bgRemover)
 	router := aipipeline.SetupRouter(pipeline)
 

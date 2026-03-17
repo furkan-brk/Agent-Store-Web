@@ -8,30 +8,44 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	"image/png"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 )
 
-// BgRemover handles background removal via the rembg ML service with
-// chroma key fallback.
-type BgRemover struct {
-	rembgURL string
+// BgRemover performs chroma-key background removal on images generated with a
+// magenta (#FF00FF) backdrop.  This is a pure-Go implementation that requires
+// no external Python service or ML model.
+//
+// The Imagen avatar prompt always requests a solid magenta background, so a
+// well-tuned chroma-key algorithm is sufficient for clean extraction.
+type BgRemover struct{}
+
+// NewBgRemover creates a BgRemover.  No configuration is required because
+// the pipeline no longer depends on an external rembg service.
+func NewBgRemover() *BgRemover {
+	return &BgRemover{}
 }
 
-// NewBgRemover creates a BgRemover pointing at the rembg sidecar service.
-func NewBgRemover(rembgURL string) *BgRemover {
-	return &BgRemover{rembgURL: rembgURL}
-}
-
-// RemoveBackground removes the background from a base64-encoded image and returns
-// raw image bytes plus the format ("webp" from ML, "png" from chroma key).
+// RemoveBackground decodes a base64-encoded image, removes the magenta
+// background via a 4-pass chroma-key algorithm, and returns the processed
+// image bytes together with the output format string ("png").
+//
+// The returned format is always "png" because the Docker build uses
+// CGO_ENABLED=0 which precludes CGo-based WebP encoders.  PNG is the only
+// stdlib format that supports an alpha channel.
+//
+// On failure the original (undecoded) image bytes are returned so callers
+// always receive a usable image.
 func (r *BgRemover) RemoveBackground(base64Image string) ([]byte, string) {
+	start := time.Now()
+
+	// Strip optional data-URI prefix (e.g. "data:image/png;base64,…").
 	raw := base64Image
-	if idx := strings.Index(raw, ","); idx != -1 {
-		raw = raw[idx+1:]
+	if strings.HasPrefix(raw, "data:") {
+		if idx := strings.Index(raw, ","); idx != -1 {
+			raw = raw[idx+1:]
+		}
 	}
 
 	imgBytes, err := base64.StdEncoding.DecodeString(raw)
@@ -40,90 +54,86 @@ func (r *BgRemover) RemoveBackground(base64Image string) ([]byte, string) {
 		return nil, ""
 	}
 
-	// Try ML removal via rembg
-	if r.rembgURL != "" {
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Post(r.rembgURL+"/api/remove", "application/octet-stream", bytes.NewReader(imgBytes))
-		if err == nil {
-			defer resp.Body.Close()
-			if resp.StatusCode == 200 {
-				webpBytes, readErr := io.ReadAll(resp.Body)
-				if readErr == nil && len(webpBytes) > 0 {
-					log.Printf("[BG-Remove] ML removal succeeded (%d bytes, webp)", len(webpBytes))
-					return webpBytes, "webp"
-				}
-				log.Printf("[BG-Remove] ML response read failed: %v", readErr)
-			} else {
-				log.Printf("[BG-Remove] ML returned status %d", resp.StatusCode)
-			}
-		} else {
-			log.Printf("[BG-Remove] ML service unreachable: %v", err)
-		}
-	} else {
-		log.Printf("[BG-Remove] rembg URL not configured, skipping ML removal")
+	processed, format, err := chromaKeyRemove(imgBytes)
+	if err != nil {
+		log.Printf("[BG-Remove] chroma-key failed: %v — returning original image", err)
+		return imgBytes, "png"
 	}
 
-	// Fallback: chroma key removal
-	log.Printf("[BG-Remove] falling back to chroma key")
-	if transparentB64, ckErr := chromaKey(raw); ckErr == nil {
-		pngBytes, decErr := base64.StdEncoding.DecodeString(transparentB64)
-		if decErr == nil && len(pngBytes) > 0 {
-			log.Printf("[BG-Remove] chroma key succeeded (%d bytes, png)", len(pngBytes))
-			return pngBytes, "png"
-		}
-	} else {
-		log.Printf("[BG-Remove] chroma key failed: %v", ckErr)
-	}
+	elapsed := time.Since(start)
+	log.Printf("[BG-Remove] chroma-key succeeded | format=%s | input=%d bytes | output=%d bytes (%.1f%% of original) | elapsed=%s",
+		format, len(imgBytes), len(processed),
+		float64(len(processed))/float64(len(imgBytes))*100,
+		elapsed.Round(time.Millisecond))
 
-	log.Printf("[BG-Remove] all methods failed, returning original image")
-	return imgBytes, "png"
+	return processed, format
 }
 
-func chromaKey(base64Image string) (string, error) {
-	imgBytes, err := base64.StdEncoding.DecodeString(base64Image)
-	if err != nil {
-		return "", fmt.Errorf("base64 decode: %w", err)
-	}
+// ---------------------------------------------------------------------------
+// Core algorithm
+// ---------------------------------------------------------------------------
 
+// chromaKeyRemove takes raw image bytes (PNG/JPEG), removes the magenta
+// background using a 4-pass algorithm, and returns the processed image bytes
+// plus the output format ("png").
+func chromaKeyRemove(imgBytes []byte) ([]byte, string, error) {
 	img, _, err := image.Decode(bytes.NewReader(imgBytes))
 	if err != nil {
-		return "", fmt.Errorf("image decode: %w", err)
+		return nil, "", fmt.Errorf("image decode: %w", err)
 	}
 
 	bounds := img.Bounds()
 	w, h := bounds.Dx(), bounds.Dy()
+	if w == 0 || h == 0 {
+		return nil, "", fmt.Errorf("degenerate image: %dx%d", w, h)
+	}
+	totalPixels := w * h
 
 	result := image.NewNRGBA(bounds)
 	draw.Draw(result, bounds, img, bounds.Min, draw.Src)
 
-	mask := make([]bool, w*h)
+	// mask[i] == true means the pixel has been classified as background.
+	mask := make([]bool, totalPixels)
+	removedPixels := 0
 
-	// Pass 1: Hard classification — mark all magenta pixels transparent
+	// 8-connected neighbour offsets
+	dx := [8]int{-1, 0, 1, -1, 1, -1, 0, 1}
+	dy := [8]int{-1, -1, -1, 0, 0, 1, 1, 1}
+
+	// ------------------------------------------------------------------
+	// Pass 1: Hard classification — mark all clearly-magenta pixels as
+	// transparent.
+	// ------------------------------------------------------------------
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			idx := y*result.Stride + x*4
 			r8 := int(result.Pix[idx])
 			g8 := int(result.Pix[idx+1])
 			b8 := int(result.Pix[idx+2])
+
 			if isMagenta(r8, g8, b8) {
 				result.Pix[idx] = 0
 				result.Pix[idx+1] = 0
 				result.Pix[idx+2] = 0
 				result.Pix[idx+3] = 0
 				mask[y*w+x] = true
+				removedPixels++
 			}
 		}
 	}
 
-	// Pass 2: Edge soft alpha + despill
-	dx := []int{-1, 0, 1, -1, 1, -1, 0, 1}
-	dy := []int{-1, -1, -1, 0, 0, 1, 1, 1}
-
+	// ------------------------------------------------------------------
+	// Pass 2: Soft edge alpha + despill — for foreground pixels that
+	// border a transparent region, compute a partial alpha based on
+	// magenta contribution and neutralise the magenta colour spill.
+	// ------------------------------------------------------------------
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			if mask[y*w+x] {
 				continue
 			}
+
+			// Check whether this pixel is adjacent to a transparent one.
 			isEdge := false
 			for d := 0; d < 8; d++ {
 				nx, ny := x+dx[d], y+dy[d]
@@ -135,20 +145,26 @@ func chromaKey(base64Image string) (string, error) {
 			if !isEdge {
 				continue
 			}
+
 			idx := y*result.Stride + x*4
 			r8 := int(result.Pix[idx])
 			g8 := int(result.Pix[idx+1])
 			b8 := int(result.Pix[idx+2])
+
 			contrib := magentaContribution(r8, g8, b8)
 			alpha := 1.0 - contrib
+
 			if alpha < 0.12 {
+				// Almost entirely magenta — treat as background.
 				result.Pix[idx] = 0
 				result.Pix[idx+1] = 0
 				result.Pix[idx+2] = 0
 				result.Pix[idx+3] = 0
 				mask[y*w+x] = true
+				removedPixels++
 				continue
 			}
+
 			dr, dg, db := despillMagenta(r8, g8, b8)
 			result.Pix[idx] = uint8(dr)
 			result.Pix[idx+1] = uint8(dg)
@@ -157,18 +173,24 @@ func chromaKey(base64Image string) (string, error) {
 		}
 	}
 
-	// Pass 3: 1-pixel erosion
-	alphaSnap := make([]uint8, w*h)
+	// ------------------------------------------------------------------
+	// Pass 3: 1-pixel fringe erosion — remove isolated foreground pixels
+	// that are almost entirely surrounded by transparent neighbours
+	// (6 out of 8 neighbours transparent).
+	// ------------------------------------------------------------------
+	alphaSnap := make([]uint8, totalPixels)
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			alphaSnap[y*w+x] = result.Pix[y*result.Stride+x*4+3]
 		}
 	}
+
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
 			if alphaSnap[y*w+x] == 0 {
 				continue
 			}
+
 			transparentCount := 0
 			for d := 0; d < 8; d++ {
 				nx, ny := x+dx[d], y+dy[d]
@@ -180,25 +202,44 @@ func chromaKey(base64Image string) (string, error) {
 					transparentCount++
 				}
 			}
+
 			if transparentCount >= 6 {
 				idx := y*result.Stride + x*4
 				result.Pix[idx] = 0
 				result.Pix[idx+1] = 0
 				result.Pix[idx+2] = 0
 				result.Pix[idx+3] = 0
+				removedPixels++
 			}
 		}
 	}
 
-	// Pass 4: Encode as transparent PNG
+	// ------------------------------------------------------------------
+	// Pass 4: Encode as PNG with best compression.
+	// ------------------------------------------------------------------
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, result); err != nil {
-		return "", fmt.Errorf("png encode: %w", err)
+	encoder := &png.Encoder{CompressionLevel: png.DefaultCompression}
+	if err := encoder.Encode(&buf, result); err != nil {
+		return nil, "", fmt.Errorf("png encode: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(buf.Bytes()), nil
+
+	pctRemoved := float64(removedPixels) / float64(totalPixels) * 100
+	log.Printf("[BG-Remove] quality metrics | image=%dx%d | total_pixels=%d | removed=%d (%.1f%%) | retained=%.1f%%",
+		w, h, totalPixels, removedPixels, pctRemoved, 100-pctRemoved)
+
+	return buf.Bytes(), "png", nil
 }
 
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
+
+// isMagenta returns true when the pixel colour is within the magenta/fuchsia
+// range.  Two tests are applied:
+//   - RGB heuristic: R and B both bright, G is significantly lower, R≈B.
+//   - HSV heuristic: hue 285-320 with saturation > 0.35.
 func isMagenta(r8, g8, b8 int) bool {
+	// Fast RGB heuristic
 	if r8 > 120 && b8 > 120 && r8 > g8+50 && b8 > g8+50 {
 		maxRB := r8
 		if b8 > maxRB {
@@ -212,13 +253,17 @@ func isMagenta(r8, g8, b8 int) bool {
 			return true
 		}
 	}
+
+	// Slower but wider HSV heuristic for borderline shades
 	hue, sat, _ := rgbToHSV(uint8(r8), uint8(g8), uint8(b8))
-	if hue >= 285 && hue <= 320 && sat > 0.35 {
+	if hue >= 280 && hue <= 335 && sat > 0.30 {
 		return true
 	}
 	return false
 }
 
+// magentaContribution estimates how much of a pixel's colour comes from
+// magenta.  Returns a value in [0, 1] where 1 means pure magenta.
 func magentaContribution(r8, g8, b8 int) float64 {
 	avgRB := float64(r8+b8) / 2.0
 	gf := float64(g8)
@@ -236,6 +281,9 @@ func magentaContribution(r8, g8, b8 int) float64 {
 	return contrib
 }
 
+// despillMagenta neutralises magenta colour contamination on edge pixels by
+// clamping R and B channels so they do not exceed the maximum of the green
+// channel and the pixel's luminance average.
 func despillMagenta(r8, g8, b8 int) (int, int, int) {
 	avg := (r8 + g8 + b8) / 3
 	limit := g8
@@ -251,6 +299,7 @@ func despillMagenta(r8, g8, b8 int) (int, int, int) {
 	return r8, g8, b8
 }
 
+// rgbToHSV converts an RGB triplet to hue (0-360), saturation (0-1), value (0-1).
 func rgbToHSV(r, g, b uint8) (h float64, s float64, v float64) {
 	rf := float64(r) / 255.0
 	gf := float64(g) / 255.0

@@ -61,7 +61,7 @@ func main() {
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
 	claudeSvc := aipipeline.NewAIService("")
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
-	bgRemover := aipipeline.NewBgRemover(cfg.RembgURL)
+	bgRemover := aipipeline.NewBgRemover()
 	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, scoreSvc, bgRemover)
 	pipelineHandler := aipipeline.NewHandler(pipeline)
 
@@ -147,6 +147,7 @@ func main() {
 		agents := v1.Group("/agents", dbReady)
 		agents.GET("", agentHandler.ListAgents)
 		agents.GET("/trending", agentHandler.TrendingAgents)
+		agents.GET("/categories", agentHandler.GetCategories)
 		agents.GET("/:id", optionalAuth, agentHandler.GetAgent)
 		agents.POST("", authMW, createRL.WalletMiddleware(), agentHandler.CreateAgent)
 		agents.PUT("/:id", authMW, agentHandler.UpdateAgent)

@@ -61,7 +61,14 @@
       "Bash(go build:*)",
       "Bash(ls -d pkg/*/ services/*/)",
       "Bash(find C:/Projeler/Agent-Store-Web/backend/services -type f -name *.go)",
-      "Bash(python -c \":*)"
+      "Bash(python -c \":*)",
+      "Bash(ls:*)",
+      "Bash(find /c/Projeler/Agent-Store-Web -name rembg* -o -name *rembg*)",
+      "Bash(grep -r \"rembg\\\\|RemoveBackground\\\\|background\" /c/Projeler/Agent-Store-Web/backend/services/aipipeline/*.go)",
+      "Bash(find /c/Projeler/Agent-Store-Web -name *rembg* -o -name rembg_server*)",
+      "Bash(find /c/Projeler/Agent-Store-Web -type f -name *.railroad -o -name .railway* -o -name Procfile -o -name *.env* -o -name requirements.txt)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -n \"^[[:space:]]*//\" /c/Projeler/Agent-Store-Web/backend/services/aipipeline/rembg.go)"
     ]
   }
 }

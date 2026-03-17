@@ -1,20 +1,34 @@
 ---
-name: ChromaKey Pipeline Architecture
-description: Chroma key background removal pipeline details - transitioning from green (#00FF00) to magenta (#FF00FF) with Approach B (global replace + edge refinement)
+name: Background Removal Pipeline Architecture
+description: Pure Go chroma-key background removal — 4-pass magenta keying, PNG output, no external dependencies
 type: project
 ---
 
-The avatar pipeline generates images with chroma key backgrounds via Imagen 3, Pollinations Flux, or Replicate pixel-art-xl. The `chromaKey()` function in `agent_service.go` (line 670) removes the background and outputs transparent PNGs.
+The avatar pipeline uses a pure-Go chroma-key background removal system in `backend/services/aipipeline/rembg.go`. The Python rembg service was removed (2026-03-18).
 
-**Why:** Characters need transparent backgrounds for compositing onto themed scene backgrounds generated separately (see `backend/cmd/genbg/`).
+**Architecture:**
+- `BgRemover` struct with `NewBgRemover()` (no arguments)
+- `RemoveBackground(base64Image string) ([]byte, string)` — returns image bytes + format ("png")
+- `chromaKeyRemove(imgBytes []byte) ([]byte, string, error)` — unexported core algorithm
 
-**How to apply:** Any background removal changes must remain pure Go (no Python/ML), handle 3 different image providers with varying styles, and run under 500ms for 512x512 images. The function is called from 3 sites: CreateAgent (line 212), ForkAgent (line 403), and RegenerateImage (line 1057).
+**4-pass algorithm:**
+1. Hard magenta classification (RGB heuristic + HSV fallback) — mark transparent
+2. Edge soft alpha + despill on border pixels (8-connected neighbours)
+3. 1-pixel fringe erosion (remove isolated pixels with >= 6 transparent neighbours)
+4. PNG encode with `BestCompression`
 
-## v3.0 Migration (approved 2026-03-16)
+**Why:** Characters need transparent backgrounds for compositing. The Imagen avatar prompt always generates a solid magenta (#FF00FF) backdrop, so ML-based segmentation is unnecessary. Pure Go avoids the Docker complexity and memory overhead of the Python rembg sidecar.
 
-- Switching from green (#00FF00) to magenta (#FF00FF) as key color
-- Approach B (Global Replace + Edge Refinement) approved; flood fill + scanAndSeed eliminated
-- 4-pass pipeline: hard classification -> soft alpha boundary -> despill -> 1px erosion
-- Critical edge case: Artisan primary #EC4899 (236, 72, 153) nearly passes magenta detection. Mitigated by R/B symmetry check (ratio 0.35) and tightened HSV hue range [285, 320].
-- Spec document: `backend/MAGENTA_CHROMAKEY_V3_SPEC.md`
-- Prompt changes also required in gemini_service.go (line 62-63) and replicate_service.go (line 61) to switch from green to magenta background instructions.
+**How to apply:** The `BgRemover` is a standalone utility — currently not wired into `PipelineService`. To integrate, add it as a field on `PipelineService`, call `RemoveBackground()` in the avatar handler after `GenerateImageWithFallback()`, and update the response format. The Dockerfile uses `CGO_ENABLED=0` so any future WebP encoding would require either enabling CGo + libwebp or finding a pure-Go WebP encoder.
+
+## Key Decisions
+- PNG output only (not WebP) because Docker build uses CGO_ENABLED=0 — no CGo-based WebP encoders available
+- PNG BestCompression used to minimize file size within stdlib constraints
+- Quality metrics logged: pixel removal %, processing time, output size
+- No external dependencies added to go.mod
+
+## Key Files
+- `backend/services/aipipeline/rembg.go` — BgRemover struct, chromaKeyRemove(), helpers
+- `backend/services/aipipeline/gemini.go` — avatarPrompt const (magenta background instructions)
+- `backend/services/aipipeline/service.go` — PipelineService orchestrator (BgRemover NOT yet wired)
+- `backend/services/aipipeline/handler.go` — Avatar endpoint (BgRemover NOT yet called)

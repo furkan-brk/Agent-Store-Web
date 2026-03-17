@@ -1,6 +1,7 @@
 package aipipeline
 
 import (
+	"encoding/base64"
 	"log"
 )
 
@@ -24,23 +25,35 @@ func NewPipelineService(gemini *GeminiService, claude *AIService,
 	}
 }
 
-// GenerateImageWithFallback generates an avatar image via Imagen (Gemini).
-// Returns base64-encoded image or "" on failure.
-func (p *PipelineService) GenerateImageWithFallback(profile *AgentProfile, imagePrompt, charType string) string {
+// GenerateImageWithFallback generates an avatar image via Imagen (Gemini),
+// then removes the background using the pure-Go BgRemover.
+// Returns (base64-encoded image, format) or ("", "") on failure.
+func (p *PipelineService) GenerateImageWithFallback(profile *AgentProfile, imagePrompt, charType string) (string, string) {
 	sanitized := sanitizeProfile(*profile)
 
 	img, err := p.Gemini.GenerateAvatarImage(&sanitized)
 	if err != nil {
 		log.Printf("[Avatar] Imagen failed: %v", err)
-		return ""
+		return "", ""
 	}
 	if img == "" {
 		log.Printf("[Avatar] Imagen returned empty image (type=%s)", charType)
-		return ""
+		return "", ""
 	}
 
 	log.Printf("[Avatar] Imagen generated image (type=%s)", charType)
-	return img
+
+	// Remove background using pure-Go BgRemover
+	if p.BgRemover != nil {
+		transparentBytes, format := p.BgRemover.RemoveBackground(img)
+		if len(transparentBytes) > 0 {
+			log.Printf("[Avatar] Background removed (format=%s, type=%s)", format, charType)
+			return base64.StdEncoding.EncodeToString(transparentBytes), format
+		}
+		log.Printf("[Avatar] BgRemover returned empty result, using original image (type=%s)", charType)
+	}
+
+	return img, "png"
 }
 
 // BuildFallbackProfile creates a sensible AgentProfile when the LLM call fails.

@@ -403,7 +403,7 @@ func (s *AgentService) processAndSaveImage(agent *models.Agent, generatedImage s
 		return
 	}
 
-	format := "webp"
+	format := "png"
 	if avatarRes != nil && avatarRes.Format != "" {
 		format = avatarRes.Format
 	}
