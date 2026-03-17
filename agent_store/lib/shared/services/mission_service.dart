@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/mission_model.dart';
 import 'api_service.dart';
 import 'local_kv_store.dart';
@@ -8,30 +11,74 @@ class MissionService {
   MissionService._();
 
   static final MissionService instance = MissionService._();
-  static const _storageKey = 'missions_v1';
+
+  /// Old global key (pre per-wallet migration).
+  static const _legacyKey = 'missions_v1';
+
+  /// Per-wallet key prefix.
+  static const _keyPrefix = 'missions_v2';
+
+  String? _currentWallet;
+
+  String get _storageKey {
+    final w = _currentWallet;
+    return w != null && w.isNotEmpty ? '${_keyPrefix}_$w' : '${_keyPrefix}_guest';
+  }
 
   final List<MissionModel> _missions = <MissionModel>[];
 
   List<MissionModel> get missions => List.unmodifiable(_missions);
 
-  Future<void> init() async => refresh();
+  Future<void> init() async {
+    // Read saved wallet to scope localStorage per-wallet from the start.
+    final prefs = await SharedPreferences.getInstance();
+    _currentWallet = prefs.getString('wallet_address')?.toLowerCase();
+
+    // One-time migration from old global key → per-wallet key.
+    await _migrateLegacyKey();
+
+    await refresh();
+  }
+
+  /// Called by AuthController when the wallet connects or disconnects.
+  Future<void> onWalletChanged(String? wallet) async {
+    final newWallet = wallet?.toLowerCase();
+    if (newWallet == _currentWallet) return;
+
+    if (_currentWallet == null && newWallet != null && _missions.isNotEmpty) {
+      // User had guest missions and is now connecting — move them to the
+      // wallet-specific key so they survive future disconnects.
+      _currentWallet = newWallet;
+      await _saveLocal();
+      await LocalKvStore.instance.remove('${_keyPrefix}_guest');
+    } else {
+      _currentWallet = newWallet;
+    }
+
+    if (newWallet == null) {
+      // Disconnecting — clear in-memory list to prevent leakage to next wallet.
+      _missions.clear();
+      return;
+    }
+
+    await refresh();
+  }
 
   Future<void> refresh() async {
     final local = await _loadLocal();
     if (ApiService.instance.isAuthenticated) {
-      // If there are local missions, batch-sync them to the backend in one
-      // request instead of N sequential POSTs. The backend upserts each and
-      // returns the complete list from the DB.
-      List<MissionModel> remote;
+      List<MissionModel> remote = <MissionModel>[];
+
+      // Always try to sync local missions to backend first.
       if (local.isNotEmpty) {
         remote = await ApiService.instance.batchSyncMissions(local);
-        // If batch sync returned empty (e.g. network error), fall back to GET.
-        if (remote.isEmpty) {
-          remote = await ApiService.instance.getUserMissions();
-        }
-      } else {
+      }
+
+      // If batch sync failed or local was empty, fetch from backend.
+      if (remote.isEmpty) {
         remote = await ApiService.instance.getUserMissions();
       }
+
       _missions
         ..clear()
         ..addAll(_mergeMissions(local, remote));
@@ -44,6 +91,20 @@ class MissionService {
       ..clear()
       ..addAll(local);
     _sort();
+  }
+
+  /// Migrate the old global `missions_v1` key to the new per-wallet key.
+  Future<void> _migrateLegacyKey() async {
+    final oldRaw = await LocalKvStore.instance.getString(_legacyKey);
+    if (oldRaw == null || oldRaw.isEmpty) return;
+
+    // Only migrate if the new per-wallet key is still empty.
+    final existing = await LocalKvStore.instance.getString(_storageKey);
+    if (existing == null || existing.isEmpty) {
+      await LocalKvStore.instance.setString(_storageKey, oldRaw);
+      debugPrint('MissionService: migrated legacy key → $_storageKey');
+    }
+    await LocalKvStore.instance.remove(_legacyKey);
   }
 
   Future<List<MissionModel>> _loadLocal() async {

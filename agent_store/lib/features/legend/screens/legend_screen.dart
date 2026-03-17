@@ -1,5 +1,6 @@
 // lib/features/legend/screens/legend_screen.dart
 
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/models/agent_model.dart';
+import '../../../shared/models/guild_model.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/mission_service.dart';
@@ -57,6 +59,7 @@ class _LegendScreenState extends State<LegendScreen>
   // ── Palette data ───────────────────────────────────────────────────────────
   List<AgentModel> _libraryAgents = [];
   List<MissionModel> _missions = [];
+  List<GuildModel> _guilds = [];
   bool _loadingAgents = false;
 
   // ── Workflow persistence ───────────────────────────────────────────────────
@@ -99,13 +102,18 @@ class _LegendScreenState extends State<LegendScreen>
     try {
       await MissionService.instance.refresh();
       await LegendService.instance.refresh();
-      final agents = ApiService.instance.isAuthenticated
+      final isAuth = ApiService.instance.isAuthenticated;
+      final agents = isAuth
           ? await ApiService.instance.getLibrary()
           : <AgentModel>[];
+      final guildsResult = isAuth
+          ? await ApiService.instance.listGuilds(limit: 50)
+          : (guilds: <GuildModel>[], total: 0);
       if (!mounted) return;
       setState(() {
         _libraryAgents = agents;
         _missions = MissionService.instance.missions;
+        _guilds = guildsResult.guilds;
         _savedWorkflows = LegendService.instance.workflows;
         _loadingAgents = false;
       });
@@ -114,6 +122,7 @@ class _LegendScreenState extends State<LegendScreen>
       setState(() {
         _libraryAgents = <AgentModel>[];
         _missions = MissionService.instance.missions;
+        _guilds = <GuildModel>[];
         _savedWorkflows = LegendService.instance.workflows;
         _loadingAgents = false;
       });
@@ -922,6 +931,182 @@ class _LegendScreenState extends State<LegendScreen>
     );
   }
 
+  // ── Split guild node ─────────────────────────────────────────────────────
+
+  Future<void> _splitGuildNode(WorkflowNode guildNode) async {
+    if (guildNode.type != WorkflowNodeType.guild || guildNode.refId == null) {
+      return;
+    }
+
+    final guildId = int.tryParse(guildNode.refId!);
+    if (guildId == null) return;
+
+    // Try to find the guild in already-loaded list
+    GuildModel? guild;
+    for (final g in _guilds) {
+      if (g.id == guildId) {
+        guild = g;
+        break;
+      }
+    }
+
+    // If guild has no members in local data, fetch from API
+    if (guild == null || guild.members.isEmpty) {
+      final detail = await ApiService.instance.getGuild(guildId);
+      if (detail != null) {
+        guild = detail.guild;
+      }
+    }
+
+    if (guild == null || guild.members.isEmpty) {
+      _showNotice('Guild has no members to split into.',
+          background: AppTheme.error);
+      return;
+    }
+
+    final members = guild.members;
+    final newNodes = <WorkflowNode>[];
+    final ts = DateTime.now().millisecondsSinceEpoch;
+
+    // Create individual agent nodes spread horizontally
+    for (int i = 0; i < members.length; i++) {
+      final member = members[i];
+      final agentTitle = member.agent?.title ?? 'Agent #${member.agentId}';
+      newNodes.add(WorkflowNode(
+        id: '${ts}_split_$i',
+        type: WorkflowNodeType.agent,
+        label: agentTitle,
+        x: (guildNode.x + i * 200).clamp(0.0, 4000.0),
+        y: guildNode.y,
+        refId: member.agentId.toString(),
+      ));
+    }
+
+    // Build chain edges between agent nodes
+    final newEdges = <WorkflowEdge>[];
+    for (int i = 0; i < newNodes.length - 1; i++) {
+      newEdges.add(WorkflowEdge(
+        id: '${newNodes[i].id}_${newNodes[i + 1].id}',
+        fromId: newNodes[i].id,
+        toId: newNodes[i + 1].id,
+      ));
+    }
+
+    // Re-wire existing edges
+    final firstNewId = newNodes.first.id;
+    final lastNewId = newNodes.last.id;
+    final rewiredEdges = <WorkflowEdge>[];
+
+    for (final edge in _edges) {
+      if (edge.toId == guildNode.id && edge.fromId == guildNode.id) {
+        // Self-loop — skip
+        continue;
+      } else if (edge.toId == guildNode.id) {
+        // Edges pointing TO guild → point to FIRST agent
+        rewiredEdges.add(WorkflowEdge(
+          id: '${edge.fromId}_$firstNewId',
+          fromId: edge.fromId,
+          toId: firstNewId,
+        ));
+      } else if (edge.fromId == guildNode.id) {
+        // Edges pointing FROM guild → point from LAST agent
+        rewiredEdges.add(WorkflowEdge(
+          id: '${lastNewId}_${edge.toId}',
+          fromId: lastNewId,
+          toId: edge.toId,
+        ));
+      } else {
+        // Keep edge as-is
+        rewiredEdges.add(edge);
+      }
+    }
+
+    setState(() {
+      _nodes.removeWhere((n) => n.id == guildNode.id);
+      _nodes.addAll(newNodes);
+      _edges = [...rewiredEdges, ...newEdges];
+      _selectedNodeId = null;
+    });
+
+    _showNotice(
+      'Guild split into ${newNodes.length} agent nodes',
+      background: AppTheme.success,
+    );
+  }
+
+  // ── Export workflow JSON ─────────────────────────────────────────────────
+
+  void _showExportDialog() {
+    if (!_hasCanvasContent) {
+      _showNotice('Add nodes to export.', background: AppTheme.error);
+      return;
+    }
+
+    final id = _currentWorkflowId ??
+        DateTime.now().millisecondsSinceEpoch.toString();
+    final wf = LegendWorkflow(
+      id: id,
+      name: _workflowName,
+      nodes: List.of(_nodes),
+      edges: List.of(_edges),
+      updatedAt: DateTime.now(),
+    );
+    final json = const JsonEncoder.withIndent('  ').convert(wf.toJson());
+
+    showDialog(
+      context: context,
+      builder: (_) => _ExportJsonDialog(json: json),
+    );
+  }
+
+  // ── Import workflow JSON ─────────────────────────────────────────────────
+
+  void _showImportDialog() {
+    showDialog<String>(
+      context: context,
+      builder: (_) => const _ImportJsonDialog(),
+    ).then((jsonStr) {
+      if (jsonStr == null || jsonStr.trim().isEmpty) return;
+      _importWorkflowFromJson(jsonStr);
+    });
+  }
+
+  void _importWorkflowFromJson(String jsonStr) {
+    try {
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is! Map<String, dynamic>) {
+        _showNotice('Invalid JSON: expected an object.', background: AppTheme.error);
+        return;
+      }
+
+      final wf = LegendWorkflow.fromJson(decoded);
+
+      if (wf.nodes.isEmpty) {
+        _showNotice('Workflow has no nodes.', background: AppTheme.error);
+        return;
+      }
+
+      _confirmReplaceCanvas(() {
+        setState(() {
+          _nodes
+            ..clear()
+            ..addAll(wf.nodes);
+          _edges
+            ..clear()
+            ..addAll(wf.edges);
+          _workflowName = wf.name;
+          _currentWorkflowId = wf.id;
+          _selectedNodeId = null;
+          _selectedEdgeId = null;
+          _lastExecution = null;
+        });
+        _showNotice('Workflow imported: ${wf.name}', background: AppTheme.success);
+      });
+    } catch (e) {
+      _showNotice('Failed to parse JSON: $e', background: AppTheme.error);
+    }
+  }
+
   // ── Get execution status for a node ───────────────────────────────────────
 
   NodeExecutionResult? _getNodeResult(String nodeId) {
@@ -1050,6 +1235,23 @@ class _LegendScreenState extends State<LegendScreen>
             ),
             const SizedBox(width: 6),
           ],
+          // Split button — only when a guild node is selected
+          if (_selectedNodeId != null &&
+              _nodes.any((n) =>
+                  n.id == _selectedNodeId &&
+                  n.type == WorkflowNodeType.guild)) ...[
+            _ToolbarButton(
+              icon: Icons.call_split,
+              label: 'Split',
+              accent: true,
+              onTap: () {
+                final guildNode = _nodes.firstWhere(
+                    (n) => n.id == _selectedNodeId);
+                _splitGuildNode(guildNode);
+              },
+            ),
+            const SizedBox(width: 6),
+          ],
           _ToolbarButton(
             icon: Icons.folder_open_outlined,
             label: 'Load',
@@ -1061,6 +1263,18 @@ class _LegendScreenState extends State<LegendScreen>
             label: 'Save',
             accent: true,
             onTap: _saveWorkflow,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.data_object,
+            label: 'Export',
+            onTap: _showExportDialog,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.upload_outlined,
+            label: 'Import',
+            onTap: _showImportDialog,
           ),
           const SizedBox(width: 6),
           _ToolbarButton(
@@ -1281,6 +1495,49 @@ class _LegendScreenState extends State<LegendScreen>
                       ),
                     )
                     .toList(),
+          ),
+          const SizedBox(height: 12),
+          _PaletteSection(
+            label: 'GUILDS',
+            children: _loadingAgents
+                ? [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFFFFA000),
+                          ),
+                        ),
+                      ),
+                    )
+                  ]
+                : _guilds.isEmpty
+                    ? [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            'No guilds available.\nCreate guilds first.',
+                            style: TextStyle(
+                                color: AppTheme.textM, fontSize: 11),
+                          ),
+                        )
+                      ]
+                    : _guilds
+                        .map(
+                          (g) => _DraggablePaletteItem(
+                            data: _NodeDragData(WorkflowNodeType.guild,
+                                g.name, g.id.toString()),
+                            color: const Color(0xFFFFA000),
+                            icon: Icons.shield_outlined,
+                            label: g.name,
+                            subtitle: '${g.memberCount} members',
+                          ),
+                        )
+                        .toList(),
           ),
           const SizedBox(height: 16),
           Container(
@@ -2098,6 +2355,8 @@ class _NodeResultCardState extends State<_NodeResultCard> {
         return AppTheme.info;
       case 'mission':
         return AppTheme.gold;
+      case 'guild':
+        return const Color(0xFFFFA000);
       default:
         return AppTheme.textM;
     }
@@ -2113,6 +2372,8 @@ class _NodeResultCardState extends State<_NodeResultCard> {
         return Icons.smart_toy_outlined;
       case 'mission':
         return Icons.flag_outlined;
+      case 'guild':
+        return Icons.shield_outlined;
       default:
         return Icons.circle;
     }
@@ -2389,7 +2650,7 @@ class _CanvasEmptyHint extends StatelessWidget {
             size: 56, color: AppTheme.textM.withValues(alpha: 0.3)),
         const SizedBox(height: 12),
         Text(
-          'Drag agents and missions here',
+          'Drag agents, missions & guilds here',
           style: TextStyle(
               color: AppTheme.textM.withValues(alpha: 0.5), fontSize: 14),
         ),
@@ -2461,6 +2722,8 @@ class _NodeCard extends StatelessWidget {
     this.isExecuting = false,
   });
 
+  static const _guildAmber = Color(0xFFFFA000);
+
   Color get _accentColor {
     if (executionResult != null && executionResult!.hasError) {
       return AppTheme.error;
@@ -2475,6 +2738,8 @@ class _NodeCard extends StatelessWidget {
         return AppTheme.info;
       case WorkflowNodeType.mission:
         return AppTheme.gold;
+      case WorkflowNodeType.guild:
+        return _guildAmber;
       case WorkflowNodeType.end:
         return AppTheme.primary;
     }
@@ -2488,6 +2753,8 @@ class _NodeCard extends StatelessWidget {
         return Icons.smart_toy_outlined;
       case WorkflowNodeType.mission:
         return Icons.flag_outlined;
+      case WorkflowNodeType.guild:
+        return Icons.shield_outlined;
       case WorkflowNodeType.end:
         return Icons.stop_rounded;
     }
@@ -2498,6 +2765,23 @@ class _NodeCard extends StatelessWidget {
     final accent = _accentColor;
     final portId = node.id;
     final hasResult = executionResult != null;
+    final isGuild = node.type == WorkflowNodeType.guild;
+
+    // Guild nodes get a thicker border for visual distinction
+    final borderWidth = isSelected
+        ? 2.5
+        : isGuild
+            ? 2.0
+            : hasResult
+                ? 1.5
+                : 1.0;
+    final borderColor = isSelected
+        ? accent
+        : isGuild
+            ? _guildAmber.withValues(alpha: 0.7)
+            : hasResult
+                ? accent.withValues(alpha: 0.6)
+                : AppTheme.border;
 
     return SizedBox(
       width: _kNodeW,
@@ -2505,15 +2789,13 @@ class _NodeCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: AppTheme.card,
+          color: isGuild
+              ? _guildAmber.withValues(alpha: 0.06)
+              : AppTheme.card,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected
-                ? accent
-                : hasResult
-                    ? accent.withValues(alpha: 0.6)
-                    : AppTheme.border,
-            width: isSelected ? 2 : hasResult ? 1.5 : 1,
+            color: borderColor,
+            width: borderWidth,
           ),
           boxShadow: [
             if (isSelected)
@@ -2521,6 +2803,12 @@ class _NodeCard extends StatelessWidget {
                 color: accent.withValues(alpha: 0.35),
                 blurRadius: 12,
                 spreadRadius: 2,
+              )
+            else if (isGuild)
+              BoxShadow(
+                color: _guildAmber.withValues(alpha: 0.2),
+                blurRadius: 10,
+                spreadRadius: 1,
               )
             else if (hasResult)
               BoxShadow(
@@ -3131,7 +3419,6 @@ class _RenameNodeDialogWithMentionsState
               const SizedBox(height: 16),
               _MentionTextField(
                 controller: _ctrl,
-                onChanged: _onTextChanged,
               ),
               if (_showMentions) ...[
                 const SizedBox(height: 12),
@@ -3308,36 +3595,17 @@ class _RenameNodeDialogWithMentionsState
 
 // ── Mention-aware text field ──────────────────────────────────────────────
 
-class _MentionTextField extends StatefulWidget {
+class _MentionTextField extends StatelessWidget {
   final TextEditingController controller;
-  final VoidCallback onChanged;
 
   const _MentionTextField({
     required this.controller,
-    required this.onChanged,
   });
-
-  @override
-  State<_MentionTextField> createState() => _MentionTextFieldState();
-}
-
-class _MentionTextFieldState extends State<_MentionTextField> {
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(widget.onChanged);
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(widget.onChanged);
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: widget.controller,
+      controller: controller,
       autofocus: true,
       style: const TextStyle(color: AppTheme.textH),
       decoration: InputDecoration(
@@ -3362,6 +3630,226 @@ class _MentionTextFieldState extends State<_MentionTextField> {
               const BorderSide(color: AppTheme.primary, width: 2),
         ),
       ),
+    );
+  }
+}
+
+// ── Export JSON Dialog ──────────────────────────────────────────────────────
+
+class _ExportJsonDialog extends StatelessWidget {
+  final String json;
+  const _ExportJsonDialog({required this.json});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.card,
+      title: const Row(
+        children: [
+          Icon(Icons.data_object, color: AppTheme.gold, size: 20),
+          SizedBox(width: 8),
+          Text('Export Workflow JSON',
+              style: TextStyle(color: AppTheme.textH, fontSize: 16)),
+        ],
+      ),
+      content: SizedBox(
+        width: 560,
+        height: 420,
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppTheme.bg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              json,
+              style: const TextStyle(
+                color: AppTheme.textB,
+                fontSize: 11,
+                height: 1.5,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close', style: TextStyle(color: AppTheme.textM)),
+        ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.gold,
+            foregroundColor: AppTheme.bg,
+          ),
+          icon: const Icon(Icons.copy, size: 14),
+          label: const Text('Copy'),
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: json));
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('JSON copied to clipboard'),
+                backgroundColor: AppTheme.success,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ── Import JSON Dialog ──────────────────────────────────────────────────────
+
+class _ImportJsonDialog extends StatefulWidget {
+  const _ImportJsonDialog();
+
+  @override
+  State<_ImportJsonDialog> createState() => _ImportJsonDialogState();
+}
+
+class _ImportJsonDialogState extends State<_ImportJsonDialog> {
+  final _controller = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _validate() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = null);
+      return;
+    }
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is! Map<String, dynamic>) {
+        setState(() => _error = 'JSON must be an object with nodes and edges.');
+        return;
+      }
+      if (decoded['nodes'] == null) {
+        setState(() => _error = 'Missing "nodes" field.');
+        return;
+      }
+      setState(() => _error = null);
+    } catch (e) {
+      setState(() => _error = 'Invalid JSON syntax.');
+    }
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text != null && data!.text!.isNotEmpty) {
+      _controller.text = data.text!;
+      _validate();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.card,
+      title: const Row(
+        children: [
+          Icon(Icons.upload_outlined, color: AppTheme.gold, size: 20),
+          SizedBox(width: 8),
+          Text('Import Workflow JSON',
+              style: TextStyle(color: AppTheme.textH, fontSize: 16)),
+        ],
+      ),
+      content: SizedBox(
+        width: 560,
+        height: 460,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Paste a workflow JSON exported from Legend.',
+                    style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: _pasteFromClipboard,
+                  icon: const Icon(Icons.paste, size: 14),
+                  label: const Text('Paste'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.gold,
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.bg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _error != null ? AppTheme.error : AppTheme.border,
+                  ),
+                ),
+                child: TextField(
+                  controller: _controller,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  style: const TextStyle(
+                    color: AppTheme.textB,
+                    fontSize: 11,
+                    height: 1.5,
+                    fontFamily: 'monospace',
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '{\n  "id": "...",\n  "name": "...",\n  "nodes": [...],\n  "edges": [...]\n}',
+                    hintStyle: TextStyle(color: AppTheme.textM, fontSize: 11),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: (_) => _validate(),
+                ),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _error!,
+                style: const TextStyle(color: AppTheme.error, fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
+        ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.gold,
+            foregroundColor: AppTheme.bg,
+          ),
+          icon: const Icon(Icons.upload, size: 14),
+          label: const Text('Import'),
+          onPressed: _controller.text.trim().isEmpty || _error != null
+              ? null
+              : () => Navigator.pop(context, _controller.text.trim()),
+        ),
+      ],
     );
   }
 }

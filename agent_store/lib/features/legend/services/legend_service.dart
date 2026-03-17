@@ -2,6 +2,9 @@
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../models/workflow_models.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_kv_store.dart';
@@ -10,29 +13,64 @@ class LegendService {
   static final LegendService instance = LegendService._();
   LegendService._();
 
-  static const _key = 'legend_workflows_v1';
+  /// Old global key (pre per-wallet migration).
+  static const _legacyKey = 'legend_workflows_v1';
+
+  /// Per-wallet key prefix.
+  static const _keyPrefix = 'legend_workflows_v2';
+
+  String? _currentWallet;
+
+  String get _storageKey {
+    final w = _currentWallet;
+    return w != null && w.isNotEmpty ? '${_keyPrefix}_$w' : '${_keyPrefix}_guest';
+  }
 
   List<LegendWorkflow> _workflows = [];
 
   List<LegendWorkflow> get workflows => List.unmodifiable(_workflows);
 
-  Future<void> init() async => refresh();
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _currentWallet = prefs.getString('wallet_address')?.toLowerCase();
+    await _migrateLegacyKey();
+    await refresh();
+  }
+
+  /// Called by AuthController when the wallet connects or disconnects.
+  Future<void> onWalletChanged(String? wallet) async {
+    final newWallet = wallet?.toLowerCase();
+    if (newWallet == _currentWallet) return;
+
+    if (_currentWallet == null && newWallet != null && _workflows.isNotEmpty) {
+      _currentWallet = newWallet;
+      await _persistLocal();
+      await LocalKvStore.instance.remove('${_keyPrefix}_guest');
+    } else {
+      _currentWallet = newWallet;
+    }
+
+    if (newWallet == null) {
+      _workflows = [];
+      return;
+    }
+
+    await refresh();
+  }
 
   Future<void> refresh() async {
     final local = await _loadLocal();
     if (ApiService.instance.isAuthenticated) {
-      // Batch-sync all local workflows to the backend in a single request.
-      // The backend upserts each and returns the complete DB list.
-      List<LegendWorkflow> remote;
+      List<LegendWorkflow> remote = <LegendWorkflow>[];
+
       if (local.isNotEmpty) {
         remote = await ApiService.instance.batchSyncLegendWorkflows(local);
-        // If batch sync returned empty (e.g. network error), fall back to GET.
-        if (remote.isEmpty) {
-          remote = await ApiService.instance.getLegendWorkflows();
-        }
-      } else {
+      }
+
+      if (remote.isEmpty) {
         remote = await ApiService.instance.getLegendWorkflows();
       }
+
       _workflows = _mergeWorkflows(local, remote);
       _sortWorkflows();
       await _persistLocal();
@@ -42,8 +80,20 @@ class LegendService {
     _sortWorkflows();
   }
 
+  Future<void> _migrateLegacyKey() async {
+    final oldRaw = await LocalKvStore.instance.getString(_legacyKey);
+    if (oldRaw == null || oldRaw.isEmpty) return;
+
+    final existing = await LocalKvStore.instance.getString(_storageKey);
+    if (existing == null || existing.isEmpty) {
+      await LocalKvStore.instance.setString(_storageKey, oldRaw);
+      debugPrint('LegendService: migrated legacy key → $_storageKey');
+    }
+    await LocalKvStore.instance.remove(_legacyKey);
+  }
+
   Future<List<LegendWorkflow>> _loadLocal() async {
-    final raw = await LocalKvStore.instance.getString(_key);
+    final raw = await LocalKvStore.instance.getString(_storageKey);
     if (raw == null || raw.isEmpty) return <LegendWorkflow>[];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
@@ -90,7 +140,7 @@ class LegendService {
 
   Future<void> _persistLocal() async {
     await LocalKvStore.instance.setString(
-      _key,
+      _storageKey,
       jsonEncode(_workflows.map((w) => w.toJson()).toList()),
     );
   }

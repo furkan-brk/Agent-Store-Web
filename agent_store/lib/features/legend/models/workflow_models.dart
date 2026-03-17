@@ -1,6 +1,6 @@
 // lib/features/legend/models/workflow_models.dart
 
-enum WorkflowNodeType { start, agent, mission, end }
+enum WorkflowNodeType { start, agent, mission, guild, end }
 
 extension WorkflowNodeTypeX on WorkflowNodeType {
   String get label {
@@ -8,6 +8,7 @@ extension WorkflowNodeTypeX on WorkflowNodeType {
       case WorkflowNodeType.start:   return 'START';
       case WorkflowNodeType.agent:   return 'Agent';
       case WorkflowNodeType.mission: return 'Mission';
+      case WorkflowNodeType.guild:   return 'Guild';
       case WorkflowNodeType.end:     return 'END';
     }
   }

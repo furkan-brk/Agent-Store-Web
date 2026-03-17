@@ -263,6 +263,10 @@ func validateWorkflowStructure(nodes []WorkflowNodeParsed, edges []WorkflowEdgeP
 			if strings.TrimSpace(n.RefID) == "" {
 				return fmt.Errorf("mission node %q has empty ref_id", n.ID)
 			}
+		case "guild":
+			if _, err := strconv.ParseUint(n.RefID, 10, 64); err != nil {
+				return fmt.Errorf("guild node %q has invalid ref_id %q: must be a valid uint", n.ID, n.RefID)
+			}
 		}
 	}
 	if startCount != 1 {
@@ -375,6 +379,43 @@ func (s *LegendService) executeNode(ctx context.Context, node WorkflowNodeParsed
 		_ = s.agentClient.IncrementUseCount(ctx, uint(agentID))
 		return output, nil
 
+	case "guild":
+		guildID, err := strconv.ParseUint(node.RefID, 10, 64)
+		if err != nil {
+			return "", fmt.Errorf("invalid guild ref_id %q: %w", node.RefID, err)
+		}
+		// Fetch guild with members sorted by joined_at ASC, preloading each member's agent.
+		var guild models.Guild
+		if err := database.DB.
+			Preload("Members", func(db *gorm.DB) *gorm.DB {
+				return db.Order("joined_at ASC")
+			}).
+			Preload("Members.Agent", func(db *gorm.DB) *gorm.DB {
+				return db.Select("id, title, prompt, character_type, character_data")
+			}).
+			First(&guild, guildID).Error; err != nil {
+			return "", fmt.Errorf("guild %d not found: %w", guildID, err)
+		}
+		if len(guild.Members) == 0 {
+			return "", fmt.Errorf("guild %d has no members", guildID)
+		}
+		// Chain-execute each member's agent in order.
+		chainInput := contextInput
+		for _, member := range guild.Members {
+			agent := member.Agent
+			output, err := s.aiClient.Chat(ctx, agent.Prompt, chainInput)
+			if err != nil {
+				return "", fmt.Errorf("ai chat failed for guild %d member agent %d: %w", guildID, agent.ID, err)
+			}
+			// Truncate intermediate output to 10000 chars.
+			if len(output) > 10000 {
+				output = output[:10000]
+			}
+			_ = s.agentClient.IncrementUseCount(ctx, agent.ID)
+			chainInput = output
+		}
+		return chainInput, nil
+
 	default:
 		return "", fmt.Errorf("unknown node type %q", node.Type)
 	}
@@ -403,11 +444,22 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 		return nil, fmt.Errorf("invalid workflow structure: %w", err)
 	}
 
-	// 4. Count agent nodes to determine credit cost.
+	// 4. Count agent and guild-member nodes to determine credit cost.
 	var requiredCredits int64
 	for _, n := range nodes {
-		if n.Type == "agent" {
+		switch n.Type {
+		case "agent":
 			requiredCredits++
+		case "guild":
+			guildID, err := strconv.ParseUint(n.RefID, 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("guild node %q has invalid ref_id %q: %w", n.ID, n.RefID, err)
+			}
+			var memberCount int64
+			if err := database.DB.Model(&models.GuildMember{}).Where("guild_id = ?", guildID).Count(&memberCount).Error; err != nil {
+				return nil, fmt.Errorf("failed to count guild %d members: %w", guildID, err)
+			}
+			requiredCredits += memberCount
 		}
 	}
 

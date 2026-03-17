@@ -104,11 +104,10 @@ class AuthController extends GetxController {
     NotificationService.instance.add('Wallet connected successfully!', type: 'save');
     await loadCredits();
 
-    // Sync local-only missions & legend workflows to the backend now that we
-    // have a valid JWT. This handles data created while the user was offline
-    // or when MetaMask was disconnected on a previous page refresh.
-    unawaited(MissionService.instance.refresh());
-    unawaited(LegendService.instance.refresh());
+    // Notify services about the new wallet so they switch to per-wallet
+    // storage and sync local-only data created while offline.
+    unawaited(MissionService.instance.onWalletChanged(walletAddr));
+    unawaited(LegendService.instance.onWalletChanged(walletAddr));
   }
 
   void disconnect() {
@@ -118,6 +117,10 @@ class AuthController extends GetxController {
     credits.value = 0;
     username.value = '';
     bio.value = '';
+
+    // Clear in-memory missions/workflows so the next wallet doesn't inherit them.
+    MissionService.instance.onWalletChanged(null);
+    LegendService.instance.onWalletChanged(null);
   }
 
   Future<void> loadCredits() async {
