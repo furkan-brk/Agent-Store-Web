@@ -1,5 +1,9 @@
 *
 !Dockerfile
+!.dockerignore
 !railway.toml
 !backend/
 !backend/**
+!rembg/
+!rembg/**
+!entrypoint.sh

@@ -60,7 +60,8 @@
       "Bash(ls backend/config/*.go)",
       "Bash(go build:*)",
       "Bash(ls -d pkg/*/ services/*/)",
-      "Bash(find C:/Projeler/Agent-Store-Web/backend/services -type f -name *.go)"
+      "Bash(find C:/Projeler/Agent-Store-Web/backend/services -type f -name *.go)",
+      "Bash(python -c \":*)"
     ]
   }
 }
