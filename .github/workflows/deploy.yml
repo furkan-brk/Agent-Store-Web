@@ -20,11 +20,13 @@ jobs:
           rm -rf .railway-deploy
           mkdir -p .railway-deploy
           cp Dockerfile .railway-deploy/Dockerfile
+          cp entrypoint.sh .railway-deploy/entrypoint.sh
           cp railway.toml .railway-deploy/railway.toml
           cp .dockerignore .railway-deploy/.dockerignore
           cp .railwayignore .railway-deploy/.railwayignore
           cp -R backend .railway-deploy/backend
           rm -rf .railway-deploy/backend/vendor
+          cp -R rembg .railway-deploy/rembg
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli

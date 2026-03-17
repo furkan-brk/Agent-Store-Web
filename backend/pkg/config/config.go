@@ -45,7 +45,7 @@ func Load() *Config {
 		MonadRPCURL:     getEnv("MONAD_RPC_URL", "https://testnet-rpc.monad.xyz"),
 		CreditsContract: getEnv("CREDITS_CONTRACT_ADDRESS", ""),
 		TreasuryWallet:  getEnv("TREASURY_WALLET", ""),
-		RembgURL:        getEnv("REMBG_URL", "http://rembg:5000"),
+		RembgURL:        getEnv("REMBG_URL", "http://127.0.0.1:5000"),
 
 		// Service URLs — on Railway use .railway.internal, else Docker service names.
 		AuthServiceURL:       getEnv("AUTH_SERVICE_URL", svcDefault("auth", "8081")),
