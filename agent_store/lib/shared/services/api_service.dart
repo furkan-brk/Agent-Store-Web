@@ -89,6 +89,31 @@ class ApiService {
     return null;
   }
 
+  // ── Categories ──────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    const cacheKey = 'categories';
+    final cached = _getCache<List<Map<String, dynamic>>>(cacheKey);
+    if (cached != null) return cached;
+
+    try {
+      final res = await http.get(
+        Uri.parse(ApiConstants.agentCategories),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = (jsonDecode(res.body) as List)
+            .map((e) => e as Map<String, dynamic>)
+            .toList();
+        _setCache(cacheKey, data, ttl: const Duration(seconds: 120));
+        return data;
+      }
+    } catch (e) {
+      debugPrint('getCategories: $e');
+    }
+    return [];
+  }
+
   // ── Agents ────────────────────────────────────────────────────────────────
 
   Future<({List<AgentModel> agents, int total})> listAgents({

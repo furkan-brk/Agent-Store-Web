@@ -219,29 +219,28 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
 
   Widget _buildAgentLoadingSkeleton() {
     return ShimmerScope(
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 170, mainAxisExtent: 200,
-          crossAxisSpacing: 12, mainAxisSpacing: 12,
-        ),
-        itemCount: 6,
-        itemBuilder: (_, __) => Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppTheme.card,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.border),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: List.generate(6, (_) => SizedBox(
+          width: 170,
+          height: 200,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.card,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: const Column(mainAxisSize: MainAxisSize.min, children: [
+              ShimmerBox(width: 72, height: 72, radius: 36, color: AppTheme.card2),
+              SizedBox(height: 8),
+              ShimmerBox(width: 80, height: 10, radius: 4, color: AppTheme.card2),
+              SizedBox(height: 4),
+              ShimmerBox(width: 60, height: 8, radius: 4, color: AppTheme.card2),
+            ]),
           ),
-          child: const Column(mainAxisSize: MainAxisSize.min, children: [
-            ShimmerBox(width: 72, height: 72, radius: 36, color: AppTheme.card2),
-            SizedBox(height: 8),
-            ShimmerBox(width: 80, height: 10, radius: 4, color: AppTheme.card2),
-            SizedBox(height: 4),
-            ShimmerBox(width: 60, height: 8, radius: 4, color: AppTheme.card2),
-          ]),
-        ),
+        )),
       ),
     );
   }
@@ -354,23 +353,21 @@ class _AgentSelector extends StatelessWidget {
   const _AgentSelector({required this.agents, required this.selectedIds, required this.onToggle});
 
   @override
-  Widget build(BuildContext context) => GridView.builder(
-    shrinkWrap: true,
-    physics: const NeverScrollableScrollPhysics(),
-    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-      maxCrossAxisExtent: 170, mainAxisExtent: 200,
-      crossAxisSpacing: 12, mainAxisSpacing: 12,
-    ),
-    itemCount: agents.length,
-    itemBuilder: (_, i) {
-      final agent = agents[i];
+  Widget build(BuildContext context) => Wrap(
+    spacing: 12,
+    runSpacing: 12,
+    children: agents.map((agent) {
       final selected = selectedIds.contains(agent.id);
-      return _AgentSelectorCard(
-        agent: agent,
-        selected: selected,
-        onTap: () => onToggle(agent.id),
+      return SizedBox(
+        width: 170,
+        height: 200,
+        child: _AgentSelectorCard(
+          agent: agent,
+          selected: selected,
+          onTap: () => onToggle(agent.id),
+        ),
       );
-    },
+    }).toList(),
   );
 }
 

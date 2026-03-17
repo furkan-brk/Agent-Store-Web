@@ -257,18 +257,17 @@ class SkeletonAgentGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShimmerScope(
-      child: GridView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        shrinkWrap: true,
+      child: Padding(
         padding: padding,
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 300,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.72,
+        child: Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: List.generate(count, (_) => const SizedBox(
+            width: 300,
+            height: 416, // 300 / 0.72
+            child: AgentCardSkeleton(),
+          )),
         ),
-        itemCount: count,
-        itemBuilder: (_, __) => const AgentCardSkeleton(),
       ),
     );
   }

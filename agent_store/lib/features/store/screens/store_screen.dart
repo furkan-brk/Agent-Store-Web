@@ -8,7 +8,7 @@ import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/widgets/wallet_guard.dart';
 import '../widgets/agent_card.dart';
-import '../widgets/category_sidebar.dart';
+import '../widgets/category_chips.dart';
 import '../widgets/filter_panel.dart';
 import '../widgets/trending_row.dart';
 import '../../../shared/widgets/onboarding_modal.dart';
@@ -83,67 +83,70 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    // Hide category sidebar on narrow screens
-    final showSidebar = screenWidth >= 768;
-
     return Scaffold(
       backgroundColor: AppTheme.bg,
-      body: Row(children: [
-        if (showSidebar)
-          Obx(() => CategorySidebar(
-            selectedCategory: _ctrl.category.value,
-            onSelect: (cat) {
-              _searchCtrl.clear();
-              _ctrl.search.value = '';
-              _ctrl.category.value = cat;
-              _ctrl.load();
-            },
-          )),
-        // ShimmerScope provides a shared AnimationController for all AgentCardSkeleton children.
-        Expanded(child: ShimmerScope(
-          child: Stack(
-            children: [
-              RefreshIndicator(
-                onRefresh: _ctrl.load,
-                color: AppTheme.primary,
-                child: CustomScrollView(cacheExtent: 1200, slivers: [
-                  // Header is purely driven by TextEditingController + inner Obx calls.
-                  SliverToBoxAdapter(child: _buildHeader(showSidebar)),
-                  // TrendingRow: only hide/show when search changes.
-                  Obx(() => _ctrl.search.value.isEmpty
-                    ? const SliverToBoxAdapter(child: TrendingRow())
-                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
-                  // Discovery: only visible with empty search + no category + not loading.
-                  Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
-                    ? SliverToBoxAdapter(child: _buildDiscovery())
-                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
-                  // Section heading with divider
-                  SliverToBoxAdapter(child: _buildSectionHeader()),
-                  // Main content sliver: rebuilds ONLY when isLoading/agents/hasError change.
-                  Obx(() => _buildContentSliver()),
-                  // End-of-list spacer
-                  Obx(() => (_ctrl.agents.isNotEmpty && !_ctrl.isLoading.value)
-                    ? SliverToBoxAdapter(child: _buildEndOfList())
-                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
-                ]),
-              ),
-              // Subtle loading indicator overlay when refreshing with stale data
-              Obx(() => (_ctrl.isLoading.value && _ctrl.agents.isNotEmpty)
-                ? Positioned(
-                    top: 0, left: 0, right: 0,
-                    child: LinearProgressIndicator(
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation(AppTheme.primary.withValues(alpha: 0.7)),
-                      minHeight: 2,
-                    ),
-                  )
-                : const SizedBox.shrink()),
-            ],
-          ),
-        )),
-      ]),
+      body: ShimmerScope(
+        child: Stack(
+          children: [
+            RefreshIndicator(
+              onRefresh: _ctrl.load,
+              color: AppTheme.primary,
+              child: CustomScrollView(cacheExtent: 1200, slivers: [
+                // Header is purely driven by TextEditingController + inner Obx calls.
+                SliverToBoxAdapter(child: _buildHeader()),
+                // Inline category chips — replaces the old sidebar
+                SliverToBoxAdapter(child: _buildCategoryChips()),
+                // TrendingRow: only hide/show when search changes.
+                Obx(() => _ctrl.search.value.isEmpty
+                  ? const SliverToBoxAdapter(child: TrendingRow())
+                  : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                // Discovery: only visible with empty search + no category + not loading.
+                Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
+                  ? SliverToBoxAdapter(child: _buildDiscovery())
+                  : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                // Section heading with divider
+                SliverToBoxAdapter(child: _buildSectionHeader()),
+                // Main content sliver: rebuilds ONLY when isLoading/agents/hasError change.
+                Obx(() => _buildContentSliver()),
+                // End-of-list spacer
+                Obx(() => (_ctrl.agents.isNotEmpty && !_ctrl.isLoading.value)
+                  ? SliverToBoxAdapter(child: _buildEndOfList())
+                  : const SliverToBoxAdapter(child: SizedBox.shrink())),
+              ]),
+            ),
+            // Subtle loading indicator overlay when refreshing with stale data
+            Obx(() => (_ctrl.isLoading.value && _ctrl.agents.isNotEmpty)
+              ? Positioned(
+                  top: 0, left: 0, right: 0,
+                  child: LinearProgressIndicator(
+                    backgroundColor: Colors.transparent,
+                    valueColor: AlwaysStoppedAnimation(AppTheme.primary.withValues(alpha: 0.7)),
+                    minHeight: 2,
+                  ),
+                )
+              : const SizedBox.shrink()),
+          ],
+        ),
+      ),
     );
+  }
+
+  Widget _buildCategoryChips() {
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    final hPad = isMobile ? 16.0 : 24.0;
+    return Obx(() => Padding(
+      padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 8),
+      child: CategoryChips(
+        categories: _ctrl.categories,
+        selectedCategory: _ctrl.category.value,
+        onSelect: (cat) {
+          _searchCtrl.clear();
+          _ctrl.search.value = '';
+          _ctrl.category.value = cat;
+          _ctrl.load();
+        },
+      ),
+    ));
   }
 
   // Responsive grid delegate based on available width.
@@ -212,7 +215,7 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  Widget _buildHeader(bool showSidebar) {
+  Widget _buildHeader() {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 768;
     final hPad = isMobile ? 16.0 : 24.0;

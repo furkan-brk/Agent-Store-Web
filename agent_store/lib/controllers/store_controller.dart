@@ -20,6 +20,9 @@ class StoreController extends GetxController {
   final showFilter = false.obs;
   final recentSearches = <String>[].obs;
 
+  // ── Categories ───────────────────────────────────────────────────────────
+  final categories = <Map<String, dynamic>>[].obs;
+
   // ── Trending ──────────────────────────────────────────────────────────────
   final trendingAgents = <AgentModel>[].obs;
   final trendingLoading = true.obs;
@@ -39,8 +42,16 @@ class StoreController extends GetxController {
   void onInit() {
     super.onInit();
     _loadRecentSearches();
+    loadCategories();
     loadTrending();
     load();
+  }
+
+  Future<void> loadCategories() async {
+    try {
+      final result = await ApiService.instance.getCategories();
+      categories.value = result;
+    } catch (_) {}
   }
 
   Future<void> loadTrending() async {

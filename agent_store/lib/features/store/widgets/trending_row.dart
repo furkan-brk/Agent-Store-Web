@@ -138,23 +138,22 @@ class _TrendingRowState extends State<TrendingRow> {
   }
 
   Widget _buildShimmer() {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 6,
-      itemBuilder: (_, __) => Container(
-        width: 140,
-        margin: const EdgeInsets.only(right: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: const LinearGradient(
-            colors: [AppTheme.card, AppTheme.card2],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: Row(
+        children: List.generate(6, (i) => Container(
+          width: 140,
+          margin: EdgeInsets.only(right: i < 5 ? 12 : 0),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              colors: [AppTheme.card, AppTheme.card2],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: AppTheme.border),
           ),
-          border: Border.all(color: AppTheme.border),
-        ),
+        )),
       ),
     );
   }
