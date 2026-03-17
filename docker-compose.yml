@@ -74,6 +74,7 @@ services:
     container_name: agent_store_authsvc
     env_file: .env
     environment:
+      PORT: "8081"
       POSTGRES_HOST: postgres
     depends_on:
       postgres:
@@ -92,6 +93,7 @@ services:
     container_name: agent_store_agentsvc
     env_file: .env
     environment:
+      PORT: "8082"
       POSTGRES_HOST: postgres
       REDIS_URL: redis://redis:6379
       AI_PIPELINE_SERVICE_URL: http://aipipelinesvc:8083
@@ -118,6 +120,7 @@ services:
     container_name: agent_store_aipipelinesvc
     env_file: .env
     environment:
+      PORT: "8083"
       REMBG_URL: http://rembg:5000
     depends_on:
       rembg:
@@ -136,6 +139,7 @@ services:
     container_name: agent_store_guildsvc
     env_file: .env
     environment:
+      PORT: "8084"
       POSTGRES_HOST: postgres
       AI_PIPELINE_SERVICE_URL: http://aipipelinesvc:8083
     depends_on:
@@ -157,6 +161,7 @@ services:
     container_name: agent_store_workspacesvc
     env_file: .env
     environment:
+      PORT: "8085"
       POSTGRES_HOST: postgres
       AI_PIPELINE_SERVICE_URL: http://aipipelinesvc:8083
       AGENT_SERVICE_URL: http://agentsvc:8082
