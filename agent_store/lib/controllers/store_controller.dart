@@ -20,6 +20,10 @@ class StoreController extends GetxController {
   final showFilter = false.obs;
   final recentSearches = <String>[].obs;
 
+  // ── Trending ──────────────────────────────────────────────────────────────
+  final trendingAgents = <AgentModel>[].obs;
+  final trendingLoading = true.obs;
+
   Timer? _debounce;
 
   int get activeFilterCount {
@@ -35,7 +39,19 @@ class StoreController extends GetxController {
   void onInit() {
     super.onInit();
     _loadRecentSearches();
+    loadTrending();
     load();
+  }
+
+  Future<void> loadTrending() async {
+    // Skip if already loaded (controller is permanent)
+    if (trendingAgents.isNotEmpty) return;
+    trendingLoading.value = true;
+    try {
+      final list = await ApiService.instance.getTrending();
+      trendingAgents.value = list;
+    } catch (_) {}
+    trendingLoading.value = false;
   }
 
   Future<void> _loadRecentSearches() async {
@@ -79,6 +95,14 @@ class StoreController extends GetxController {
       _saveRecentSearch(val);
       load();
     });
+  }
+
+  /// Immediately submit a search (enter key, tag click, recent search chip).
+  void submitSearch(String val) {
+    _debounce?.cancel();
+    search.value = val;
+    _saveRecentSearch(val);
+    load();
   }
 
   void clearSearch() {

@@ -1,6 +1,4 @@
 // lib/features/store/screens/store_screen.dart
-import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
@@ -32,7 +30,6 @@ class _StoreScreenState extends State<StoreScreen> {
   late final StoreController _ctrl;
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
-  Timer? _debounce;
 
   @override
   void initState() {
@@ -47,39 +44,14 @@ class _StoreScreenState extends State<StoreScreen> {
     });
   }
 
-  Future<void> _loadRecentSearches() async {
-    try {
-      final raw = await LocalKvStore.instance.getString('recent_searches') ?? '[]';
-      _ctrl.recentSearches.value = (jsonDecode(raw) as List).cast<String>().take(8).toList();
-    } catch (_) {}
-  }
-
-  void _saveRecentSearch(String term) {
-    if (term.trim().isEmpty) return;
-    try {
-      final list = _ctrl.recentSearches.toList();
-      list.remove(term); list.insert(0, term);
-      if (list.length > 8) list.removeRange(8, list.length);
-      _ctrl.recentSearches.value = list;
-      LocalKvStore.instance.setString('recent_searches', jsonEncode(list));
-    } catch (_) {}
-  }
-
   void _onSearchChanged(String val) {
     setState(() {}); // updates clear button visibility only
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      _ctrl.search.value = val;
-      _saveRecentSearch(val);
-      _ctrl.load();
-    });
+    _ctrl.onSearchChanged(val);
   }
 
   void _clearSearch() {
-    _debounce?.cancel();
     _searchCtrl.clear();
-    _ctrl.search.value = '';
-    _ctrl.load();
+    _ctrl.clearSearch();
     setState(() {});
   }
 
@@ -104,7 +76,6 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
@@ -343,12 +314,12 @@ class _StoreScreenState extends State<StoreScreen> {
             const SizedBox(width: 10),
             ..._ctrl.recentSearches.map((s) => Padding(padding: const EdgeInsets.only(right: 6), child: ActionChip(
               label: Text(s, style: const TextStyle(fontSize: 10, color: AppTheme.textB)),
-              onPressed: () { _debounce?.cancel(); _searchCtrl.text = s; _ctrl.search.value = s; _ctrl.load(); },
+              onPressed: () { _searchCtrl.text = s; _ctrl.submitSearch(s); },
               backgroundColor: AppTheme.card2, side: const BorderSide(color: AppTheme.border),
               padding: const EdgeInsets.symmetric(horizontal: 6), visualDensity: VisualDensity.compact,
             ))),
             TextButton.icon(
-              onPressed: () { LocalKvStore.instance.remove('recent_searches'); _ctrl.recentSearches.clear(); },
+              onPressed: _ctrl.clearRecentSearches,
               style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
               icon: const Icon(Icons.close_rounded, size: 11, color: AppTheme.textM),
               label: const Text('Clear', style: TextStyle(fontSize: 10, color: AppTheme.textM)),
@@ -364,7 +335,7 @@ class _StoreScreenState extends State<StoreScreen> {
   Widget _buildSearchField() => TextField(
     controller: _searchCtrl,
     focusNode: _searchFocus,
-    onSubmitted: (v) { _debounce?.cancel(); _ctrl.search.value = v; _saveRecentSearch(v); _ctrl.load(); },
+    onSubmitted: (v) { _ctrl.submitSearch(v); },
     onChanged: _onSearchChanged,
     style: const TextStyle(color: AppTheme.textH, fontSize: 14),
     decoration: InputDecoration(
@@ -746,7 +717,7 @@ class _StoreScreenState extends State<StoreScreen> {
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: _kPopularTags.map((tag) => _HoverTagChip(
         tag: tag,
-        onPressed: () { _debounce?.cancel(); _searchCtrl.text = tag; _ctrl.search.value = tag; _saveRecentSearch(tag); _ctrl.load(); },
+        onPressed: () { _searchCtrl.text = tag; _ctrl.submitSearch(tag); },
       )).toList()),
       const SizedBox(height: 12),
     ]),

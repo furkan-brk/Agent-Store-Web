@@ -1,10 +1,11 @@
 // lib/features/store/widgets/trending_row.dart
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
+import '../../../controllers/store_controller.dart';
 import '../../../shared/models/agent_model.dart';
-import '../../../shared/services/api_service.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../character/character_types.dart';
 
@@ -16,17 +17,16 @@ class TrendingRow extends StatefulWidget {
 }
 
 class _TrendingRowState extends State<TrendingRow> {
-  List<AgentModel> _agents = [];
-  bool _loading = true;
   late final ScrollController _scrollCtrl;
   bool _canScrollLeft = false;
   bool _canScrollRight = true;
+
+  StoreController get _ctrl => Get.find<StoreController>();
 
   @override
   void initState() {
     super.initState();
     _scrollCtrl = ScrollController()..addListener(_updateScrollButtons);
-    _load();
   }
 
   @override
@@ -60,82 +60,81 @@ class _TrendingRowState extends State<TrendingRow> {
     );
   }
 
-  Future<void> _load() async {
-    try {
-      final agents = await ApiService.instance.getTrending();
-      if (mounted) setState(() { _agents = agents; _loading = false; });
-      // Let scroll controller measure after build
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _updateScrollButtons();
-      });
-    } catch (_) {
-      if (mounted) setState(() { _loading = false; });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
-          child: Row(children: [
-            const Icon(Icons.local_fire_department_rounded,
-                color: AppTheme.primary, size: 18),
-            const SizedBox(width: 6),
-            const Text(
-              'TRENDING',
-              style: TextStyle(
-                color: AppTheme.textH,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.5,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                _loading ? '...' : '${_agents.length}',
-                style: const TextStyle(
-                  color: AppTheme.primary,
-                  fontSize: 10,
+    return Obx(() {
+      final loading = _ctrl.trendingLoading.value;
+      final agents = _ctrl.trendingAgents;
+
+      // Update scroll arrows after data arrives
+      if (!loading && agents.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateScrollButtons();
+        });
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+            child: Row(children: [
+              const Icon(Icons.local_fire_department_rounded,
+                  color: AppTheme.primary, size: 18),
+              const SizedBox(width: 6),
+              const Text(
+                'TRENDING',
+                style: TextStyle(
+                  color: AppTheme.textH,
+                  fontSize: 13,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
                 ),
               ),
-            ),
-            const Spacer(),
-            // Scroll navigation arrows (web UX)
-            if (!_loading && _agents.isNotEmpty) ...[
-              _ScrollArrow(
-                icon: Icons.chevron_left_rounded,
-                enabled: _canScrollLeft,
-                onTap: () => _scrollBy(-200),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  loading ? '...' : '${agents.length}',
+                  style: const TextStyle(
+                    color: AppTheme.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-              const SizedBox(width: 4),
-              _ScrollArrow(
-                icon: Icons.chevron_right_rounded,
-                enabled: _canScrollRight,
-                onTap: () => _scrollBy(200),
-              ),
-            ],
-          ]),
-        ),
-        SizedBox(
-          height: 190,
-          child: _loading
-              ? _buildShimmer()
-              : _agents.isEmpty
-                  ? _buildEmpty()
-                  : _buildList(),
-        ),
-      ],
-    );
+              const Spacer(),
+              // Scroll navigation arrows (web UX)
+              if (!loading && agents.isNotEmpty) ...[
+                _ScrollArrow(
+                  icon: Icons.chevron_left_rounded,
+                  enabled: _canScrollLeft,
+                  onTap: () => _scrollBy(-200),
+                ),
+                const SizedBox(width: 4),
+                _ScrollArrow(
+                  icon: Icons.chevron_right_rounded,
+                  enabled: _canScrollRight,
+                  onTap: () => _scrollBy(200),
+                ),
+              ],
+            ]),
+          ),
+          SizedBox(
+            height: 190,
+            child: loading
+                ? _buildShimmer()
+                : agents.isEmpty
+                    ? _buildEmpty()
+                    : _buildList(agents),
+          ),
+        ],
+      );
+    });
   }
 
   Widget _buildShimmer() {
@@ -169,14 +168,14 @@ class _TrendingRowState extends State<TrendingRow> {
     );
   }
 
-  Widget _buildList() {
+  Widget _buildList(List<AgentModel> agents) {
     return ListView.builder(
       controller: _scrollCtrl,
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      itemCount: _agents.length,
+      itemCount: agents.length,
       itemBuilder: (_, i) =>
-          _TrendingCard(agent: _agents[i], rank: i + 1),
+          _TrendingCard(agent: agents[i], rank: i + 1),
     );
   }
 }
