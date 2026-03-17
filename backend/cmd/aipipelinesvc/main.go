@@ -15,12 +15,10 @@ func main() {
 	// Create all AI sub-services.
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
 	claudeSvc := aipipeline.NewAIService("") // Claude API key from env if needed
-	replicateSvc := aipipeline.NewReplicateService(cfg.ReplicateAPIKey)
-	pollinationsSvc := aipipeline.NewPollinationsService()
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
 	bgRemover := aipipeline.NewBgRemover(cfg.RembgURL)
 
-	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, replicateSvc, pollinationsSvc, scoreSvc, bgRemover)
+	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, scoreSvc, bgRemover)
 	router := aipipeline.SetupRouter(pipeline)
 
 	port := cfg.Port

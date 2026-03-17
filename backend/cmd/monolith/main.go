@@ -60,11 +60,9 @@ func main() {
 	// AI Pipeline (no DB needed)
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
 	claudeSvc := aipipeline.NewAIService("")
-	replicateSvc := aipipeline.NewReplicateService(cfg.ReplicateAPIKey)
-	pollinationsSvc := aipipeline.NewPollinationsService()
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
 	bgRemover := aipipeline.NewBgRemover(cfg.RembgURL)
-	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, replicateSvc, pollinationsSvc, scoreSvc, bgRemover)
+	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, scoreSvc, bgRemover)
 	pipelineHandler := aipipeline.NewHandler(pipeline)
 
 	// Agent

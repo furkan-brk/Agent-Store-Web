@@ -126,7 +126,7 @@ func (h *Handler) Avatar(c *gin.Context) {
 		return
 	}
 
-	// Generate image (tries Imagen, Pollinations, Replicate in parallel)
+	// Generate image via Imagen (Gemini)
 	base64Image := h.pipeline.GenerateImageWithFallback(req.Profile, req.ImagePrompt, req.CharType)
 	if base64Image == "" {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "all image providers failed"})

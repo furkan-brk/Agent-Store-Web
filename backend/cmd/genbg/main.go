@@ -80,12 +80,7 @@ func main() {
 			imgBase64, err := callImagen(apiKey, bg.Prompt)
 			if err != nil {
 				log.Printf("[%d/20] FAILED %s: %v (%.1fs)", idx+1, bg.ID, err, time.Since(start).Seconds())
-				// Try Pollinations as fallback
-				imgBase64, err = callPollinations(bg.Prompt)
-				if err != nil {
-					log.Printf("[%d/20] FALLBACK FAILED %s: %v", idx+1, bg.ID, err)
-					return
-				}
+				return
 			}
 
 			imgBytes, err := base64.StdEncoding.DecodeString(imgBase64)
@@ -151,61 +146,4 @@ func callImagen(apiKey, prompt string) (string, error) {
 		return "", fmt.Errorf("no predictions")
 	}
 	return imgResp.Predictions[0].BytesBase64Encoded, nil
-}
-
-func callPollinations(prompt string) (string, error) {
-	reqBody := map[string]interface{}{
-		"prompt":    prompt,
-		"model":     "flux",
-		"width":     768,
-		"height":    432,
-		"steps":     20,
-		"guidance":  7.5,
-		"seed":      -1,
-		"negative":  "text, letters, words, numbers, symbols, watermark, signature, people, characters, figures, person",
-		"sampler":   "euler",
-		"scheduler": "normal",
-		"upscale":   false,
-		"async":     false,
-	}
-
-	body, _ := json.Marshal(reqBody)
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Post("https://api.pollinations.ai/v1/images", "application/json", bytes.NewBuffer(body))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("pollinations %d: %s", resp.StatusCode, string(respBody[:min(200, len(respBody))]))
-	}
-
-	var result struct {
-		Images []struct {
-			URL string `json:"url"`
-		} `json:"images"`
-	}
-	respBody, _ := io.ReadAll(resp.Body)
-	json.Unmarshal(respBody, &result)
-	if len(result.Images) == 0 {
-		return "", fmt.Errorf("no images")
-	}
-
-	// Download image
-	imgResp, err := client.Get(result.Images[0].URL)
-	if err != nil {
-		return "", err
-	}
-	defer imgResp.Body.Close()
-	imgBytes, _ := io.ReadAll(imgResp.Body)
-	return base64.StdEncoding.EncodeToString(imgBytes), nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

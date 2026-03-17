@@ -20,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // UserProfile holds a user's public profile data.
@@ -829,7 +830,9 @@ func (s *AgentService) GetRatings(agentID uint) ([]models.AgentRating, float64, 
 // GetUserRating returns the authenticated user's rating for an agent.
 func (s *AgentService) GetUserRating(agentID uint, wallet string) int {
 	var r models.AgentRating
-	if database.DB.Where("agent_id = ? AND wallet = ?", agentID, wallet).First(&r).Error != nil {
+	err := database.DB.Session(&gorm.Session{Logger: logger.Discard}).
+		Where("agent_id = ? AND wallet = ?", agentID, wallet).First(&r).Error
+	if err != nil {
 		return 0
 	}
 	return r.Rating

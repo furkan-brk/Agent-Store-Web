@@ -1,81 +1,46 @@
 package aipipeline
 
 import (
-	"context"
 	"log"
-	"time"
 )
 
 // PipelineService orchestrates AI inference, image generation, and scoring.
 // It is the main entry point used by the handler layer.
 type PipelineService struct {
-	Gemini       *GeminiService
-	Claude       *AIService
-	Replicate    *ReplicateService
-	Pollinations *PollinationsService
-	Score        *ScoreService
-	BgRemover    *BgRemover
+	Gemini    *GeminiService
+	Claude    *AIService
+	Score     *ScoreService
+	BgRemover *BgRemover
 }
 
 // NewPipelineService creates an orchestrator with all AI sub-services.
-func NewPipelineService(gemini *GeminiService, claude *AIService, replicate *ReplicateService,
-	pollinations *PollinationsService, score *ScoreService, bgRemover *BgRemover) *PipelineService {
+func NewPipelineService(gemini *GeminiService, claude *AIService,
+	score *ScoreService, bgRemover *BgRemover) *PipelineService {
 	return &PipelineService{
-		Gemini:       gemini,
-		Claude:       claude,
-		Replicate:    replicate,
-		Pollinations: pollinations,
-		Score:        score,
-		BgRemover:    bgRemover,
+		Gemini:    gemini,
+		Claude:    claude,
+		Score:     score,
+		BgRemover: bgRemover,
 	}
 }
 
-// GenerateImageWithFallback fires all 3 image providers in parallel and returns
-// the first successful base64-encoded image. Returns "" if all fail.
+// GenerateImageWithFallback generates an avatar image via Imagen (Gemini).
+// Returns base64-encoded image or "" on failure.
 func (p *PipelineService) GenerateImageWithFallback(profile *AgentProfile, imagePrompt, charType string) string {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	type imageResult struct {
-		image    string
-		provider string
-	}
-	ch := make(chan imageResult, 3)
-
 	sanitized := sanitizeProfile(*profile)
 
-	go func() {
-		if img, err := p.Gemini.GenerateAvatarImage(&sanitized); err == nil && img != "" {
-			ch <- imageResult{image: img, provider: "Imagen"}
-		} else if err != nil {
-			log.Printf("[Avatar] Imagen failed: %v", err)
-		}
-	}()
-
-	go func() {
-		if img, err := p.Pollinations.GenerateImage(&sanitized); err == nil && img != "" {
-			ch <- imageResult{image: img, provider: "Pollinations"}
-		} else if err != nil {
-			log.Printf("[Avatar] Pollinations failed: %v", err)
-		}
-	}()
-
-	go func() {
-		if img, err := p.Replicate.GeneratePixelArt(imagePrompt, charType); err == nil && img != "" {
-			ch <- imageResult{image: img, provider: "Replicate"}
-		} else if err != nil {
-			log.Printf("[Avatar] Replicate failed: %v", err)
-		}
-	}()
-
-	select {
-	case r := <-ch:
-		log.Printf("[Avatar] %s won the race (type=%s)", r.provider, charType)
-		return r.image
-	case <-ctx.Done():
-		log.Printf("[Avatar] all providers timed out or failed within 60s (type=%s)", charType)
+	img, err := p.Gemini.GenerateAvatarImage(&sanitized)
+	if err != nil {
+		log.Printf("[Avatar] Imagen failed: %v", err)
 		return ""
 	}
+	if img == "" {
+		log.Printf("[Avatar] Imagen returned empty image (type=%s)", charType)
+		return ""
+	}
+
+	log.Printf("[Avatar] Imagen generated image (type=%s)", charType)
+	return img
 }
 
 // BuildFallbackProfile creates a sensible AgentProfile when the LLM call fails.
