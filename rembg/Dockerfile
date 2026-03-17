@@ -1,12 +1,15 @@
 FROM python:3.11-slim
 
-RUN pip install --no-cache-dir "rembg[cpu]" fastapi uvicorn pillow
+WORKDIR /app
 
-# Pre-download the model at build time
-RUN python -c "from rembg import new_session; new_session('isnet-general-use')"
+# Install Python dependencies (cached until requirements change)
+RUN pip install --no-cache-dir "rembg[cpu]" fastapi uvicorn pillow numpy
+
+# Pre-download the ML model at build time (best-effort)
+COPY download_model.py /tmp/download_model.py
+RUN python /tmp/download_model.py || true && rm -f /tmp/download_model.py
 
 COPY server.py /app/server.py
-WORKDIR /app
 EXPOSE 5000
 
 CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "5000"]

@@ -1,0 +1,10 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+pyrightconfig.json
+.vscode
+.idea
+*.md
+README*
+LICENSE
