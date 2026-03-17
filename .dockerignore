@@ -3,3 +3,6 @@
 !.dockerignore
 !backend/
 !backend/**
+!rembg/
+!rembg/**
+!entrypoint.sh
