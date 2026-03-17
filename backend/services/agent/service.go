@@ -118,7 +118,7 @@ func (s *AgentService) ListAgents(category, search, sort string, page, limit int
 		orderClause = "created_at ASC"
 	}
 	err := query.
-		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, generated_image, price, prompt_score, card_version, created_at").
 		Offset(offset).Limit(limit).Order(orderClause).Find(&agents).Error
 	if err == nil {
 		if b, jerr := json.Marshal(cachedResult{Agents: agents, Total: total}); jerr == nil {
@@ -399,7 +399,7 @@ func (s *AgentService) GetTrending() ([]models.Agent, error) {
 	}
 	var agents []models.Agent
 	err := database.DB.
-		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at").
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, generated_image, price, prompt_score, card_version, created_at").
 		Order("(save_count * 3 + use_count * 2) DESC").
 		Limit(6).
 		Find(&agents).Error
