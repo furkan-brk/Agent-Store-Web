@@ -36,3 +36,6 @@ agent_store/build/web/.vercel
 .vscode/
 .idea/
 *.swp
+
+# Claude Code
+.claude/
