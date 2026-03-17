@@ -25,32 +25,54 @@ jobs:
           cp .railwayignore .railway-deploy/.railwayignore
           cp -R backend .railway-deploy/backend
           rm -rf .railway-deploy/backend/vendor
+          # Copy per-service Dockerfiles for multi-service deploy
+          mkdir -p .railway-deploy/backend/deploy
+          cp -R backend/deploy/*.Dockerfile .railway-deploy/backend/deploy/
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy to Railway
+      - name: Deploy Gateway to Railway
         working-directory: .railway-deploy
         run: |
           set -euo pipefail
-
           for attempt in 1 2 3; do
-            if railway up --service Agent_Store --detach; then
-              exit 0
-            fi
-
-            if [ "$attempt" -eq 3 ]; then
-              echo "Railway deploy failed after ${attempt} attempts"
-              exit 1
-            fi
-
-            sleep_seconds=$((attempt * 15))
-            echo "Railway deploy attempt ${attempt} failed, retrying in ${sleep_seconds}s"
-            sleep "$sleep_seconds"
+            if railway up --service Agent_Store --detach; then exit 0; fi
+            if [ "$attempt" -eq 3 ]; then echo "Gateway deploy failed after ${attempt} attempts"; exit 1; fi
+            sleep $((attempt * 15))
           done
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Deploy Auth Service to Railway
+        working-directory: .railway-deploy
+        run: railway up --service authsvc --detach || true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Agent Service to Railway
+        working-directory: .railway-deploy
+        run: railway up --service agentsvc --detach || true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy AI Pipeline Service to Railway
+        working-directory: .railway-deploy
+        run: railway up --service aipipelinesvc --detach || true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Guild Service to Railway
+        working-directory: .railway-deploy
+        run: railway up --service guildsvc --detach || true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Workspace Service to Railway
+        working-directory: .railway-deploy
+        run: railway up --service workspacesvc --detach || true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   # -------------------------------------------------------
   # Frontend → Vercel (Flutter Web static build)

@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -94,7 +95,7 @@ func (p *Proxy) getOrCreateProxy(target string) *httputil.ReverseProxy {
 			log.Printf("[gateway] proxy error for %s %s -> %s: %v", r.Method, r.URL.Path, target, err)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadGateway)
-			w.Write([]byte(`{"error":"service unavailable"}`))
+			w.Write([]byte(fmt.Sprintf(`{"error":"service unavailable","target":"%s","path":"%s"}`, target, r.URL.Path)))
 		},
 	}
 

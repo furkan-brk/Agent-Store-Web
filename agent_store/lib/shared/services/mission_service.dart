@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/mission_model.dart';
 import 'api_service.dart';
 import 'local_kv_store.dart';
+import 'notification_service.dart';
 
 class MissionService {
   MissionService._();
@@ -77,6 +78,17 @@ class MissionService {
       // If batch sync failed or local was empty, fetch from backend.
       if (remote.isEmpty) {
         remote = await ApiService.instance.getUserMissions();
+      }
+
+      // Detect sync failure: authenticated + remote empty + local non-empty
+      if (remote.isEmpty && local.isNotEmpty) {
+        debugPrint('MissionService: sync failed — ${local.length} missions saved locally only');
+        NotificationService.instance.add(
+          'Mission sync failed — ${local.length} missions saved locally only',
+          type: 'info',
+        );
+      } else {
+        debugPrint('MissionService: sync OK — ${remote.length} remote, ${local.length} local');
       }
 
       _missions

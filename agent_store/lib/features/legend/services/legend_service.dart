@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/workflow_models.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_kv_store.dart';
+import '../../../shared/services/notification_service.dart';
 
 class LegendService {
   static final LegendService instance = LegendService._();
@@ -69,6 +70,17 @@ class LegendService {
 
       if (remote.isEmpty) {
         remote = await ApiService.instance.getLegendWorkflows();
+      }
+
+      // Detect sync failure: authenticated + remote empty + local non-empty
+      if (remote.isEmpty && local.isNotEmpty) {
+        debugPrint('LegendService: sync failed — ${local.length} workflows saved locally only');
+        NotificationService.instance.add(
+          'Workflow sync failed — ${local.length} workflows saved locally only',
+          type: 'info',
+        );
+      } else {
+        debugPrint('LegendService: sync OK — ${remote.length} remote, ${local.length} local');
       }
 
       _workflows = _mergeWorkflows(local, remote);

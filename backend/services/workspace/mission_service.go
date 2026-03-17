@@ -112,17 +112,29 @@ func (s *MissionService) SaveUserMission(wallet string, input SaveMissionInput) 
 }
 
 // BatchSyncMissions upserts multiple missions in one request and returns the
-// full list of all user missions from the DB.
+// full list of all user missions from the DB. The entire batch runs inside a
+// transaction so partial failures don't leave inconsistent data.
 func (s *MissionService) BatchSyncMissions(wallet string, inputs []SaveMissionInput) ([]models.UserMission, error) {
 	wallet = strings.ToLower(wallet)
 
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
 	for _, input := range inputs {
 		if err := validateMissionInput(input); err != nil {
+			tx.Rollback()
 			return nil, fmt.Errorf("invalid mission %q: %w", input.ID, err)
 		}
 
 		mission := &models.UserMission{}
-		err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(mission).Error
+		err := tx.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(mission).Error
 		if err != nil {
 			mission = &models.UserMission{
 				UserWallet: wallet,
@@ -143,9 +155,14 @@ func (s *MissionService) BatchSyncMissions(wallet string, inputs []SaveMissionIn
 			mission.UseCount = input.UseCount
 		}
 
-		if err := database.DB.Save(mission).Error; err != nil {
+		if err := tx.Save(mission).Error; err != nil {
+			tx.Rollback()
 			return nil, fmt.Errorf("failed to save mission %q: %w", input.ID, err)
 		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return s.ListUserMissions(wallet)

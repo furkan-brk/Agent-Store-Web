@@ -296,13 +296,19 @@ class ApiService {
 
   Future<List<MissionModel>> getUserMissions() async {
     try {
-      final res = await http.get(Uri.parse(ApiConstants.userMissions), headers: _headers);
+      final res = await http.get(Uri.parse(ApiConstants.userMissions), headers: _headers)
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final missions = (data['missions'] as List<dynamic>? ?? const <dynamic>[])
             .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
             .toList();
         return missions;
+      }
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: getUserMissions — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('getUserMissions: HTTP ${res.statusCode} — ${res.body}');
       }
     } catch (e) { debugPrint('getUserMissions: $e'); }
     return [];
@@ -339,26 +345,36 @@ class ApiService {
         Uri.parse(ApiConstants.userMissionsSync),
         headers: _headers,
         body: jsonEncode({'missions': missions.map((m) => m.toJson()).toList()}),
-      );
+      ).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         return (data['missions'] as List<dynamic>? ?? const <dynamic>[])
             .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
             .toList();
       }
-      debugPrint('batchSyncMissions: HTTP ${res.statusCode} — ${res.body}');
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: batchSyncMissions — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('batchSyncMissions: HTTP ${res.statusCode} — ${res.body}');
+      }
     } catch (e) { debugPrint('batchSyncMissions: $e'); }
     return [];
   }
 
   Future<List<LegendWorkflow>> getLegendWorkflows() async {
     try {
-      final res = await http.get(Uri.parse(ApiConstants.userLegendWorkflows), headers: _headers);
+      final res = await http.get(Uri.parse(ApiConstants.userLegendWorkflows), headers: _headers)
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         return (data['workflows'] as List<dynamic>? ?? const <dynamic>[])
             .map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>))
             .toList();
+      }
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: getLegendWorkflows — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('getLegendWorkflows: HTTP ${res.statusCode} — ${res.body}');
       }
     } catch (e) { debugPrint('getLegendWorkflows: $e'); }
     return [];
@@ -395,14 +411,18 @@ class ApiService {
         Uri.parse(ApiConstants.userLegendWorkflowsSync),
         headers: _headers,
         body: jsonEncode({'workflows': workflows.map((w) => w.toJson()).toList()}),
-      );
+      ).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         return (data['workflows'] as List<dynamic>? ?? const <dynamic>[])
             .map((e) => LegendWorkflow.fromJson(e as Map<String, dynamic>))
             .toList();
       }
-      debugPrint('batchSyncLegendWorkflows: HTTP ${res.statusCode} — ${res.body}');
+      if (res.statusCode == 502) {
+        debugPrint('CRITICAL: batchSyncLegendWorkflows — workspace service unreachable (502). Body: ${res.body}');
+      } else {
+        debugPrint('batchSyncLegendWorkflows: HTTP ${res.statusCode} — ${res.body}');
+      }
     } catch (e) { debugPrint('batchSyncLegendWorkflows: $e'); }
     return [];
   }

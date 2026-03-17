@@ -168,17 +168,26 @@ func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflow
 }
 
 // BatchSyncWorkflows upserts multiple workflows in one request and returns the
-// full list of all user workflows from the DB.
+// full list of all user workflows from the DB. Uses a transaction to ensure
+// atomicity — either all workflows are saved or none.
 func (s *LegendService) BatchSyncWorkflows(wallet string, inputs []SaveLegendWorkflowInput) ([]LegendWorkflowDTO, error) {
 	wallet = strings.ToLower(wallet)
 
+	// Validate all inputs before starting the transaction.
 	for _, input := range inputs {
 		if err := validateWorkflowInput(input); err != nil {
 			return nil, fmt.Errorf("invalid workflow %q: %w", input.ID, err)
 		}
+	}
 
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	for _, input := range inputs {
 		record := &models.UserLegendWorkflow{}
-		err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(record).Error
+		err := tx.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(record).Error
 		if err != nil {
 			record = &models.UserLegendWorkflow{
 				UserWallet: wallet,
@@ -194,9 +203,14 @@ func (s *LegendService) BatchSyncWorkflows(wallet string, inputs []SaveLegendWor
 		record.EdgesJSON = string(input.Edges)
 		record.UpdatedAt = updatedAt
 
-		if err := database.DB.Save(record).Error; err != nil {
+		if err := tx.Save(record).Error; err != nil {
+			tx.Rollback()
 			return nil, fmt.Errorf("failed to save workflow %q: %w", input.ID, err)
 		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return s.ListUserWorkflows(wallet)
