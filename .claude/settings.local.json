@@ -59,7 +59,8 @@
       "Bash(find:*)",
       "Bash(docker-compose build:*)",
       "Bash(xxd \"C:\\\\Projeler\\\\Agent-Store-Web\\\\backend\\\\services\\\\workspace\\\\legend_service.go\")",
-      "Bash(dart analyze:*)"
+      "Bash(dart analyze:*)",
+      "Bash(go build:*)"
     ]
   }
 }

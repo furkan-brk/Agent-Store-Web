@@ -17,9 +17,9 @@ COPY . .
 # 4. Build
 RUN set -eux; \
 	if [ -f vendor/modules.txt ]; then \
-		CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o service ./cmd/authsvc; \
+		CGO_ENABLED=0 GOOS=linux go build -mod=vendor -ldflags="-s -w" -o service ./cmd/authsvc; \
 	else \
-		CGO_ENABLED=0 GOOS=linux go build -o service ./cmd/authsvc; \
+		CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o service ./cmd/authsvc; \
 	fi
 
 # Runtime stage — merged layers
@@ -31,4 +31,5 @@ COPY --from=builder /app/service .
 RUN chown appuser:appgroup ./service
 USER appuser
 EXPOSE 8081
+ENV GOMEMLIMIT=204MiB GOGC=50
 CMD ["./service"]

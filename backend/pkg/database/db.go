@@ -36,8 +36,8 @@ func ConnectWithRetry(dsn string) {
 			log.Println("Database connected")
 			sqlDB, poolErr := db.DB()
 			if poolErr == nil {
-				sqlDB.SetMaxOpenConns(25)
-				sqlDB.SetMaxIdleConns(5)
+				sqlDB.SetMaxOpenConns(5)
+				sqlDB.SetMaxIdleConns(2)
 				sqlDB.SetConnMaxLifetime(5 * time.Minute)
 			}
 			return
