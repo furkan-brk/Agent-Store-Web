@@ -16,9 +16,21 @@ type ServiceHealth struct {
 	OK   bool   `json:"ok"`
 }
 
-// HealthHandler returns a Gin handler that pings every downstream service's
+// HealthHandler returns a lightweight handler that always returns 200 so that
+// platform healthchecks (Railway, etc.) pass even when downstream services are
+// not yet available. Use FullHealthHandler for deep downstream checks.
+func HealthHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": "gateway",
+		})
+	}
+}
+
+// FullHealthHandler returns a Gin handler that pings every downstream service's
 // /health endpoint in parallel and returns an aggregated status.
-func HealthHandler(services []ServiceHealth) gin.HandlerFunc {
+func FullHealthHandler(services []ServiceHealth) gin.HandlerFunc {
 	client := &http.Client{Timeout: 3 * time.Second}
 
 	return func(c *gin.Context) {

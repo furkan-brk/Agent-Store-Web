@@ -40,7 +40,8 @@ func main() {
 		{Name: "guild", URL: cfg.GuildServiceURL},
 		{Name: "workspace", URL: cfg.WorkspaceServiceURL},
 	}
-	r.GET("/health", gateway.HealthHandler(services))
+	r.GET("/health", gateway.HealthHandler())
+	r.GET("/health/full", gateway.FullHealthHandler(services))
 
 	// Reverse proxy — routes all /api/v1/* requests to backend services.
 	proxy := gateway.NewProxy(
