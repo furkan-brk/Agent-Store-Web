@@ -342,10 +342,11 @@
 | 20.4 | grep: html.window.localStorage = 0 (local_kv_store_web haric) | ✅ sadece local_kv_store_web.dart |
 | 20.5 | grep: category_sidebar import = 0 | ✅ 0 dosya |
 | 20.6 | grep: NeverScrollableScrollPhysics = 0 | ✅ 0 dosya |
-| 20.7 | `docker compose build --no-cache` | ⏳ Manuel test gerekli |
-| 20.8 | `docker compose up -d` -> 3 servis UP | ⏳ Manuel test gerekli |
-| 20.9 | E2E: Store yuklenme -> kategori filtre -> arama | ⏳ Manuel test gerekli |
-| 20.10 | E2E: Wallet bagla -> mission -> disconnect -> reconnect | ⏳ Manuel test gerekli |
+| 20.7 | `docker compose build --no-cache` -> tum 7 image built | ✅ |
+| 20.8 | docker-compose.yml: PORT env var eksik -> 5 servise eklendi (8081-8085) | ✅ FIX |
+| 20.9 | `docker compose up -d` -> **10 servis UP + healthy** | ✅ |
+| 20.10 | E2E: Store yuklenme -> kategori filtre -> arama | ⏳ Manuel test |
+| 20.11 | E2E: Wallet bagla -> mission -> disconnect -> reconnect | ⏳ Manuel test |
 
 ---
 
