@@ -27,7 +27,8 @@ func ConnectWithRetry(dsn string) {
 		logLevel = logger.Warn
 	}
 
-	for attempt := 1; ; attempt++ {
+	maxAttempts := 30 // give up after ~2.5 minutes
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 			Logger: logger.Default.LogMode(logLevel),
 		})
@@ -42,9 +43,10 @@ func ConnectWithRetry(dsn string) {
 			}
 			return
 		}
-		log.Printf("DB connection attempt %d failed: %v. Retrying in 5s...", attempt, err)
+		log.Printf("DB connection attempt %d/%d failed: %v", attempt, maxAttempts, err)
 		time.Sleep(5 * time.Second)
 	}
+	log.Printf("WARNING: database not available after %d attempts, running without DB", maxAttempts)
 }
 
 // ConnectAndWait blocks until the DB is connected (synchronous version for services).

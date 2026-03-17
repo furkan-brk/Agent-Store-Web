@@ -15,15 +15,15 @@ func main() {
 	_ = godotenv.Load()
 	cfg := config.Load()
 
-	// Synchronous DB connect — must be ready before serving.
-	database.ConnectAndWait(cfg.PostgresDSN)
-	agent.Migrate()
+	// Async DB connect — HTTP server starts immediately so Railway healthcheck passes.
+	go func() {
+		database.ConnectWithRetry(cfg.PostgresDSN)
+		agent.Migrate()
+	}()
 
 	// Create dependencies.
 	aiClient := client.NewAIClient(cfg.AIPipelineServiceURL)
 	imageSvc := agent.NewImageService("./uploads", "")
-	// Restore any missing image files from DB in the background (handles ephemeral disk)
-	go imageSvc.HydrateFromDB()
 	cacheStore := cache.NewStore()
 
 	agentSvc := agent.NewAgentService(aiClient, imageSvc, cacheStore)

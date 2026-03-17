@@ -14,8 +14,11 @@ func main() {
 	_ = godotenv.Load()
 	cfg := config.Load()
 
-	database.ConnectAndWait(cfg.PostgresDSN)
-	workspace.Migrate()
+	// Async DB connect — HTTP server starts immediately so Railway healthcheck passes.
+	go func() {
+		database.ConnectWithRetry(cfg.PostgresDSN)
+		workspace.Migrate()
+	}()
 
 	aiClient := client.NewAIClient(cfg.AIPipelineServiceURL)
 	agentClient := client.NewAgentClient(cfg.AgentServiceURL)

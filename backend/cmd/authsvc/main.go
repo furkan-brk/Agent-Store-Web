@@ -13,9 +13,11 @@ func main() {
 	_ = godotenv.Load()
 	cfg := config.Load()
 
-	// Auth service uses synchronous DB connect — must be ready before serving.
-	database.ConnectAndWait(cfg.PostgresDSN)
-	auth.Migrate()
+	// Async DB connect — HTTP server starts immediately so Railway healthcheck passes.
+	go func() {
+		database.ConnectWithRetry(cfg.PostgresDSN)
+		auth.Migrate()
+	}()
 
 	authSvc := auth.NewAuthService(cfg.JWTSecret)
 	router := auth.SetupRouter(authSvc)
