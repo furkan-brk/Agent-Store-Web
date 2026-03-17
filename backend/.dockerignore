@@ -1,0 +1,14 @@
+.git
+.gitignore
+*.md
+README*
+LICENSE
+.env*
+.vscode
+.idea
+docker-compose*
+Dockerfile
+.dockerignore
+tmp/
+test/
+*_test.go
