@@ -1,13 +1,18 @@
 package agent
 
 import (
+	"encoding/base64"
+	"log"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/pkg/middleware"
+	"github.com/agentstore/backend/pkg/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -84,21 +89,79 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		internal.GET("/credits/:wallet", handler.InternalGetCredits)
 	}
 
-	// Serve uploaded images with long-lived cache headers
+	// Serve uploaded images with long-lived cache headers.
+	// Fast path: serve from disk. Fallback: decode base64 from DB and lazy-hydrate to disk.
 	r.GET("/api/v1/images/*filepath", func(c *gin.Context) {
 		fp := c.Param("filepath")
+		// Security: prevent directory traversal
 		if strings.Contains(fp, "..") {
 			c.AbortWithStatus(http.StatusBadRequest)
 			return
 		}
 		fullPath := filepath.Join("./uploads", fp)
-		c.Header("Cache-Control", "public, max-age=31536000, immutable")
+
+		// Determine content type from extension
+		contentType := "application/octet-stream"
 		if strings.HasSuffix(fp, ".webp") {
-			c.Header("Content-Type", "image/webp")
+			contentType = "image/webp"
 		} else if strings.HasSuffix(fp, ".png") {
-			c.Header("Content-Type", "image/png")
+			contentType = "image/png"
 		}
-		c.File(fullPath)
+
+		// Fast path: file exists on disk
+		if _, err := os.Stat(fullPath); err == nil {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			c.Header("Content-Type", contentType)
+			c.File(fullPath)
+			return
+		}
+
+		// Slow path: file missing on disk — try DB fallback
+		if !database.IsReady() {
+			c.AbortWithStatus(http.StatusServiceUnavailable)
+			return
+		}
+
+		// Parse agent ID from filepath: e.g. "/agents/123.webp" → 123
+		base := filepath.Base(fp)
+		ext := filepath.Ext(base)
+		idStr := strings.TrimSuffix(base, ext)
+		agentID, err := strconv.ParseUint(idStr, 10, 64)
+		if err != nil {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+
+		// Load only the generated_image column (base64 text) to avoid fetching full row
+		var agent models.Agent
+		if err := database.DB.Select("id, generated_image").First(&agent, agentID).Error; err != nil || agent.GeneratedImage == "" {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+
+		imgBytes, err := base64.StdEncoding.DecodeString(agent.GeneratedImage)
+		if err != nil || len(imgBytes) == 0 {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
+		// Serve the decoded image with a shorter cache (1 hour) since it was a fallback
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.Header("Content-Type", contentType)
+		c.Data(http.StatusOK, contentType, imgBytes)
+
+		// Lazy-hydrate: re-save the file to disk so next request hits the fast path
+		go func(path string, data []byte) {
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				log.Printf("[ImageHydrate] mkdir failed for %s: %v", path, err)
+				return
+			}
+			if err := os.WriteFile(path, data, 0644); err != nil {
+				log.Printf("[ImageHydrate] write failed for %s: %v", path, err)
+				return
+			}
+			log.Printf("[ImageHydrate] lazy-restored %s (%d bytes)", path, len(data))
+		}(fullPath, imgBytes)
 	})
 
 	r.GET("/health", func(c *gin.Context) {

@@ -22,6 +22,8 @@ func main() {
 	// Create dependencies.
 	aiClient := client.NewAIClient(cfg.AIPipelineServiceURL)
 	imageSvc := agent.NewImageService("./uploads", "")
+	// Restore any missing image files from DB in the background (handles ephemeral disk)
+	go imageSvc.HydrateFromDB()
 	cacheStore := cache.NewStore()
 
 	agentSvc := agent.NewAgentService(aiClient, imageSvc, cacheStore)
