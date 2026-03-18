@@ -43,18 +43,21 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: Column(
         children: [
           // ── Header ───────────────────────────────────────────────────
-          _buildHeader(context),
+          _buildHeader(context, isMobile),
           // ── Tab bar ──────────────────────────────────────────────────
-          _buildTabBar(),
+          _buildTabBar(isMobile),
           // ── Body ─────────────────────────────────────────────────────
           Expanded(
             child: Obx(() {
-              if (_ctrl.isLoading.value) return _buildLoadingSkeleton();
+              if (_ctrl.isLoading.value) return _buildLoadingSkeleton(isMobile);
               if (_ctrl.error.value != null) return _buildErrorState();
 
               final rankings = _ctrl.data.value?['rankings'] as List? ?? [];
@@ -63,9 +66,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               return TabBarView(
                 controller: _tabCtrl,
                 children: [
-                  _buildRankingList(context, rankings, _SortMode.bySaves),
-                  _buildRankingList(context, rankings, _SortMode.byUses),
-                  _buildRankingList(context, rankings, _SortMode.byAgents),
+                  _buildRankingList(context, rankings, _SortMode.bySaves, isMobile),
+                  _buildRankingList(context, rankings, _SortMode.byUses, isMobile),
+                  _buildRankingList(context, rankings, _SortMode.byAgents, isMobile),
                 ],
               );
             }),
@@ -77,9 +80,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   // ── Header with title + refresh ──────────────────────────────────────────
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, bool isMobile) {
+    final hPad = isMobile ? 16.0 : 24.0;
+    final topPad = isMobile ? 20.0 : 28.0;
+
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+      padding: EdgeInsets.fromLTRB(hPad, topPad, hPad, 0),
       decoration: const BoxDecoration(
         color: AppTheme.surface,
       ),
@@ -87,8 +93,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         children: [
           // Crown icon
           Container(
-            width: 36,
-            height: 36,
+            width: isMobile ? 32 : 36,
+            height: isMobile ? 32 : 36,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -98,12 +104,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   AppTheme.gold.withValues(alpha: 0.08),
                 ],
               ),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.workspace_premium_rounded,
               color: AppTheme.gold,
-              size: 20,
+              size: isMobile ? 18 : 20,
             ),
           ),
           const SizedBox(width: 12),
@@ -112,11 +118,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             shaderCallback: (bounds) => const LinearGradient(
               colors: [AppTheme.textH, AppTheme.gold],
             ).createShader(bounds),
-            child: const Text(
+            child: Text(
               'Leaderboard',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 22,
+                fontSize: isMobile ? 18 : 22,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.3,
               ),
@@ -137,7 +143,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   // ── Tab bar ──────────────────────────────────────────────────────────────
 
-  Widget _buildTabBar() {
+  Widget _buildTabBar(bool isMobile) {
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.surface,
@@ -149,24 +155,29 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         unselectedLabelColor: AppTheme.textM,
         indicatorColor: AppTheme.gold,
         indicatorWeight: 2.5,
-        labelStyle: const TextStyle(
+        isScrollable: isMobile,
+        tabAlignment: isMobile ? TabAlignment.start : null,
+        labelStyle: TextStyle(
           fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontSize: isMobile ? 12 : 13,
           letterSpacing: 0.2,
         ),
-        unselectedLabelStyle: const TextStyle(
+        unselectedLabelStyle: TextStyle(
           fontWeight: FontWeight.w500,
-          fontSize: 13,
+          fontSize: isMobile ? 12 : 13,
         ),
         dividerColor: Colors.transparent,
-        tabs: const [
+        labelPadding: isMobile
+            ? const EdgeInsets.symmetric(horizontal: 12)
+            : null,
+        tabs: [
           Tab(
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.bookmark_rounded, size: 15),
-                SizedBox(width: 6),
-                Text('Top by Saves'),
+                const Icon(Icons.bookmark_rounded, size: 15),
+                const SizedBox(width: 6),
+                Text(isMobile ? 'Saves' : 'Top by Saves'),
               ],
             ),
           ),
@@ -174,9 +185,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.play_circle_outline, size: 15),
-                SizedBox(width: 6),
-                Text('Top by Uses'),
+                const Icon(Icons.play_circle_outline, size: 15),
+                const SizedBox(width: 6),
+                Text(isMobile ? 'Uses' : 'Top by Uses'),
               ],
             ),
           ),
@@ -184,9 +195,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.person_rounded, size: 15),
-                SizedBox(width: 6),
-                Text('Top Creators'),
+                const Icon(Icons.person_rounded, size: 15),
+                const SizedBox(width: 6),
+                Text(isMobile ? 'Creators' : 'Top Creators'),
               ],
             ),
           ),
@@ -197,10 +208,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   // ── Loading skeleton ─────────────────────────────────────────────────────
 
-  Widget _buildLoadingSkeleton() {
+  Widget _buildLoadingSkeleton(bool isMobile) {
+    final listPad = isMobile ? 12.0 : 16.0;
     return ShimmerScope(
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(listPad),
         itemCount: 8,
         itemBuilder: (_, i) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -340,6 +352,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     BuildContext context,
     List<dynamic> rankings,
     _SortMode mode,
+    bool isMobile,
   ) {
     // Sort a copy based on the selected tab
     final sorted = List<Map<String, dynamic>>.from(
@@ -362,9 +375,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
     // Find the max value for the progress bar normalization
     final maxVal = _maxValueForMode(sorted, mode);
+    final hPad = isMobile ? 12.0 : 16.0;
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 24),
       itemCount: sorted.length,
       itemBuilder: (context, index) {
         final entry = sorted[index];
@@ -375,6 +389,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             rank: index + 1,
             mode: mode,
             maxValue: maxVal,
+            isMobile: isMobile,
           ),
         );
       },
@@ -469,12 +484,14 @@ class _RankCard extends StatefulWidget {
   final int rank;
   final _SortMode mode;
   final int maxValue;
+  final bool isMobile;
 
   const _RankCard({
     required this.entry,
     required this.rank,
     required this.mode,
     required this.maxValue,
+    this.isMobile = false,
   });
 
   @override
@@ -539,6 +556,13 @@ class _RankCardState extends State<_RankCard> {
           )
         : null;
 
+    final isMobile = widget.isMobile;
+    final cardHPad = isMobile ? 12.0 : 16.0;
+    final cardVPad = isMobile ? 12.0 : 14.0;
+    final badgeGap = isMobile ? 10.0 : 14.0;
+    final statGap = isMobile ? 8.0 : 14.0;
+    final walletFontSize = isMobile ? 12.0 : 14.0;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -553,7 +577,7 @@ class _RankCardState extends State<_RankCard> {
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
           margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: EdgeInsets.symmetric(horizontal: cardHPad, vertical: cardVPad),
           decoration: BoxDecoration(
             color: _hovered ? AppTheme.card2 : AppTheme.card,
             borderRadius: BorderRadius.circular(12),
@@ -580,7 +604,7 @@ class _RankCardState extends State<_RankCard> {
             children: [
               // ── Rank badge ──────────────────────────────────────────
               _buildRankBadge(rank, medalColor, medalBg),
-              const SizedBox(width: 14),
+              SizedBox(width: badgeGap),
               // ── Creator info ────────────────────────────────────────
               Expanded(
                 child: Column(
@@ -592,7 +616,7 @@ class _RankCardState extends State<_RankCard> {
                         Icon(
                           Icons.person_rounded,
                           color: isTopThree ? medalColor : AppTheme.textM,
-                          size: 14,
+                          size: isMobile ? 12 : 14,
                         ),
                         const SizedBox(width: 6),
                         Flexible(
@@ -602,7 +626,7 @@ class _RankCardState extends State<_RankCard> {
                               color: AppTheme.textH,
                               fontWeight:
                                   isTopThree ? FontWeight.w700 : FontWeight.w600,
-                              fontSize: 14,
+                              fontSize: walletFontSize,
                               fontFamily: 'monospace',
                             ),
                           ),
@@ -610,35 +634,58 @@ class _RankCardState extends State<_RankCard> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    // Stats row
-                    Row(
-                      children: [
-                        _StatChip(
-                          icon: Icons.smart_toy_outlined,
-                          value: totalAgents,
-                          label: 'agents',
-                        ),
-                        const SizedBox(width: 12),
-                        _StatChip(
-                          icon: Icons.bookmark_rounded,
-                          value: totalSaves,
-                          label: 'saves',
-                        ),
-                        const SizedBox(width: 12),
-                        _StatChip(
-                          icon: Icons.play_circle_outline,
-                          value: totalUses,
-                          label: 'uses',
-                        ),
-                      ],
-                    ),
+                    // Stats row — use Wrap on mobile to prevent overflow
+                    if (isMobile)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          _StatChip(
+                            icon: Icons.smart_toy_outlined,
+                            value: totalAgents,
+                            label: 'agents',
+                          ),
+                          _StatChip(
+                            icon: Icons.bookmark_rounded,
+                            value: totalSaves,
+                            label: 'saves',
+                          ),
+                          _StatChip(
+                            icon: Icons.play_circle_outline,
+                            value: totalUses,
+                            label: 'uses',
+                          ),
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          _StatChip(
+                            icon: Icons.smart_toy_outlined,
+                            value: totalAgents,
+                            label: 'agents',
+                          ),
+                          const SizedBox(width: 12),
+                          _StatChip(
+                            icon: Icons.bookmark_rounded,
+                            value: totalSaves,
+                            label: 'saves',
+                          ),
+                          const SizedBox(width: 12),
+                          _StatChip(
+                            icon: Icons.play_circle_outline,
+                            value: totalUses,
+                            label: 'uses',
+                          ),
+                        ],
+                      ),
                     const SizedBox(height: 8),
                     // Progress bar for the active sort metric
                     _buildProgressBar(progress, medalColor, isTopThree),
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: statGap),
               // ── Primary stat highlight ──────────────────────────────
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -646,7 +693,7 @@ class _RankCardState extends State<_RankCard> {
                   Icon(
                     primaryIcon,
                     color: isTopThree ? medalColor : AppTheme.primary,
-                    size: 18,
+                    size: isMobile ? 16 : 18,
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -654,29 +701,31 @@ class _RankCardState extends State<_RankCard> {
                     style: TextStyle(
                       color: isTopThree ? medalColor : AppTheme.textH,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: isMobile ? 16 : 18,
                     ),
                   ),
                   Text(
                     primaryLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppTheme.textM,
-                      fontSize: 10,
+                      fontSize: isMobile ? 9 : 10,
                     ),
                   ),
                 ],
               ),
               // ── Chevron ─────────────────────────────────────────────
-              const SizedBox(width: 8),
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: _hovered ? 1.0 : 0.3,
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.textM,
-                  size: 20,
+              if (!isMobile) ...[
+                const SizedBox(width: 8),
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _hovered ? 1.0 : 0.3,
+                  child: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.textM,
+                    size: 20,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -687,6 +736,10 @@ class _RankCardState extends State<_RankCard> {
   // ── Rank badge (medal for top 3, number for others) ──────────────────────
 
   Widget _buildRankBadge(int rank, Color medalColor, Color medalBg) {
+    final isMobile = widget.isMobile;
+    final badgeSize = isMobile ? 36.0 : 42.0;
+    final iconSize = isMobile ? 20.0 : 24.0;
+
     if (rank <= 3) {
       final medalIcon = switch (rank) {
         1 => Icons.looks_one_rounded,
@@ -694,8 +747,8 @@ class _RankCardState extends State<_RankCard> {
         _ => Icons.looks_3_rounded,
       };
       return Container(
-        width: 42,
-        height: 42,
+        width: badgeSize,
+        height: badgeSize,
         decoration: BoxDecoration(
           color: medalBg,
           shape: BoxShape.circle,
@@ -710,12 +763,12 @@ class _RankCardState extends State<_RankCard> {
             ),
           ],
         ),
-        child: Icon(medalIcon, color: medalColor, size: 24),
+        child: Icon(medalIcon, color: medalColor, size: iconSize),
       );
     }
     return Container(
-      width: 42,
-      height: 42,
+      width: badgeSize,
+      height: badgeSize,
       decoration: BoxDecoration(
         color: AppTheme.card2,
         shape: BoxShape.circle,
@@ -724,9 +777,9 @@ class _RankCardState extends State<_RankCard> {
       child: Center(
         child: Text(
           '#$rank',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTheme.textB,
-            fontSize: 14,
+            fontSize: isMobile ? 12 : 14,
             fontWeight: FontWeight.bold,
           ),
         ),

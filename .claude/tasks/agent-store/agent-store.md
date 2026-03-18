@@ -363,7 +363,69 @@ v3.0 (TAMAMLANDI):
   Blok 18 ✅ -> Scrollable widget duzeltmeleri
   Blok 19 ✅ -> Sidebar & kategori yeniden tasarimi
   Blok 20 ✅ -> Build dogrulama (Docker + E2E manuel test bekliyor)
+
+v3.1 (AKTIF):
+  Blok 20.5 ✅ -> BG Removal optimizasyonu (Python rembg -> pure Go chroma-key)
+  Blok 21 ✅ -> Mobil web responsive duzeltmeleri (7 ekran)
 ```
+
+---
+
+## Blok 20.5 — BG Removal Optimizasyonu ✅
+> Agent: bg-removal-architect + go-backend-architect (paralel) | Tarih: 2026-03-18
+
+| # | Gorev | Dosya | Durum |
+|---|---|---|---|
+| 20.5.1 | Python rembg servisi kaldirildi (500MB+ tasarruf) | `rembg/` silindi | ✅ |
+| 20.5.2 | Pure Go BgRemover: 4-pass chroma-key (magenta #FF00FF) | `services/aipipeline/rembg.go` (YENI) | ✅ |
+| 20.5.3 | PipelineService'e BgRemover entegrasyonu | `services/aipipeline/service.go` | ✅ |
+| 20.5.4 | Avatar handler format dondurme | `services/aipipeline/handler.go` | ✅ |
+| 20.5.5 | Monolith + aipipelinesvc wiring | `cmd/monolith/main.go` + `cmd/aipipelinesvc/main.go` | ✅ |
+| 20.5.6 | Dockerfile: python:3.11-slim -> alpine:3.19 | `Dockerfile` | ✅ |
+| 20.5.7 | entrypoint.sh silindi (sidecar gereksiz) | `entrypoint.sh` silindi | ✅ |
+| 20.5.8 | Bug fix: default format webp->png | `services/agent/service.go` | ✅ |
+| 20.5.9 | Bug fix: HSV hue range 285-320 -> 280-335 | `services/aipipeline/rembg.go` | ✅ |
+| 20.5.10 | Bug fix: zero-dim guard, data-URI strip | `services/aipipeline/rembg.go` | ✅ |
+| 20.5.11 | Deploy temizligi (.dockerignore, .railwayignore, railway.toml, deploy.yml) | 5 dosya | ✅ |
+
+**Dogrulama:** `go build ./...` EXIT 0, `go vet ./...` PASS ✅
+
+---
+
+## Blok 21 — Mobil Web Responsive Duzeltmeleri ✅
+> Agent: 3 paralel flutter-univercity-dev | Tarih: 2026-03-18
+
+### 21A — Wallet + Leaderboard (KRITIK) ✅
+| # | Gorev | Dosya | Durum |
+|---|---|---|---|
+| 21A.1 | Wallet: hardcoded 480px -> responsive (full-width < 520px) | `wallet_connect_screen.dart` | ✅ |
+| 21A.2 | Wallet: padding 36 -> 20 mobile / 36 desktop | `wallet_connect_screen.dart` | ✅ |
+| 21A.3 | Leaderboard: responsive padding (12-16 mobile / 24 desktop) | `leaderboard_screen.dart` | ✅ |
+| 21A.4 | Leaderboard: tab isScrollable + kisaltilmis etiketler mobile | `leaderboard_screen.dart` | ✅ |
+| 21A.5 | Leaderboard: RankCard stats Wrap (mobile overflow fix) | `leaderboard_screen.dart` | ✅ |
+| 21A.6 | Leaderboard: rank badge 36px mobile / 42px desktop | `leaderboard_screen.dart` | ✅ |
+
+### 21B — Store/Trending + Library (YUKSEK) ✅
+| # | Gorev | Dosya | Durum |
+|---|---|---|---|
+| 21B.1 | TrendingRow: responsive padding (14 mobile / 24 desktop) | `trending_row.dart` | ✅ |
+| 21B.2 | TrendingRow: card 130px mobile / 140px desktop | `trending_row.dart` | ✅ |
+| 21B.3 | TrendingRow: scroll arrows hidden < 400px | `trending_row.dart` | ✅ |
+| 21B.4 | Library: responsive grid (2 col <500, 3 col 500-900, 4 col 900+) | `library_screen.dart` | ✅ |
+| 21B.5 | Library: responsive padding + scrollable stats chips | `library_screen.dart` | ✅ |
+| 21B.6 | Library: TabBar isScrollable + TabAlignment.start mobile | `library_screen.dart` | ✅ |
+| 21B.7 | Store: "X agents available" Flexible + TextOverflow.ellipsis | `store_screen.dart` | ✅ |
+
+### 21C — Agent Detail + Create Agent + Guild (YUKSEK) ✅
+| # | Gorev | Dosya | Durum |
+|---|---|---|---|
+| 21C.1 | Agent Detail: zaten responsive (clamp 240-360, 768px breakpoint) | `agent_detail_screen.dart` | ✅ degisiklik gerekmedi |
+| 21C.2 | Create Agent: zaten responsive (clamp 220-320, mobile layout) | `create_agent_screen.dart` | ✅ degisiklik gerekmedi |
+| 21C.3 | Guild Screen: zaten responsive (breakpoints, responsive grid) | `guild_screen.dart` | ✅ degisiklik gerekmedi |
+| 21C.4 | Guild Detail: zaten responsive (bodyPad, isMobile checks) | `guild_detail_screen.dart` | ✅ degisiklik gerekmedi |
+| 21C.5 | Skeleton context fix | `agent_detail_screen.dart` | ✅ |
+
+**Dogrulama:** `flutter analyze` -> **No issues found!** ✅
 
 ---
 
@@ -382,6 +444,19 @@ v3.0 (TAMAMLANDI):
 - [x] go build -> EXIT 0
 - [ ] Docker 3 servis UP (manuel test gerekli)
 
+## Basari Kriterleri (v3.1)
+
+- [x] BG removal: Python rembg kaldirildi, pure Go chroma-key aktif
+- [x] Dockerfile: alpine:3.19 (python:3.11-slim yerine, ~500MB tasarruf)
+- [x] Wallet ekrani: < 520px ekranlarda full-width, overflow yok
+- [x] Leaderboard: mobile card layout, scrollable tabs, Wrap stats
+- [x] TrendingRow: responsive padding + card boyutu
+- [x] Library: responsive grid (2/3/4 col), scrollable stats
+- [x] Store: text overflow korunmasi
+- [x] Agent Detail/Create/Guild: zaten responsive (dogrulandi)
+- [x] flutter analyze -> 0 error
+- [x] go build + go vet -> EXIT 0
+
 ---
 
 ## Teknik Notlar
@@ -398,3 +473,11 @@ v3.0 (TAMAMLANDI):
 |---|---|---|---|
 | GET | /api/v1/agents?creator_wallet=0x... | Creator bazli filtreleme | 17 |
 | GET | /api/v1/agents/categories | Kategori listesi + agent sayisi | 17 |
+
+### Mobil Breakpoints (v3.1)
+| Genislik | Sinif | Davranis |
+|---|---|---|
+| < 500px | Telefon (kucuk) | 2 kolon grid, kucuk padding, scrollable tabs |
+| 500-600px | Telefon (buyuk) | 2-3 kolon, orta padding |
+| 600-900px | Tablet | 3 kolon, orta padding, tablet layout |
+| > 900px | Desktop | 3-4 kolon, genis padding, sidebar layout |

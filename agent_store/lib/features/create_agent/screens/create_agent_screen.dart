@@ -194,8 +194,10 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   // ── Preview panel (desktop sidebar) ───────────────────────────────────────
 
   Widget _buildPreviewPanel() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final panelWidth = (screenWidth * 0.28).clamp(220.0, 320.0);
     return Container(
-      width: 280,
+      width: panelWidth,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -211,7 +213,10 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       ),
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth < 900 ? 16 : 24,
+            vertical: screenWidth < 900 ? 24 : 32,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -539,10 +544,13 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   // ── Form panel ────────────────────────────────────────────────────────────
 
   Widget _buildFormPanel({bool isMobile = false}) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final hPad = isMobile ? 16.0 : (screenWidth < 900 ? 24.0 : 48.0);
+    final vPad = isMobile ? 24.0 : (screenWidth < 900 ? 28.0 : 40.0);
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 20 : 48,
-        vertical: isMobile ? 24 : 40,
+        horizontal: hPad,
+        vertical: vPad,
       ),
       child: Center(
         child: ConstrainedBox(

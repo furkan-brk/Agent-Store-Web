@@ -45,12 +45,16 @@ class _GuildScreenState extends State<GuildScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final isTablet = screenWidth >= 600 && screenWidth <= 900;
+    final bodyPad = isMobile ? 12.0 : (isTablet ? 16.0 : 24.0);
     return Obx(() {
       final filtered = _filteredGuilds;
       return Scaffold(
         backgroundColor: AppTheme.bg,
         body: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.all(bodyPad),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // -- Page header with icon
             Row(children: [
@@ -63,26 +67,38 @@ class _GuildScreenState extends State<GuildScreen> {
                 child: const Icon(Icons.groups_rounded, color: AppTheme.primary, size: 22),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Guilds', style: TextStyle(color: AppTheme.textH, fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 2),
-                  Text('2-4 agents united for synergy bonuses', style: TextStyle(color: AppTheme.textM, fontSize: 13)),
+                  Text('Guilds', style: TextStyle(color: AppTheme.textH, fontSize: isMobile ? 20 : 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 2),
+                  const Text('2-4 agents united for synergy bonuses', style: TextStyle(color: AppTheme.textM, fontSize: 13)),
                 ]),
               ),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: AppTheme.textH,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              if (isMobile)
+                IconButton(
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: AppTheme.textH,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => _onCreateGuild(context),
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  tooltip: 'Create Guild',
+                )
+              else
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: AppTheme.textH,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => _onCreateGuild(context),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Create Guild', style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
-                onPressed: () => _onCreateGuild(context),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Create Guild', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
             ]),
-            const SizedBox(height: 20),
+            SizedBox(height: isMobile ? 14 : 20),
 
             // -- Search bar
             SizedBox(
@@ -113,7 +129,7 @@ class _GuildScreenState extends State<GuildScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: isMobile ? 14 : 20),
 
             // -- Content area
             if (_ctrl.isLoading.value)
@@ -121,9 +137,11 @@ class _GuildScreenState extends State<GuildScreen> {
                 child: ShimmerScope(
                   child: GridView.builder(
                     padding: EdgeInsets.zero,
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 320, mainAxisExtent: 190,
-                      crossAxisSpacing: 16, mainAxisSpacing: 16,
+                    gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: isMobile ? 180 : 320,
+                      mainAxisExtent: isMobile ? 170 : 190,
+                      crossAxisSpacing: isMobile ? 10 : 16,
+                      mainAxisSpacing: isMobile ? 10 : 16,
                     ),
                     itemCount: 8,
                     itemBuilder: (_, __) => const _GuildCardSkeleton(),
@@ -204,9 +222,11 @@ class _GuildScreenState extends State<GuildScreen> {
                 onRefresh: _ctrl.load,
                 color: AppTheme.primary,
                 child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 320, mainAxisExtent: 190,
-                    crossAxisSpacing: 16, mainAxisSpacing: 16,
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: isMobile ? 180 : 320,
+                    mainAxisExtent: isMobile ? 170 : 190,
+                    crossAxisSpacing: isMobile ? 10 : 16,
+                    mainAxisSpacing: isMobile ? 10 : 16,
                   ),
                   itemCount: filtered.length,
                   itemBuilder: (_, i) => _GuildCard(guild: filtered[i]),

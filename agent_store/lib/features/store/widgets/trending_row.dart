@@ -62,6 +62,10 @@ class _TrendingRowState extends State<TrendingRow> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 14.0 : 24.0;
+
     return Obx(() {
       final loading = _ctrl.trendingLoading.value;
       final agents = _ctrl.trendingAgents;
@@ -77,16 +81,16 @@ class _TrendingRowState extends State<TrendingRow> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+            padding: EdgeInsets.fromLTRB(hPad, isMobile ? 14 : 20, hPad, 10),
             child: Row(children: [
-              const Icon(Icons.local_fire_department_rounded,
-                  color: AppTheme.primary, size: 18),
+              Icon(Icons.local_fire_department_rounded,
+                  color: AppTheme.primary, size: isMobile ? 16 : 18),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 'TRENDING',
                 style: TextStyle(
                   color: AppTheme.textH,
-                  fontSize: 13,
+                  fontSize: isMobile ? 12 : 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
                 ),
@@ -108,8 +112,8 @@ class _TrendingRowState extends State<TrendingRow> {
                 ),
               ),
               const Spacer(),
-              // Scroll navigation arrows (web UX)
-              if (!loading && agents.isNotEmpty) ...[
+              // Scroll navigation arrows (web UX) — hide on very narrow screens
+              if (!loading && agents.isNotEmpty && screenWidth >= 400) ...[
                 _ScrollArrow(
                   icon: Icons.chevron_left_rounded,
                   enabled: _canScrollLeft,
@@ -138,12 +142,16 @@ class _TrendingRowState extends State<TrendingRow> {
   }
 
   Widget _buildShimmer() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 14.0 : 24.0;
+    final cardW = isMobile ? 130.0 : 140.0;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: hPad),
       child: Row(
         children: List.generate(6, (i) => Container(
-          width: 140,
-          margin: EdgeInsets.only(right: i < 5 ? 12 : 0),
+          width: cardW,
+          margin: EdgeInsets.only(right: i < 5 ? (isMobile ? 8 : 12) : 0),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: const LinearGradient(
@@ -168,10 +176,13 @@ class _TrendingRowState extends State<TrendingRow> {
   }
 
   Widget _buildList(List<AgentModel> agents) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 14.0 : 24.0;
     return ListView.builder(
       controller: _scrollCtrl,
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: EdgeInsets.symmetric(horizontal: hPad),
       itemCount: agents.length,
       itemBuilder: (_, i) =>
           _TrendingCard(agent: agents[i], rank: i + 1),
@@ -243,6 +254,10 @@ class _TrendingCardState extends State<_TrendingCard> {
   @override
   Widget build(BuildContext context) {
     final rc = widget.agent.rarity.color;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final cardWidth = isMobile ? 130.0 : 140.0;
+    final cardMargin = isMobile ? 8.0 : 12.0;
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -250,8 +265,8 @@ class _TrendingCardState extends State<_TrendingCard> {
         onTap: () => context.go('/agent/${widget.agent.id}'),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
-          width: 140,
-          margin: const EdgeInsets.only(right: 12),
+          width: cardWidth,
+          margin: EdgeInsets.only(right: cardMargin),
           decoration: BoxDecoration(
             color: AppTheme.card,
             borderRadius: BorderRadius.circular(12),

@@ -302,6 +302,8 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   /// Desktop layout — side-by-side: left character panel + right tabbed content
   Widget _buildDesktopLayout(AgentModel a, bool hasAccess) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final contentPad = screenWidth < 900 ? 16.0 : 24.0;
     return Row(children: [
       _buildLeftPanel(a, hasAccess),
       Expanded(
@@ -313,7 +315,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
               _buildTitleRow(a),
               const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: EdgeInsets.symmetric(horizontal: contentPad),
                 child: _buildQuickInfoBar(a),
               ),
               const SizedBox(height: 16),
@@ -462,7 +464,8 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   /// Tab bar — shared between desktop and mobile with responsive styling
   Widget _buildTabBar({required bool isMobile}) {
-    final hPad = isMobile ? 12.0 : 24.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final hPad = isMobile ? 12.0 : (screenWidth < 900 ? 16.0 : 24.0);
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
       child: TabBar(
@@ -510,7 +513,8 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   /// Tab content — shared between desktop and mobile with responsive padding
   Widget _buildTabContent(AgentModel a, bool hasAccess, {required bool isMobile}) {
-    final chatPad = isMobile ? 16.0 : 24.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final chatPad = isMobile ? 16.0 : (screenWidth < 900 ? 16.0 : 24.0);
     return TabBarView(
       controller: _tabCtrl,
       children: [
@@ -530,8 +534,11 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   Widget _buildLeftPanel(AgentModel a, bool hasAccess) {
     final rarityColor = a.rarity.color;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final panelWidth = (screenWidth * 0.3).clamp(240.0, 360.0);
+    final panelPad = screenWidth < 900 ? 20.0 : 28.0;
     return Container(
-      width: 300,
+      width: panelWidth,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -540,7 +547,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         border: const Border(right: BorderSide(color: AppTheme.border)),
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(panelPad),
         child: Column(children: [
           const SizedBox(height: 28),
           PixelCharacterWidget(
@@ -676,8 +683,9 @@ class _AgentDetailViewState extends State<_AgentDetailView>
   // ── Title Row ──────────────────────────────────────────────────────────────
 
   Widget _buildTitleRow(AgentModel a, {bool isMobile = false}) {
-    final hPad = isMobile ? 16.0 : 24.0;
-    final titleSize = isMobile ? 20.0 : 26.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final hPad = isMobile ? 16.0 : (screenWidth < 900 ? 16.0 : 24.0);
+    final titleSize = isMobile ? 20.0 : (screenWidth < 900 ? 22.0 : 26.0);
 
     // Build action buttons
     final actionButtons = [
@@ -841,10 +849,12 @@ class _AgentDetailViewState extends State<_AgentDetailView>
   }
 
   Widget _quickDivider() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dividerMargin = screenWidth < 900 ? 8.0 : 12.0;
     return Container(
       width: 1,
       height: 28,
-      margin: const EdgeInsets.symmetric(horizontal: 12),
+      margin: EdgeInsets.symmetric(horizontal: dividerMargin),
       color: AppTheme.border,
     );
   }
@@ -852,8 +862,9 @@ class _AgentDetailViewState extends State<_AgentDetailView>
   // ── Details Tab ─────────────────────────────────────────────────────────────
 
   Widget _buildDetailsTab(AgentModel a, bool hasAccess, {bool isMobile = false}) {
-    final hPad = isMobile ? 16.0 : 32.0;
-    final vPad = isMobile ? 20.0 : 28.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final hPad = isMobile ? 16.0 : (screenWidth < 900 ? 20.0 : 32.0);
+    final vPad = isMobile ? 20.0 : (screenWidth < 900 ? 20.0 : 28.0);
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, hPad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1329,7 +1340,7 @@ class _DetailLoadingSkeleton extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: ShimmerScope(
-        child: isMobile ? _buildMobileSkeleton() : _buildDesktopSkeleton(),
+        child: isMobile ? _buildMobileSkeleton() : _buildDesktopSkeleton(context),
       ),
     );
   }
@@ -1410,19 +1421,22 @@ class _DetailLoadingSkeleton extends StatelessWidget {
     );
   }
 
-  Widget _buildDesktopSkeleton() {
+  Widget _buildDesktopSkeleton(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final panelWidth = (screenWidth * 0.3).clamp(240.0, 360.0);
+    final panelPad = screenWidth < 900 ? 20.0 : 28.0;
     return Row(
       children: [
         // Left panel skeleton
         Container(
-          width: 300,
+          width: panelWidth,
           decoration: const BoxDecoration(
             color: AppTheme.surface,
             border: Border(right: BorderSide(color: AppTheme.border)),
           ),
-          child: const Padding(
-            padding: EdgeInsets.all(28),
-            child: Column(
+          child: Padding(
+            padding: EdgeInsets.all(panelPad),
+            child: const Column(
               children: [
                 SizedBox(height: 28),
                 ShimmerBox(width: 148, height: 148, radius: 14, color: AppTheme.card2),

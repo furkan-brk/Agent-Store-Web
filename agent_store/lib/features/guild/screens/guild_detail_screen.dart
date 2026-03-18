@@ -64,7 +64,7 @@ class GuildDetailScreen extends StatelessWidget {
     if (ctrl.isLoading.value) return _buildLoadingSkeleton();
     if (ctrl.error.value != null) {
       return Center(child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 64, height: 64,
@@ -118,12 +118,16 @@ class GuildDetailScreen extends StatelessWidget {
     final isCreator = ctrl.isCreator;
     final isFull = guild.memberCount >= 4;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final bodyPad = isMobile ? 12.0 : (screenWidth < 900 ? 16.0 : 24.0);
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(bodyPad),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ---- Guild Header ----
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(isMobile ? 14 : 20),
           decoration: BoxDecoration(
             color: AppTheme.card,
             borderRadius: BorderRadius.circular(14),
@@ -144,9 +148,9 @@ class GuildDetailScreen extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(guild.name, style: const TextStyle(color: AppTheme.textH, fontSize: 22, fontWeight: FontWeight.bold)),
+                Text(guild.name, style: TextStyle(color: AppTheme.textH, fontSize: isMobile ? 18 : 22, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-                Row(children: [
+                Wrap(spacing: 10, runSpacing: 6, children: [
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
@@ -159,13 +163,14 @@ class GuildDetailScreen extends StatelessWidget {
                       style: TextStyle(color: rarityColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.8),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  const Icon(Icons.group_rounded, size: 14, color: AppTheme.textM),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${guild.memberCount}/4 members',
-                    style: const TextStyle(color: AppTheme.textM, fontSize: 12),
-                  ),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.group_rounded, size: 14, color: AppTheme.textM),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${guild.memberCount}/4 members',
+                      style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+                    ),
+                  ]),
                 ]),
               ])),
             ]),
@@ -236,11 +241,11 @@ class GuildDetailScreen extends StatelessWidget {
             ],
           ]),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: isMobile ? 16 : 24),
 
         // ---- Guild Stats ----
         _Section(title: 'Guild Stats', icon: Icons.bar_chart_rounded, child: _GuildStatsRow(guild: guild)),
-        const SizedBox(height: 24),
+        SizedBox(height: isMobile ? 16 : 24),
 
         // ---- Formation ----
         _Section(
@@ -250,16 +255,16 @@ class GuildDetailScreen extends StatelessWidget {
               ? const _EmptySection(message: 'No members yet', icon: Icons.person_add_outlined)
               : TeamFormationWidget(members: guild.members),
         ),
-        const SizedBox(height: 24),
+        SizedBox(height: isMobile ? 16 : 24),
 
         // ---- Active Synergies ----
         _Section(title: 'Active Synergies', icon: Icons.bolt_rounded, child: SynergyBadgeList(synergies: d.synergy)),
-        const SizedBox(height: 24),
+        SizedBox(height: isMobile ? 16 : 24),
 
         // ---- Combined Bonuses ----
         if (d.bonuses.isNotEmpty) ...[
           _Section(title: 'Combined Stat Bonuses', icon: Icons.trending_up_rounded, child: CombinedBonusBar(bonuses: d.bonuses)),
-          const SizedBox(height: 24),
+          SizedBox(height: isMobile ? 16 : 24),
         ],
 
         // ---- Members List ----
@@ -284,7 +289,7 @@ class GuildDetailScreen extends StatelessWidget {
   Widget _buildLoadingSkeleton() {
     return ShimmerScope(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // Header skeleton
           Container(
@@ -531,8 +536,9 @@ class _GuildStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFull = guild.memberCount >= 4;
     final slotColor = isFull ? AppTheme.primary : const Color(0xFF5A8A48);
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isMobile ? 10 : 16),
       decoration: BoxDecoration(
         color: AppTheme.surface,
         borderRadius: BorderRadius.circular(12),

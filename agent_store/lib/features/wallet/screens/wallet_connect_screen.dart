@@ -13,15 +13,25 @@ class WalletConnectScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ctrl = AuthController.to;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final containerWidth = screenWidth < 520 ? double.infinity : 480.0;
+    final padding = isMobile ? 20.0 : 36.0;
+    final horizontalMargin = isMobile ? 16.0 : 0.0;
+    final verticalMargin = isMobile ? 16.0 : 32.0;
+
     return Obx(() => Scaffold(
       backgroundColor: AppTheme.bg,
       body: Center(child: SingleChildScrollView(child: Container(
-        width: 480,
-        padding: const EdgeInsets.all(36),
-        margin: const EdgeInsets.symmetric(vertical: 32),
+        width: containerWidth,
+        padding: EdgeInsets.all(padding),
+        margin: EdgeInsets.symmetric(
+          vertical: verticalMargin,
+          horizontal: horizontalMargin,
+        ),
         decoration: BoxDecoration(
           color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
           border: Border.all(color: AppTheme.border2),
           boxShadow: [
             BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 40, spreadRadius: 4),

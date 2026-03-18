@@ -252,13 +252,16 @@ class _StoreScreenState extends State<StoreScreen> {
       ]),
       const SizedBox(height: 8),
       Obx(() => Padding(
-        padding: const EdgeInsets.only(left: 16),
+        padding: EdgeInsets.only(left: isMobile ? 12 : 16),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.auto_awesome, size: 14, color: AppTheme.gold),
           const SizedBox(width: 6),
-          Text(
-            '${_ctrl.total.value} agents available',
-            style: const TextStyle(color: AppTheme.textM, fontSize: 13, letterSpacing: 0.2),
+          Flexible(
+            child: Text(
+              '${_ctrl.total.value} agents available',
+              style: TextStyle(color: AppTheme.textM, fontSize: isMobile ? 12 : 13, letterSpacing: 0.2),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ]),
       )),

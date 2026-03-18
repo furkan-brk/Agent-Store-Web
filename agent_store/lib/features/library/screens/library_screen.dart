@@ -160,10 +160,13 @@ class _LibraryScreenState extends State<LibraryScreen>
     final short = wallet.length > 10
         ? '${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}'
         : wallet;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 14.0 : 24.0;
 
     return Obx(() => Container(
           color: AppTheme.surface,
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          padding: EdgeInsets.fromLTRB(hPad, isMobile ? 16 : 24, hPad, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -171,27 +174,27 @@ class _LibraryScreenState extends State<LibraryScreen>
               Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: isMobile ? 32 : 36,
+                    height: isMobile ? 32 : 36,
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                           color: AppTheme.primary.withValues(alpha: 0.3)),
                     ),
-                    child: const Icon(Icons.collections_bookmark_rounded,
-                        color: AppTheme.primary, size: 18),
+                    child: Icon(Icons.collections_bookmark_rounded,
+                        color: AppTheme.primary, size: isMobile ? 16 : 18),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'My Library',
                           style: TextStyle(
                             color: AppTheme.textH,
-                            fontSize: 20,
+                            fontSize: isMobile ? 18 : 20,
                             fontWeight: FontWeight.bold,
                             letterSpacing: -0.3,
                           ),
@@ -205,21 +208,31 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ],
                     ),
                   ),
-                  // Stats chips
-                  _statChip(Icons.bolt, '${_ctrl.credits.value}', AppTheme.gold,
-                      'credits'),
-                  const SizedBox(width: 12),
-                  _statChip(Icons.auto_awesome_outlined,
-                      '${_ctrl.created.length}', AppTheme.primary, 'created'),
-                  const SizedBox(width: 12),
-                  _statChip(Icons.bookmark_border, '${_ctrl.totalSaves}',
-                      AppTheme.primary, 'saves'),
                 ],
               ),
-              const SizedBox(height: 16),
+              // Stats chips row — scrollable on mobile
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _statChip(Icons.bolt, '${_ctrl.credits.value}',
+                        AppTheme.gold, 'credits'),
+                    SizedBox(width: isMobile ? 8 : 12),
+                    _statChip(Icons.auto_awesome_outlined,
+                        '${_ctrl.created.length}', AppTheme.primary, 'created'),
+                    SizedBox(width: isMobile ? 8 : 12),
+                    _statChip(Icons.bookmark_border, '${_ctrl.totalSaves}',
+                        AppTheme.primary, 'saves'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               // Tabs
               TabBar(
                 controller: _tabCtrl,
+                isScrollable: isMobile,
+                tabAlignment: isMobile ? TabAlignment.start : null,
                 tabs: [
                   Tab(text: 'Saved (${_ctrl.saved.length})'),
                   Tab(text: 'Created (${_ctrl.created.length})'),
@@ -250,14 +263,17 @@ class _LibraryScreenState extends State<LibraryScreen>
   // ── Loading Skeleton ──────────────────────────────────────────────────────
 
   Widget _buildLoadingSkeleton() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 12.0 : 20.0;
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         // Skeleton search bar placeholder
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: ShimmerBox(
+            padding: EdgeInsets.fromLTRB(hPad, 16, hPad, 8),
+            child: const ShimmerBox(
               width: double.infinity,
               height: 44,
               radius: 10,
@@ -267,21 +283,41 @@ class _LibraryScreenState extends State<LibraryScreen>
         ),
         // Skeleton grid
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 20),
           sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 300,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.72,
-            ),
+            gridDelegate: _responsiveGridDelegate(screenWidth),
             delegate: SliverChildBuilderDelegate(
               (_, __) => const AgentCardSkeleton(),
-              childCount: 8,
+              childCount: isMobile ? 6 : 8,
             ),
           ),
         ),
       ],
+    );
+  }
+
+  /// Responsive grid delegate based on available width.
+  SliverGridDelegate _responsiveGridDelegate(double width) {
+    if (width < 500) {
+      return const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 0.68,
+      );
+    } else if (width < 900) {
+      return const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 240,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.70,
+      );
+    }
+    return const SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 300,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      childAspectRatio: 0.72,
     );
   }
 
@@ -324,6 +360,9 @@ class _LibraryScreenState extends State<LibraryScreen>
         final baseList = _ctrl.filteredSaved;
         final filtered = _applyFilters(baseList);
         final categories = _uniqueCategories(_ctrl.saved);
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final hPad = isMobile ? 12.0 : 20.0;
 
         if (_ctrl.saved.isEmpty && _searchQuery.isEmpty) {
           return _buildEmptySavedState();
@@ -341,16 +380,19 @@ class _LibraryScreenState extends State<LibraryScreen>
             // Count indicator
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 12),
                 child: Row(
                   children: [
                     const Icon(Icons.grid_view_rounded,
                         size: 13, color: AppTheme.textM),
                     const SizedBox(width: 6),
-                    Text(
-                      '${filtered.length} agent${filtered.length == 1 ? '' : 's'}${_searchQuery.isNotEmpty || _filterCategory.isNotEmpty ? ' found' : ' in your library'}',
-                      style: const TextStyle(
-                          color: AppTheme.textM, fontSize: 12),
+                    Expanded(
+                      child: Text(
+                        '${filtered.length} agent${filtered.length == 1 ? '' : 's'}${_searchQuery.isNotEmpty || _filterCategory.isNotEmpty ? ' found' : ' in your library'}',
+                        style: const TextStyle(
+                            color: AppTheme.textM, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -360,38 +402,41 @@ class _LibraryScreenState extends State<LibraryScreen>
             if (filtered.isEmpty)
               SliverFillRemaining(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.search_off_rounded,
-                          color: AppTheme.border2, size: 48),
-                      const SizedBox(height: 12),
-                      const Text('No matching agents',
-                          style: TextStyle(
-                              color: AppTheme.textB, fontSize: 16)),
-                      const SizedBox(height: 6),
-                      const Text(
-                          'Try adjusting your search or filters',
-                          style: TextStyle(
-                              color: AppTheme.textM, fontSize: 12)),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () {
-                          _clearSearch();
-                          setState(() {
-                            _filterCategory = '';
-                            _sortBy = 'newest';
-                          });
-                        },
-                        child: const Text('Clear all filters'),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: hPad),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.search_off_rounded,
+                            color: AppTheme.border2, size: 48),
+                        const SizedBox(height: 12),
+                        const Text('No matching agents',
+                            style: TextStyle(
+                                color: AppTheme.textB, fontSize: 16)),
+                        const SizedBox(height: 6),
+                        const Text(
+                            'Try adjusting your search or filters',
+                            style: TextStyle(
+                                color: AppTheme.textM, fontSize: 12)),
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: () {
+                            _clearSearch();
+                            setState(() {
+                              _filterCategory = '';
+                              _sortBy = 'newest';
+                            });
+                          },
+                          child: const Text('Clear all filters'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               )
             else
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 20),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
                     (ctx, i) {
@@ -412,13 +457,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     },
                     childCount: filtered.length,
                   ),
-                  gridDelegate:
-                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 300,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.72,
-                  ),
+                  gridDelegate: _responsiveGridDelegate(screenWidth),
                 ),
               ),
           ],
@@ -426,9 +465,10 @@ class _LibraryScreenState extends State<LibraryScreen>
       });
 
   Widget _buildEmptySavedState() {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -473,8 +513,11 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   Widget _buildSearchAndSort(List<String> categories) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 12.0 : 20.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
       child: Column(
         children: [
           // Search bar + sort dropdown
@@ -652,8 +695,12 @@ class _LibraryScreenState extends State<LibraryScreen>
     });
   }
 
-  Widget _buildCollectionsSection() => Obx(() => Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+  Widget _buildCollectionsSection() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final hPad = isMobile ? 12.0 : 20.0;
+    return Obx(() => Container(
+        padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -775,6 +822,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           ],
         ),
       ));
+  }
 
   void _showNewCollectionDialog() {
     showDialog<void>(
@@ -842,12 +890,10 @@ class _LibraryScreenState extends State<LibraryScreen>
           libraryCount: _ctrl.saved.length,
           credits: _ctrl.credits.value,
         );
-        const gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 300,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          childAspectRatio: 0.72,
-        );
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isMobile = screenWidth < 600;
+        final hPad = isMobile ? 12.0 : 20.0;
+        final gridDelegate = _responsiveGridDelegate(screenWidth);
         final wallet = WalletService.instance.connectedWallet;
 
         if (_ctrl.created.isEmpty) {
@@ -856,14 +902,14 @@ class _LibraryScreenState extends State<LibraryScreen>
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 0),
                   child: AchievementRow(achievements: achievements),
                 ),
               ),
               SliverFillRemaining(
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 40),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -920,30 +966,33 @@ class _LibraryScreenState extends State<LibraryScreen>
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 8),
                 child: AchievementRow(achievements: achievements),
               ),
             ),
             // Created count
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
                 child: Row(
                   children: [
                     const Icon(Icons.grid_view_rounded,
                         size: 13, color: AppTheme.textM),
                     const SizedBox(width: 6),
-                    Text(
-                      '${_ctrl.created.length} agent${_ctrl.created.length == 1 ? '' : 's'} created',
-                      style: const TextStyle(
-                          color: AppTheme.textM, fontSize: 12),
+                    Expanded(
+                      child: Text(
+                        '${_ctrl.created.length} agent${_ctrl.created.length == 1 ? '' : 's'} created',
+                        style: const TextStyle(
+                            color: AppTheme.textM, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 20),
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) {
