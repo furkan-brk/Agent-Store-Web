@@ -193,6 +193,15 @@ services:
 - [x] **v2.5 — Blockchain Credits + Leaderboard** (Backend + Frontend) → Blok 6 + 8 ✅
 - [x] **v2.6 — Docker rebuild + E2E test** (Team Leader) ✅ 9/9 container UP, 20 E2E test passed
 - [x] **v3.0 — Legend: Touch/Touchpad + Claude Agent Export + Live Claude Execution** (Frontend + Backend) ✅ 16 task
+- [x] **v3.1 — UX Improvement Sprint** (Frontend) ✅ Guild emoji→Material Icon, keyboard nav, Mission redesign, hover consistency
+
+## v3.1 UX Sprint Detaylari (2026-03-22)
+4 feature, 13 task tamamlandi:
+- **Guild Emoji Migration**: roleIcon emoji (Unicode) → Material Icons (IconData + Color getters), member role icons → Icons.psychology/shield/bolt/lightbulb/gps_fixed
+- **Keyboard Navigation**: Sidebar FocusTraversalGroup + FocusableActionDetector, Store grid FocusableActionDetector, Alt+Backspace browser back, `/` search focus, Escape dismiss, Enter activate
+- **Mission Redesign**: Page header icon, search bar, category filter chips, stat row, card-based layout, hover effects, skeleton loading, edit/duplicate/delete CRUD, empty state
+- **UX Consistency**: Hover effects on all screens (store, guild, mission, leaderboard), all text English, Store dual sidebar preserved
+- **Yeni**: AppShellState.searchFocusNode (cross-widget search focus), _GoBackIntent (Alt+Backspace)
 
 ## v3.0 Legend Sprint Detaylari (2026-03-22)
 3 feature, 16 task tamamlandi:

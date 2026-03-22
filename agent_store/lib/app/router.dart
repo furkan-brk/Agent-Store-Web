@@ -51,6 +51,10 @@ class _FocusSearchIntent extends Intent {
   const _FocusSearchIntent();
 }
 
+class _GoBackIntent extends Intent {
+  const _GoBackIntent();
+}
+
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -129,6 +133,13 @@ class _AppShell extends StatefulWidget {
   State<_AppShell> createState() => _AppShellState();
 }
 
+/// Provides access to shared app-level state for keyboard shortcuts.
+class AppShellState {
+  /// The store screen registers its search FocusNode here so that
+  /// the '/' shortcut can request focus cross-widget.
+  static FocusNode? searchFocusNode;
+}
+
 class _AppShellState extends State<_AppShell> {
   @override
   Widget build(BuildContext context) {
@@ -146,6 +157,7 @@ class _AppShellState extends State<_AppShell> {
         SingleActivator(LogicalKeyboardKey.keyW, alt: true): _GoLegendIntent(),
         SingleActivator(LogicalKeyboardKey.escape): _DismissIntent(),
         SingleActivator(LogicalKeyboardKey.slash): _FocusSearchIntent(),
+        SingleActivator(LogicalKeyboardKey.backspace, alt: true): _GoBackIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -187,7 +199,19 @@ class _AppShellState extends State<_AppShell> {
           ),
           _FocusSearchIntent: CallbackAction<_FocusSearchIntent>(
             onInvoke: (_) {
-              // Search focus requires cross-widget state — left as no-op for now
+              // Navigate to store and request focus on the search field
+              final currentLoc = GoRouterState.of(context).uri.toString();
+              if (currentLoc != '/') context.go('/');
+              // Use the shared search focus node
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                AppShellState.searchFocusNode?.requestFocus();
+              });
+              return null;
+            },
+          ),
+          _GoBackIntent: CallbackAction<_GoBackIntent>(
+            onInvoke: (_) {
+              Navigator.of(context).maybePop();
               return null;
             },
           ),

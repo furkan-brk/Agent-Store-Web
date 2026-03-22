@@ -14,6 +14,7 @@ import '../widgets/trending_row.dart';
 import '../../../shared/widgets/onboarding_modal.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../character/character_types.dart';
+import '../../../app/router.dart';
 
 class StoreScreen extends StatefulWidget {
   const StoreScreen({super.key});
@@ -37,6 +38,7 @@ class _StoreScreenState extends State<StoreScreen> {
     _ctrl = Get.isRegistered<StoreController>()
         ? Get.find<StoreController>()
         : Get.put(StoreController(), permanent: true);
+    AppShellState.searchFocusNode = _searchFocus;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (await OnboardingModal.shouldShow() && mounted) {
         showDialog(context: context, barrierDismissible: false, builder: (_) => const OnboardingModal());
@@ -76,6 +78,9 @@ class _StoreScreenState extends State<StoreScreen> {
 
   @override
   void dispose() {
+    if (AppShellState.searchFocusNode == _searchFocus) {
+      AppShellState.searchFocusNode = null;
+    }
     _searchCtrl.dispose();
     _searchFocus.dispose();
     super.dispose();
