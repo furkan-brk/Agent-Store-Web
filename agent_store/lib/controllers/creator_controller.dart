@@ -7,10 +7,22 @@ class CreatorController extends GetxController {
   final agents = <AgentModel>[].obs;
   final isLoading = true.obs;
   final error = RxnString();
+  final searchQuery = ''.obs;
 
   int get totalSaves => agents.fold(0, (s, a) => s + a.saveCount);
   int get totalUses => agents.fold(0, (s, a) => s + a.useCount);
   double get totalRevenue => agents.fold(0.0, (s, a) => s + (a.price > 0 ? a.price : 0.0));
+
+  void setSearchQuery(String q) => searchQuery.value = q;
+
+  List<AgentModel> get filteredAgents {
+    if (searchQuery.value.isEmpty) return agents;
+    final q = searchQuery.value.toLowerCase();
+    return agents.where((a) =>
+      a.title.toLowerCase().contains(q) ||
+      a.description.toLowerCase().contains(q)
+    ).toList();
+  }
 
   @override
   void onInit() {

@@ -1,5 +1,6 @@
 // lib/features/legend/services/legend_service.dart
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../models/workflow_models.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_kv_store.dart';
+import '../../../shared/services/mission_service.dart' show SyncStatus;
 import '../../../shared/services/notification_service.dart';
 
 class LegendService {
@@ -30,6 +32,15 @@ class LegendService {
 
   List<LegendWorkflow> get workflows => List.unmodifiable(_workflows);
 
+  // ── Sync status tracking ────────────────────────────────────────────
+  final ValueNotifier<SyncStatus> syncStatusNotifier = ValueNotifier(SyncStatus.synced);
+  SyncStatus get syncStatus => syncStatusNotifier.value;
+  String? _syncError;
+  String? get syncError => _syncError;
+  DateTime? _lastSyncTime;
+  DateTime? get lastSyncTime => _lastSyncTime;
+  Timer? _periodicSyncTimer;
+
   Future<void> init() async {
     _currentWallet = (await LocalKvStore.instance.getString('wallet_address'))?.toLowerCase();
     await _migrateLegacyKey();
@@ -51,34 +62,65 @@ class LegendService {
 
     if (newWallet == null) {
       _workflows = [];
+      _stopPeriodicSync();
       return;
     }
 
     await refresh();
+    _startPeriodicSync();
+  }
+
+  void _startPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (ApiService.instance.isAuthenticated &&
+          (syncStatus == SyncStatus.failed || syncStatus == SyncStatus.pending)) {
+        forceSyncToBackend();
+      }
+    });
+  }
+
+  void _stopPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
   }
 
   Future<void> refresh() async {
     final local = await _loadLocal();
     if (ApiService.instance.isAuthenticated) {
+      syncStatusNotifier.value = SyncStatus.syncing;
+      _syncError = null;
       List<LegendWorkflow> remote = <LegendWorkflow>[];
 
-      if (local.isNotEmpty) {
-        remote = await ApiService.instance.batchSyncLegendWorkflows(local);
+      try {
+        if (local.isNotEmpty) {
+          remote = await ApiService.instance.retry(
+            () => ApiService.instance.batchSyncLegendWorkflows(local),
+          );
+        }
+
+        if (remote.isEmpty) {
+          remote = await ApiService.instance.retry(
+            () => ApiService.instance.getLegendWorkflows(),
+          );
+        }
+      } catch (e) {
+        debugPrint('LegendService: retry exhausted — $e');
       }
 
-      if (remote.isEmpty) {
-        remote = await ApiService.instance.getLegendWorkflows();
-      }
-
-      // Detect sync failure: authenticated + remote empty + local non-empty
       if (remote.isEmpty && local.isNotEmpty) {
         debugPrint('LegendService: sync failed — ${local.length} workflows saved locally only');
+        _syncError = 'Sync failed — ${local.length} workflows saved locally only';
+        syncStatusNotifier.value = SyncStatus.failed;
         await NotificationService.instance.add(
           'Workflow sync failed — ${local.length} workflows saved locally only',
           type: 'info',
         );
       } else {
         debugPrint('LegendService: sync OK — ${remote.length} remote, ${local.length} local');
+        _syncError = null;
+        _lastSyncTime = DateTime.now();
+        syncStatusNotifier.value = SyncStatus.synced;
       }
 
       _workflows = _mergeWorkflows(local, remote);
@@ -88,6 +130,34 @@ class LegendService {
     }
     _workflows = local;
     _sortWorkflows();
+    syncStatusNotifier.value = SyncStatus.pending;
+  }
+
+  /// Force re-sync all local workflows to the backend.
+  Future<void> forceSyncToBackend() async {
+    if (!ApiService.instance.isAuthenticated || _workflows.isEmpty) return;
+    syncStatusNotifier.value = SyncStatus.syncing;
+    _syncError = null;
+
+    try {
+      final remote = await ApiService.instance.retry(
+        () => ApiService.instance.batchSyncLegendWorkflows(_workflows),
+      );
+      if (remote.isNotEmpty) {
+        _workflows = remote;
+        _sortWorkflows();
+        await _persistLocal();
+        _lastSyncTime = DateTime.now();
+        syncStatusNotifier.value = SyncStatus.synced;
+        _syncError = null;
+        debugPrint('LegendService: force sync OK — ${remote.length} workflows');
+        return;
+      }
+    } catch (e) {
+      debugPrint('LegendService: force sync failed — $e');
+    }
+    _syncError = 'Sync failed — please try again later';
+    syncStatusNotifier.value = SyncStatus.failed;
   }
 
   Future<void> _migrateLegacyKey() async {

@@ -3,6 +3,7 @@
 import 'package:agent_store/features/character/character_types.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/animations.dart';
 import '../../../app/theme.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
@@ -44,12 +45,12 @@ class _AgentCardState extends State<AgentCard> {
       },
       child: AnimatedScale(
         scale: _hovered ? 1.02 : 1.0,
-        duration: const Duration(milliseconds: 180),
+        duration: AppAnimations.hoverDuration,
         curve: Curves.easeOut,
         child: GestureDetector(
           onTap: () => context.go('/agent/${agent.id}'),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: AppAnimations.hoverDuration,
             decoration: BoxDecoration(
               color: AppTheme.card,
               borderRadius: BorderRadius.circular(14),
@@ -364,7 +365,7 @@ class _CharacterBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: AppAnimations.hoverDuration,
         height: 155,
         decoration: BoxDecoration(
           borderRadius:

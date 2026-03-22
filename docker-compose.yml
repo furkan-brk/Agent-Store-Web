@@ -52,6 +52,8 @@ services:
         condition: service_healthy
       agentsvc:
         condition: service_healthy
+      workspacesvc:
+        condition: service_healthy
     restart: unless-stopped
 
   authsvc:

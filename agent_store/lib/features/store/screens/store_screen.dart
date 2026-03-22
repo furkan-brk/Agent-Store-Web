@@ -9,7 +9,9 @@ import '../../../shared/services/api_service.dart';
 import '../../../shared/widgets/wallet_guard.dart';
 import '../widgets/agent_card.dart';
 import '../widgets/category_chips.dart';
+import '../widgets/category_sidebar.dart';
 import '../widgets/filter_panel.dart';
+import '../widgets/filter_sidebar.dart';
 import '../widgets/trending_row.dart';
 import '../../../shared/widgets/onboarding_modal.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
@@ -91,48 +93,191 @@ class _StoreScreenState extends State<StoreScreen> {
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: ShimmerScope(
-        child: Stack(
-          children: [
-            RefreshIndicator(
-              onRefresh: _ctrl.load,
-              color: AppTheme.primary,
-              child: CustomScrollView(cacheExtent: 1200, slivers: [
-                // Header is purely driven by TextEditingController + inner Obx calls.
-                SliverToBoxAdapter(child: _buildHeader()),
-                // Inline category chips — replaces the old sidebar
-                SliverToBoxAdapter(child: _buildCategoryChips()),
-                // TrendingRow: only hide/show when search changes.
-                Obx(() => _ctrl.search.value.isEmpty
-                  ? const SliverToBoxAdapter(child: TrendingRow())
-                  : const SliverToBoxAdapter(child: SizedBox.shrink())),
-                // Discovery: only visible with empty search + no category + not loading.
-                Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
-                  ? SliverToBoxAdapter(child: _buildDiscovery())
-                  : const SliverToBoxAdapter(child: SizedBox.shrink())),
-                // Section heading with divider
-                SliverToBoxAdapter(child: _buildSectionHeader()),
-                // Main content sliver: rebuilds ONLY when isLoading/agents/hasError change.
-                Obx(() => _buildContentSliver()),
-                // End-of-list spacer
-                Obx(() => (_ctrl.agents.isNotEmpty && !_ctrl.isLoading.value)
-                  ? SliverToBoxAdapter(child: _buildEndOfList())
-                  : const SliverToBoxAdapter(child: SizedBox.shrink())),
-              ]),
-            ),
-            // Subtle loading indicator overlay when refreshing with stale data
-            Obx(() => (_ctrl.isLoading.value && _ctrl.agents.isNotEmpty)
-              ? Positioned(
-                  top: 0, left: 0, right: 0,
-                  child: LinearProgressIndicator(
-                    backgroundColor: Colors.transparent,
-                    valueColor: AlwaysStoppedAnimation(AppTheme.primary.withValues(alpha: 0.7)),
-                    minHeight: 2,
-                  ),
-                )
-              : const SizedBox.shrink()),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth > 1024;
+
+            if (isDesktop) {
+              return _buildDesktopLayout();
+            }
+            return _buildDefaultLayout();
+          },
         ),
       ),
+    );
+  }
+
+  /// Default layout for tablet (768-1024) and mobile (<768).
+  /// Inline CategoryChips, collapsible FilterPanel, horizontal TrendingRow.
+  Widget _buildDefaultLayout() {
+    return Stack(
+      children: [
+        RefreshIndicator(
+          onRefresh: _ctrl.load,
+          color: AppTheme.primary,
+          child: CustomScrollView(cacheExtent: 1200, slivers: [
+            SliverToBoxAdapter(child: _buildHeader()),
+            SliverToBoxAdapter(child: _buildCategoryChips()),
+            Obx(() => _ctrl.search.value.isEmpty
+              ? const SliverToBoxAdapter(child: TrendingRow())
+              : const SliverToBoxAdapter(child: SizedBox.shrink())),
+            Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
+              ? SliverToBoxAdapter(child: _buildDiscovery())
+              : const SliverToBoxAdapter(child: SizedBox.shrink())),
+            SliverToBoxAdapter(child: _buildSectionHeader()),
+            Obx(() => _buildContentSliver()),
+            Obx(() => (_ctrl.agents.isNotEmpty && !_ctrl.isLoading.value)
+              ? SliverToBoxAdapter(child: _buildEndOfList())
+              : const SliverToBoxAdapter(child: SizedBox.shrink())),
+          ]),
+        ),
+        Obx(() => (_ctrl.isLoading.value && _ctrl.agents.isNotEmpty)
+          ? Positioned(
+              top: 0, left: 0, right: 0,
+              child: LinearProgressIndicator(
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation(AppTheme.primary.withValues(alpha: 0.7)),
+                minHeight: 2,
+              ),
+            )
+          : const SizedBox.shrink()),
+      ],
+    );
+  }
+
+  /// Desktop 3-column layout (>1024px):
+  /// Left: StoreCategorySidebar (200px) | Center: header + grid | Right: StoreFilterSidebar (260px)
+  Widget _buildDesktopLayout() {
+    return Row(
+      children: [
+        // Left: category sidebar
+        const StoreCategorySidebar(),
+        // Center: main content (no inline chips, filter panel, or trending row)
+        Expanded(
+          child: Stack(
+            children: [
+              RefreshIndicator(
+                onRefresh: _ctrl.load,
+                color: AppTheme.primary,
+                child: CustomScrollView(cacheExtent: 1200, slivers: [
+                  // Header with search bar only (filter button hidden on desktop)
+                  SliverToBoxAdapter(child: _buildDesktopHeader()),
+                  // Discovery section (no category chips or trending row — those are in sidebars)
+                  Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
+                    ? SliverToBoxAdapter(child: _buildDiscovery())
+                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                  // Section heading with divider
+                  SliverToBoxAdapter(child: _buildSectionHeader()),
+                  // Main content grid
+                  Obx(() => _buildContentSliver()),
+                  // End-of-list spacer
+                  Obx(() => (_ctrl.agents.isNotEmpty && !_ctrl.isLoading.value)
+                    ? SliverToBoxAdapter(child: _buildEndOfList())
+                    : const SliverToBoxAdapter(child: SizedBox.shrink())),
+                ]),
+              ),
+              // Loading indicator overlay
+              Obx(() => (_ctrl.isLoading.value && _ctrl.agents.isNotEmpty)
+                ? Positioned(
+                    top: 0, left: 0, right: 0,
+                    child: LinearProgressIndicator(
+                      backgroundColor: Colors.transparent,
+                      valueColor: AlwaysStoppedAnimation(AppTheme.primary.withValues(alpha: 0.7)),
+                      minHeight: 2,
+                    ),
+                  )
+                : const SizedBox.shrink()),
+            ],
+          ),
+        ),
+        // Right: filter + trending sidebar
+        const StoreFilterSidebar(),
+      ],
+    );
+  }
+
+  /// Simplified header for desktop layout — no sort dropdown or filter button
+  /// (those are in the right sidebar).
+  Widget _buildDesktopHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Title row with accent decoration
+        Row(children: [
+          Container(
+            width: 4, height: 28,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppTheme.primary, AppTheme.gold],
+              ),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              'Discover Agents',
+              style: TextStyle(
+                color: AppTheme.textH,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Obx(() => Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.auto_awesome, size: 14, color: AppTheme.gold),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                '${_ctrl.total.value} agents available',
+                style: const TextStyle(color: AppTheme.textM, fontSize: 13, letterSpacing: 0.2),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ]),
+        )),
+        const SizedBox(height: 20),
+        // Search field only — sort/filter are in sidebar
+        _buildSearchField(),
+        // Recent searches
+        Obx(() => _ctrl.recentSearches.isNotEmpty && _ctrl.search.value.isEmpty ? Padding(
+          padding: const EdgeInsets.only(top: 14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.card.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.border.withValues(alpha: 0.5)),
+            ),
+            child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+              const Icon(Icons.history_rounded, size: 13, color: AppTheme.textM),
+              const SizedBox(width: 8),
+              const Text('Recent:', style: TextStyle(color: AppTheme.textM, fontSize: 11, fontWeight: FontWeight.w500)),
+              const SizedBox(width: 10),
+              ..._ctrl.recentSearches.map((s) => Padding(padding: const EdgeInsets.only(right: 6), child: ActionChip(
+                label: Text(s, style: const TextStyle(fontSize: 10, color: AppTheme.textB)),
+                onPressed: () { _searchCtrl.text = s; _ctrl.submitSearch(s); },
+                backgroundColor: AppTheme.card2, side: const BorderSide(color: AppTheme.border),
+                padding: const EdgeInsets.symmetric(horizontal: 6), visualDensity: VisualDensity.compact,
+              ))),
+              TextButton.icon(
+                onPressed: _ctrl.clearRecentSearches,
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6), minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                icon: const Icon(Icons.close_rounded, size: 11, color: AppTheme.textM),
+                label: const Text('Clear', style: TextStyle(fontSize: 10, color: AppTheme.textM)),
+              ),
+            ])),
+          ),
+        ) : const SizedBox.shrink()),
+        const SizedBox(height: 4),
+      ]),
     );
   }
 

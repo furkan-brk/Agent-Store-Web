@@ -10,6 +10,7 @@ import '../../../shared/services/api_service.dart';
 import '../../../shared/services/collection_service.dart';
 import '../../../shared/services/wallet_service.dart';
 import '../../../shared/widgets/achievement_badge.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../store/widgets/agent_card.dart';
 
@@ -641,58 +642,35 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
-  void _confirmRemoveAgent(AgentModel agent) {
-    showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppTheme.border2),
-        ),
-        title: const Text('Remove from Library',
-            style: TextStyle(color: AppTheme.textH, fontSize: 18)),
-        content: Text(
-          'Remove "${agent.title}" from your library?',
-          style: const TextStyle(color: AppTheme.textB, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style:
-                FilledButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    ).then((confirmed) async {
-      if (confirmed == true) {
-        final ok =
-            await ApiService.instance.removeFromLibrary(agent.id);
-        if (mounted) {
-          if (ok) {
-            _ctrl.load();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('"${agent.title}" removed from library'),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to remove agent. Try again.'),
-              ),
-            );
-          }
+  void _confirmRemoveAgent(AgentModel agent) async {
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Remove from Library',
+      message: 'Remove "${agent.title}" from your library?',
+      confirmLabel: 'Remove',
+      isDestructive: true,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (confirmed) {
+      final ok = await ApiService.instance.removeFromLibrary(agent.id);
+      if (mounted) {
+        if (ok) {
+          _ctrl.load();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('"${agent.title}" removed from library'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to remove agent. Try again.'),
+            ),
+          );
         }
       }
-    });
+    }
   }
 
   Widget _buildCollectionsSection() {

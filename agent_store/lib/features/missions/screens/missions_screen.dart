@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/mission_service.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/widgets/error_state.dart';
+import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
 
 class _CategoryDef {
@@ -33,6 +36,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
   String _searchQuery = '';
   String _selectedCategory = 'All';
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -41,8 +45,17 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _loadMissions() async {
-    setState(() => _isLoading = true);
-    await MissionService.instance.refresh();
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      await MissionService.instance.refresh();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Failed to load missions: $e');
+      }
+    }
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -99,30 +112,15 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _deleteMission(MissionModel mission) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Mission?', style: TextStyle(color: AppTheme.textH, fontWeight: FontWeight.bold)),
-        content: Text(
-          'Are you sure you want to delete "#${mission.slug}"? This cannot be undone.',
-          style: const TextStyle(color: AppTheme.textB),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: AppTheme.textH),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Mission?',
+      message: 'Are you sure you want to delete "#${mission.slug}"? This cannot be undone.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+      icon: Icons.delete_outline_rounded,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await MissionService.instance.deleteMission(mission.id);
     if (mounted) {
       setState(() {});
@@ -229,58 +227,33 @@ class _MissionsScreenState extends State<MissionsScreen> {
         padding: EdgeInsets.all(bodyPad),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           // -- Page header
-          Row(children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.flag_rounded, color: AppTheme.primary, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(
-                  'Missions',
-                  style: TextStyle(
-                    color: AppTheme.textH,
-                    fontSize: isMobile ? 20 : 24,
-                    fontWeight: FontWeight.bold,
+          PageHeader(
+            icon: Icons.flag_rounded,
+            title: 'Missions',
+            subtitle: 'Save reusable task definitions here. Reference them in chats with #slug.',
+            trailing: isMobile
+                ? IconButton(
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: AppTheme.textH,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _showCreateDialog,
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    tooltip: 'Create Mission',
+                  )
+                : FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: AppTheme.textH,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: _showCreateDialog,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('Create Mission', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                ),
-                const SizedBox(height: 2),
-                const Text(
-                  'Save reusable task definitions here. Reference them in chats with #slug.',
-                  style: TextStyle(color: AppTheme.textM, fontSize: 13),
-                ),
-              ]),
-            ),
-            if (isMobile)
-              IconButton(
-                style: IconButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: AppTheme.textH,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: _showCreateDialog,
-                icon: const Icon(Icons.add_rounded, size: 20),
-                tooltip: 'Create Mission',
-              )
-            else
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: AppTheme.textH,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: _showCreateDialog,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Create Mission', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-          ]),
+          ),
           SizedBox(height: isMobile ? 14 : 20),
 
           // -- Search bar
@@ -344,6 +317,50 @@ class _MissionsScreenState extends State<MissionsScreen> {
               ]),
             ),
 
+          // -- Sync status banner
+          ValueListenableBuilder<SyncStatus>(
+            valueListenable: MissionService.instance.syncStatusNotifier,
+            builder: (_, status, __) => switch (status) {
+              SyncStatus.failed => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.gold.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.cloud_off_rounded, color: AppTheme.gold, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          MissionService.instance.syncError ?? 'Sync failed',
+                          style: const TextStyle(color: AppTheme.gold, fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => MissionService.instance.forceSyncToBackend(),
+                        child: const Text('Retry Sync', style: TextStyle(color: AppTheme.gold, fontWeight: FontWeight.w600)),
+                      ),
+                    ]),
+                  ),
+                ),
+              SyncStatus.syncing => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: const LinearProgressIndicator(
+                      minHeight: 3,
+                      color: AppTheme.primary,
+                      backgroundColor: AppTheme.border,
+                    ),
+                  ),
+                ),
+              _ => const SizedBox.shrink(),
+            },
+          ),
+
           // -- Category filter chips
           if (!_isLoading && missions.isNotEmpty)
             Padding(
@@ -399,6 +416,13 @@ class _MissionsScreenState extends State<MissionsScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, __) => const _MissionCardSkeleton(),
                 ),
+              ),
+            )
+          else if (_error != null)
+            Expanded(
+              child: ErrorState(
+                message: _error!,
+                onRetry: _loadMissions,
               ),
             )
           else if (missions.isEmpty)

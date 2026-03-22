@@ -6,6 +6,7 @@ import 'package:agent_store/features/character/character_types.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/animations.dart';
 import '../../../app/theme.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../shared/models/agent_model.dart';
@@ -60,12 +61,12 @@ class _AgentCardV2State extends State<AgentCardV2> {
       },
       child: AnimatedScale(
         scale: _hovered ? 1.02 : 1.0,
-        duration: const Duration(milliseconds: 180),
+        duration: AppAnimations.hoverDuration,
         curve: Curves.easeOut,
         child: GestureDetector(
           onTap: () => context.go('/agent/${agent.id}'),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: AppAnimations.hoverDuration,
             decoration: BoxDecoration(
               color: AppTheme.card,
               borderRadius: BorderRadius.circular(14),
@@ -289,7 +290,7 @@ class _BackgroundBanner extends StatelessWidget {
             // Background image (or gradient fallback)
             Positioned.fill(
               child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
+                duration: AppAnimations.hoverDuration,
                 opacity: hovered ? 1.0 : 0.85,
                 child: hasAsset
                     ? Image.asset(

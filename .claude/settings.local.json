@@ -78,7 +78,8 @@
       "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin:/c/Go/bin:$HOME/go/bin\")",
       "Bash(dart analyze:*)",
       "Bash(docker-compose version:*)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(find /c/Projeler/Agent-Store-Web/agent_store/lib/features -name \"*_screen.dart\" -exec wc -l {} +)"
     ]
   }
 }

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:get/get.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/mission_service.dart';
@@ -106,8 +104,9 @@ class AuthController extends GetxController {
 
     // Notify services about the new wallet so they switch to per-wallet
     // storage and sync local-only data created while offline.
-    unawaited(MissionService.instance.onWalletChanged(walletAddr));
-    unawaited(LegendService.instance.onWalletChanged(walletAddr));
+    // Awaited so sync completes before the user interacts with those screens.
+    await MissionService.instance.onWalletChanged(walletAddr);
+    await LegendService.instance.onWalletChanged(walletAddr);
   }
 
   void disconnect() {

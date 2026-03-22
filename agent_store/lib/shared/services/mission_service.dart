@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,8 @@ import '../models/mission_model.dart';
 import 'api_service.dart';
 import 'local_kv_store.dart';
 import 'notification_service.dart';
+
+enum SyncStatus { synced, syncing, pending, failed }
 
 class MissionService {
   MissionService._();
@@ -28,6 +31,15 @@ class MissionService {
   final List<MissionModel> _missions = <MissionModel>[];
 
   List<MissionModel> get missions => List.unmodifiable(_missions);
+
+  // ── Sync status tracking ────────────────────────────────────────────
+  final ValueNotifier<SyncStatus> syncStatusNotifier = ValueNotifier(SyncStatus.synced);
+  SyncStatus get syncStatus => syncStatusNotifier.value;
+  String? _syncError;
+  String? get syncError => _syncError;
+  DateTime? _lastSyncTime;
+  DateTime? get lastSyncTime => _lastSyncTime;
+  Timer? _periodicSyncTimer;
 
   Future<void> init() async {
     // Read saved wallet to scope localStorage per-wallet from the start.
@@ -55,38 +67,70 @@ class MissionService {
     }
 
     if (newWallet == null) {
-      // Disconnecting — clear in-memory list to prevent leakage to next wallet.
+      // Disconnecting — clear in-memory list, stop periodic sync.
       _missions.clear();
+      _stopPeriodicSync();
       return;
     }
 
     await refresh();
+    _startPeriodicSync();
+  }
+
+  void _startPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      if (ApiService.instance.isAuthenticated &&
+          (syncStatus == SyncStatus.failed || syncStatus == SyncStatus.pending)) {
+        forceSyncToBackend();
+      }
+    });
+  }
+
+  void _stopPeriodicSync() {
+    _periodicSyncTimer?.cancel();
+    _periodicSyncTimer = null;
   }
 
   Future<void> refresh() async {
     final local = await _loadLocal();
     if (ApiService.instance.isAuthenticated) {
+      syncStatusNotifier.value = SyncStatus.syncing;
+      _syncError = null;
       List<MissionModel> remote = <MissionModel>[];
 
-      // Always try to sync local missions to backend first.
-      if (local.isNotEmpty) {
-        remote = await ApiService.instance.batchSyncMissions(local);
-      }
+      try {
+        // Always try to sync local missions to backend first (with retry).
+        if (local.isNotEmpty) {
+          remote = await ApiService.instance.retry(
+            () => ApiService.instance.batchSyncMissions(local),
+          );
+        }
 
-      // If batch sync failed or local was empty, fetch from backend.
-      if (remote.isEmpty) {
-        remote = await ApiService.instance.getUserMissions();
+        // If batch sync failed or local was empty, fetch from backend.
+        if (remote.isEmpty) {
+          remote = await ApiService.instance.retry(
+            () => ApiService.instance.getUserMissions(),
+          );
+        }
+      } catch (e) {
+        debugPrint('MissionService: retry exhausted — $e');
       }
 
       // Detect sync failure: authenticated + remote empty + local non-empty
       if (remote.isEmpty && local.isNotEmpty) {
         debugPrint('MissionService: sync failed — ${local.length} missions saved locally only');
+        _syncError = 'Sync failed — ${local.length} missions saved locally only';
+        syncStatusNotifier.value = SyncStatus.failed;
         await NotificationService.instance.add(
           'Mission sync failed — ${local.length} missions saved locally only',
           type: 'info',
         );
       } else {
         debugPrint('MissionService: sync OK — ${remote.length} remote, ${local.length} local');
+        _syncError = null;
+        _lastSyncTime = DateTime.now();
+        syncStatusNotifier.value = SyncStatus.synced;
       }
 
       _missions
@@ -101,6 +145,36 @@ class MissionService {
       ..clear()
       ..addAll(local);
     _sort();
+    syncStatusNotifier.value = SyncStatus.pending;
+  }
+
+  /// Force re-sync all local missions to the backend. Callable from UI.
+  Future<void> forceSyncToBackend() async {
+    if (!ApiService.instance.isAuthenticated || _missions.isEmpty) return;
+    syncStatusNotifier.value = SyncStatus.syncing;
+    _syncError = null;
+
+    try {
+      final remote = await ApiService.instance.retry(
+        () => ApiService.instance.batchSyncMissions(_missions),
+      );
+      if (remote.isNotEmpty) {
+        _missions
+          ..clear()
+          ..addAll(remote);
+        _sort();
+        await _saveLocal();
+        _lastSyncTime = DateTime.now();
+        syncStatusNotifier.value = SyncStatus.synced;
+        _syncError = null;
+        debugPrint('MissionService: force sync OK — ${remote.length} missions');
+        return;
+      }
+    } catch (e) {
+      debugPrint('MissionService: force sync failed — $e');
+    }
+    _syncError = 'Sync failed — please try again later';
+    syncStatusNotifier.value = SyncStatus.failed;
   }
 
   /// Migrate the old global `missions_v1` key to the new per-wallet key.

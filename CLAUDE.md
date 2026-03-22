@@ -194,6 +194,18 @@ services:
 - [x] **v2.6 — Docker rebuild + E2E test** (Team Leader) ✅ 9/9 container UP, 20 E2E test passed
 - [x] **v3.0 — Legend: Touch/Touchpad + Claude Agent Export + Live Claude Execution** (Frontend + Backend) ✅ 16 task
 - [x] **v3.1 — UX Improvement Sprint** (Frontend) ✅ Guild emoji→Material Icon, keyboard nav, Mission redesign, hover consistency
+- [x] **v3.2 — UX Overhaul + DB Persistence Fix** (Frontend + Backend) ✅ 24 task
+
+## v3.2 UX Overhaul + DB Persistence Fix (2026-03-22)
+6 feature, 24 task:
+- **CRITICAL BUG FIX**: docker-compose gateway depends_on missing workspacesvc (502 Bad Gateway root cause)
+- **Shared Widget Library**: PageHeader, EmptyState, ErrorState, ConfirmDialog — reused across 8+ screens
+- **Mission/Legend DB Persistence**: Exponential backoff retry (3 attempts), SyncStatus enum + ValueNotifier, forceSyncToBackend(), 5-min periodic sync timer, sync status banner UI
+- **Store Dual Sidebar**: Left category sidebar (200px) + right filter/trending sidebar (260px) for >1024px desktop, 3-column layout with LayoutBuilder breakpoints
+- **Legend UX**: Toolbar sync indicator, keyboard shortcuts (Ctrl+S save, Escape deselect, Ctrl+/ help), unsaved changes warning (PopScope), 4-step onboarding overlay
+- **Screen Polish**: Missions PageHeader + sync banner + ConfirmDialog, Library ConfirmDialog, Settings/CreditHistory/PublicProfile/CreatorDashboard/AgentDetail improvements
+- **Cross-Cutting**: AppAnimations class (standardized hover durations), animation consistency across cards
+- **Yeni dosyalar**: page_header.dart, empty_state.dart, error_state.dart, confirm_dialog.dart, animations.dart, category_sidebar.dart, filter_sidebar.dart, legend_onboarding.dart
 
 ## v3.1 UX Sprint Detaylari (2026-03-22)
 4 feature, 13 task tamamlandi:
@@ -215,3 +227,4 @@ services:
 - `SPRINT_V2.md` — Detayli plan ve teknik kararlar
 - `SPRINT_V2_TRACKER.md` — Task bazli ilerleme takibi (Team Leader gunceller)
 - `.claude/tasks/agent-store/LEGEND_V3_PLAN.md` — Legend v3.0 sprint plani
+- `.claude/tasks/agent-store/ux_sprint.md` — v3.2 UX Overhaul sprint plani

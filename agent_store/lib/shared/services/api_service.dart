@@ -37,6 +37,19 @@ class ApiService {
   }
   // ────────────────────────────────────────────────────────────────────────
 
+  /// Exponential backoff retry helper.  3 attempts with 1s / 2s / 4s delays.
+  Future<T> retry<T>(Future<T> Function() fn, {int maxAttempts = 3}) async {
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        if (attempt == maxAttempts) rethrow;
+        await Future<void>.delayed(Duration(seconds: 1 << (attempt - 1)));
+      }
+    }
+    throw StateError('retry exhausted'); // unreachable
+  }
+
   String? _token;
   void setToken(String t) {
     _token = t;

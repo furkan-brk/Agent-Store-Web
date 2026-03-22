@@ -2,6 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/empty_state.dart';
+import '../../../shared/widgets/error_state.dart';
+import '../../../shared/widgets/page_header.dart';
 import '../../../app/theme.dart';
 
 class CreditHistoryScreen extends StatelessWidget {
@@ -15,103 +18,117 @@ class CreditHistoryScreen extends StatelessWidget {
     return Obx(() => Scaffold(
       backgroundColor: AppTheme.bg,
       body: Column(children: [
-        // ── Header bar ──────────────────────────────────────────────────
+        // -- Header bar with PageHeader + balance badge + refresh --------
         Container(
           padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
           decoration: const BoxDecoration(
             color: AppTheme.surface,
             border: Border(bottom: BorderSide(color: AppTheme.border)),
           ),
-          child: Row(children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppTheme.gold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.history_rounded, color: AppTheme.gold, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                'Credit History',
-                style: TextStyle(
-                  color: AppTheme.textH,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+          child: PageHeader(
+            icon: Icons.receipt_long_rounded,
+            iconColor: AppTheme.gold,
+            title: 'Credit History',
+            subtitle: 'Track your credit transactions',
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              // Balance badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.card,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
                 ),
-              ),
-            ),
-            // Balance badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppTheme.card,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.bolt_rounded, color: AppTheme.gold, size: 18),
-                const SizedBox(width: 4),
-                Text(
-                  '${ctrl.balance.value}',
-                  style: const TextStyle(
-                    color: AppTheme.textH,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.bolt_rounded, color: AppTheme.gold, size: 18),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${ctrl.balance.value}',
+                    style: const TextStyle(
+                      color: AppTheme.textH,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Text(
-                  'credits',
-                  style: TextStyle(color: AppTheme.textM, fontSize: 12),
-                ),
-              ]),
-            ),
-            const SizedBox(width: 8),
-            // Refresh button
-            _HoverIconButton(
-              icon: Icons.refresh_rounded,
-              tooltip: 'Refresh',
-              isLoading: ctrl.isLoading.value,
-              onPressed: ctrl.isLoading.value ? null : ctrl.load,
-            ),
-          ]),
-        ),
-
-        // ── Sort controls ───────────────────────────────────────────────
-        if (!ctrl.isLoading.value && ctrl.error.value == null && ctrl.transactions.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            color: AppTheme.bg,
-            child: Row(children: [
-              Text(
-                '${ctrl.transactions.length} transactions',
-                style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'credits',
+                    style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                  ),
+                ]),
               ),
-              const Spacer(),
-              _SortToggle(
-                ascending: ctrl.sortAscending.value,
-                onToggle: ctrl.toggleSort,
+              const SizedBox(width: 8),
+              _HoverIconButton(
+                icon: Icons.refresh_rounded,
+                tooltip: 'Refresh',
+                isLoading: ctrl.isLoading.value,
+                onPressed: ctrl.isLoading.value ? null : ctrl.load,
               ),
             ]),
           ),
+        ),
 
-        // ── Content ─────────────────────────────────────────────────────
+        // -- Filter bar (search + type dropdown + date chips) -----------
+        if (!ctrl.isLoading.value && ctrl.error.value == null)
+          _FilterBar(ctrl: ctrl),
+
+        // -- Content ----------------------------------------------------
         if (ctrl.isLoading.value)
           Expanded(child: _buildLoadingSkeleton())
         else if (ctrl.error.value != null)
-          Expanded(child: _buildErrorState(ctrl))
-        else if (ctrl.transactions.isEmpty)
-          Expanded(child: _buildEmptyState())
+          Expanded(child: ErrorState(
+            message: ctrl.error.value!,
+            onRetry: ctrl.load,
+          ))
+        else if (ctrl.filteredTransactions.isEmpty)
+          Expanded(child: ctrl.hasActiveFilters
+            ? Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.filter_list_off_rounded, size: 48,
+                    color: AppTheme.textM.withValues(alpha: 0.5)),
+                  const SizedBox(height: 12),
+                  const Text('No matching transactions',
+                    style: TextStyle(color: AppTheme.textM, fontSize: 14)),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: ctrl.clearFilters,
+                    icon: const Icon(Icons.clear_all_rounded, size: 16),
+                    label: const Text('Clear Filters'),
+                  ),
+                ]),
+              )
+            : const EmptyState(
+                icon: Icons.receipt_long_outlined,
+                title: 'No transactions yet',
+                subtitle: 'Create or fork an agent to see your credit history here.',
+              ),
+          )
         else
+          // Sort controls row
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-              itemCount: ctrl.transactions.length,
-              itemBuilder: (_, i) => _TxCard(tx: ctrl.transactions[i]),
-            ),
+            child: Column(children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                child: Row(children: [
+                  Text(
+                    '${ctrl.filteredTransactions.length} transaction${ctrl.filteredTransactions.length == 1 ? '' : 's'}',
+                    style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+                  ),
+                  const Spacer(),
+                  _SortToggle(
+                    ascending: ctrl.sortAscending.value,
+                    onToggle: ctrl.toggleSort,
+                  ),
+                ]),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+                  itemCount: ctrl.filteredTransactions.length,
+                  itemBuilder: (_, i) => _TxCard(tx: ctrl.filteredTransactions[i]),
+                ),
+              ),
+            ]),
           ),
       ]),
     ));
@@ -175,90 +192,173 @@ class CreditHistoryScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildErrorState(_CreditHistoryController ctrl) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.error_outline_rounded,
-              color: AppTheme.primary,
-              size: 32,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            ctrl.error.value!,
-            style: const TextStyle(color: AppTheme.textB, fontSize: 15),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton.icon(
-            onPressed: ctrl.load,
-            icon: const Icon(Icons.refresh_rounded, size: 16),
-            label: const Text('Retry'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppTheme.primary,
-              side: const BorderSide(color: AppTheme.primary),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+// -- Filter bar with search, type dropdown, date chips ----------------------
+
+class _FilterBar extends StatelessWidget {
+  final _CreditHistoryController ctrl;
+  const _FilterBar({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Search + type dropdown row
+          Row(children: [
+            // Search field
+            Expanded(
+              child: SizedBox(
+                height: 38,
+                child: TextField(
+                  onChanged: ctrl.setSearchQuery,
+                  style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: 'Search by agent name...',
+                    hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppTheme.textM),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    filled: true,
+                    fillColor: AppTheme.card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppTheme.gold, width: 1.5),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppTheme.gold.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-              border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
+            const SizedBox(width: 12),
+            // Type dropdown
+            Obx(() => Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.card,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: ctrl.typeFilter.value,
+                  dropdownColor: AppTheme.card2,
+                  style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+                  icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.textM, size: 20),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Types')),
+                    DropdownMenuItem(value: 'create', child: Text('Create')),
+                    DropdownMenuItem(value: 'fork', child: Text('Fork')),
+                    DropdownMenuItem(value: 'topup', child: Text('Topup')),
+                    DropdownMenuItem(value: 'initial', child: Text('Initial')),
+                  ],
+                  onChanged: (v) => ctrl.setTypeFilter(v ?? 'all'),
+                ),
+              ),
+            )),
+          ]),
+          const SizedBox(height: 10),
+          // Date filter chips
+          Obx(() => Row(children: [
+            _DateChip(
+              label: '7 days',
+              isSelected: ctrl.dateFilter.value == 7,
+              onTap: () => ctrl.setDateFilter(ctrl.dateFilter.value == 7 ? 0 : 7),
             ),
-            child: const Icon(
-              Icons.receipt_long_outlined,
-              color: AppTheme.gold,
-              size: 36,
+            const SizedBox(width: 8),
+            _DateChip(
+              label: '30 days',
+              isSelected: ctrl.dateFilter.value == 30,
+              onTap: () => ctrl.setDateFilter(ctrl.dateFilter.value == 30 ? 0 : 30),
             ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'No transactions yet',
-            style: TextStyle(
-              color: AppTheme.textH,
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
+            const SizedBox(width: 8),
+            _DateChip(
+              label: 'All time',
+              isSelected: ctrl.dateFilter.value == 0,
+              onTap: () => ctrl.setDateFilter(0),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Create or fork an agent to see your credit history here.',
-            style: TextStyle(color: AppTheme.textM, fontSize: 13, height: 1.5),
-            textAlign: TextAlign.center,
-          ),
-        ]),
+            if (ctrl.hasActiveFilters) ...[
+              const Spacer(),
+              TextButton.icon(
+                onPressed: ctrl.clearFilters,
+                icon: const Icon(Icons.clear_all_rounded, size: 14),
+                label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.textM,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ])),
+        ],
       ),
     );
   }
 }
 
-// ── Sort toggle button ──────────────────────────────────────────────────────
+// -- Date chip for filter bar -----------------------------------------------
+
+class _DateChip extends StatefulWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  const _DateChip({required this.label, required this.isSelected, required this.onTap});
+
+  @override
+  State<_DateChip> createState() => _DateChipState();
+}
+
+class _DateChipState extends State<_DateChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? AppTheme.gold.withValues(alpha: 0.15)
+                : (_hovered ? AppTheme.card2 : AppTheme.card),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: widget.isSelected
+                  ? AppTheme.gold.withValues(alpha: 0.5)
+                  : (_hovered ? AppTheme.border2 : AppTheme.border),
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: widget.isSelected ? AppTheme.gold : AppTheme.textM,
+              fontSize: 12,
+              fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// -- Sort toggle button -----------------------------------------------------
 
 class _SortToggle extends StatefulWidget {
   final bool ascending;
@@ -305,7 +405,7 @@ class _SortToggleState extends State<_SortToggle> {
   }
 }
 
-// ── Hover icon button ───────────────────────────────────────────────────────
+// -- Hover icon button ------------------------------------------------------
 
 class _HoverIconButton extends StatefulWidget {
   final IconData icon;
@@ -359,7 +459,7 @@ class _HoverIconButtonState extends State<_HoverIconButton> {
   }
 }
 
-// ── Local micro-controller ──────────────────────────────────────────────────
+// -- Local micro-controller with filter support -----------------------------
 
 class _CreditHistoryController extends GetxController {
   final transactions = <Map<String, dynamic>>[].obs;
@@ -367,6 +467,60 @@ class _CreditHistoryController extends GetxController {
   final isLoading = true.obs;
   final error = RxnString();
   final sortAscending = false.obs;
+
+  // Filter state
+  final searchQuery = ''.obs;
+  final typeFilter = 'all'.obs;
+  final dateFilter = 0.obs; // 0 = all, 7 = 7 days, 30 = 30 days
+
+  bool get hasActiveFilters =>
+      searchQuery.value.isNotEmpty ||
+      typeFilter.value != 'all' ||
+      dateFilter.value != 0;
+
+  List<Map<String, dynamic>> get filteredTransactions {
+    var result = transactions.toList();
+
+    // Search by agent_title
+    if (searchQuery.value.isNotEmpty) {
+      final q = searchQuery.value.toLowerCase();
+      result = result.where((tx) {
+        final title = (tx['agent_title'] as String? ?? '').toLowerCase();
+        return title.contains(q);
+      }).toList();
+    }
+
+    // Filter by type
+    if (typeFilter.value != 'all') {
+      result = result.where((tx) =>
+        (tx['type'] as String? ?? '') == typeFilter.value
+      ).toList();
+    }
+
+    // Filter by date
+    if (dateFilter.value > 0) {
+      final cutoff = DateTime.now().subtract(Duration(days: dateFilter.value));
+      result = result.where((tx) {
+        try {
+          final dt = DateTime.parse(tx['created_at'] as String? ?? '');
+          return dt.isAfter(cutoff);
+        } catch (_) {
+          return true;
+        }
+      }).toList();
+    }
+
+    return result;
+  }
+
+  void setSearchQuery(String q) => searchQuery.value = q;
+  void setTypeFilter(String t) => typeFilter.value = t;
+  void setDateFilter(int days) => dateFilter.value = days;
+  void clearFilters() {
+    searchQuery.value = '';
+    typeFilter.value = 'all';
+    dateFilter.value = 0;
+  }
 
   @override
   void onInit() {
@@ -405,7 +559,7 @@ class _CreditHistoryController extends GetxController {
   }
 }
 
-// ── Transaction card ────────────────────────────────────────────────────────
+// -- Transaction card -------------------------------------------------------
 
 class _TxCard extends StatefulWidget {
   final Map<String, dynamic> tx;

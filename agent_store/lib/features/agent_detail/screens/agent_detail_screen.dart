@@ -13,8 +13,10 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
+import '../../../shared/services/api_service.dart';
 import '../../../shared/services/mission_service.dart';
 import '../../../shared/services/wallet_service.dart';
+import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../store/data/background_data.dart';
@@ -309,6 +311,40 @@ class _AgentDetailViewState extends State<_AgentDetailView>
     });
   }
 
+  // ── Breadcrumb ─────────────────────────────────────────────────────────────
+
+  Widget _buildBreadcrumb(AgentModel a, {bool isMobile = false}) {
+    final hPad = isMobile ? 16.0 : (MediaQuery.of(context).size.width < 900 ? 16.0 : 24.0);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(hPad, isMobile ? 8 : 14, hPad, 0),
+      child: Row(children: [
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: () => context.go('/'),
+            child: const Text('Store',
+              style: TextStyle(
+                color: AppTheme.gold,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              )),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Icon(Icons.chevron_right_rounded, size: 14,
+            color: AppTheme.textM.withValues(alpha: 0.6)),
+        ),
+        Flexible(
+          child: Text(a.title,
+            style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        ),
+      ]),
+    );
+  }
+
   /// Desktop layout — side-by-side: left character panel + right tabbed content
   Widget _buildDesktopLayout(AgentModel a, bool hasAccess) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -320,7 +356,8 @@ class _AgentDetailViewState extends State<_AgentDetailView>
           children: [
             _HeroBackdrop(agent: a),
             Column(children: [
-              const SizedBox(height: 50),
+              _buildBreadcrumb(a),
+              const SizedBox(height: 8),
               _buildTitleRow(a),
               const SizedBox(height: 8),
               Padding(
@@ -1556,25 +1593,13 @@ class _DetailErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bg,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline_rounded, size: 56, color: AppTheme.primary.withValues(alpha: 0.7)),
-            const SizedBox(height: 16),
-            const Text('Agent Not Found',
-              style: TextStyle(color: AppTheme.textH, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('This agent may have been removed or the link is invalid.',
-              style: TextStyle(color: AppTheme.textM, fontSize: 14)),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/'),
-              icon: const Icon(Icons.arrow_back_rounded, size: 18),
-              label: const Text('Back to Store'),
-            ),
-          ],
-        ),
+      body: EmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'Agent not found',
+        subtitle: 'This agent may have been removed or the link is invalid.',
+        actionLabel: 'Back to Store',
+        actionIcon: Icons.arrow_back_rounded,
+        onAction: () => context.go('/'),
       ),
     );
   }

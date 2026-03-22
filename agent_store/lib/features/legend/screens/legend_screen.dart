@@ -11,12 +11,13 @@ import '../../../shared/models/agent_model.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
-import '../../../shared/services/mission_service.dart';
+import '../../../shared/services/mission_service.dart' show MissionService, SyncStatus;
 import '../models/workflow_models.dart';
 import '../../../core/utils/input_mode.dart';
 import '../services/claude_export_service.dart';
 import '../services/legend_service.dart';
 import '../widgets/legend_export_dialog.dart';
+import '../widgets/legend_onboarding.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,9 @@ class _LegendScreenState extends State<LegendScreen>
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulseAnim;
 
+  // ── Onboarding ────────────────────────────────────────────────────────────
+  bool _showOnboarding = false;
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
@@ -94,6 +98,12 @@ class _LegendScreenState extends State<LegendScreen>
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
     _loadData();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final show = await LegendOnboarding.shouldShow();
+    if (show && mounted) setState(() => _showOnboarding = true);
   }
 
   @override
@@ -139,6 +149,20 @@ class _LegendScreenState extends State<LegendScreen>
       });
     }
   }
+
+  // ── Unsaved changes tracking ──────────────────────────────────────────
+  String _lastSavedState = '';
+
+  bool get _hasUnsavedChanges {
+    final current = jsonEncode({'nodes': _nodes.map((n) => n.toJson()).toList(), 'edges': _edges.map((e) => e.toJson()).toList()});
+    return current != _lastSavedState && (_nodes.isNotEmpty || _edges.isNotEmpty);
+  }
+
+  void _markSaved() {
+    _lastSavedState = jsonEncode({'nodes': _nodes.map((n) => n.toJson()).toList(), 'edges': _edges.map((e) => e.toJson()).toList()});
+  }
+
+  String _fmtTime(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   bool get _hasCanvasContent => _nodes.isNotEmpty || _edges.isNotEmpty;
   int get _workflowCount => _savedWorkflows.length;
@@ -642,6 +666,7 @@ class _LegendScreenState extends State<LegendScreen>
       _currentWorkflowId = id;
       _savedWorkflows = LegendService.instance.workflows;
     });
+    _markSaved();
     _showNotice('Workflow "$_workflowName" saved',
         background: AppTheme.success);
   }
@@ -661,6 +686,7 @@ class _LegendScreenState extends State<LegendScreen>
       _lastExecution = null;
       _showResultsPanel = false;
     });
+    _markSaved();
     Navigator.of(context).pop();
   }
 
@@ -1297,7 +1323,21 @@ class _LegendScreenState extends State<LegendScreen>
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 768;
-        return Scaffold(
+        return PopScope(
+          canPop: !_hasUnsavedChanges,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            final action = await _showUnsavedDialog();
+            if (!mounted) return;
+            if (action == 'save') {
+              await _saveWorkflow();
+              if (mounted) Navigator.of(context).maybePop();
+            } else if (action == 'discard') {
+              _markSaved(); // clear dirty flag
+              if (mounted) Navigator.of(context).maybePop();
+            }
+          },
+          child: Scaffold(
           backgroundColor: AppTheme.bg,
           drawer: isMobile
               ? Drawer(
@@ -1305,12 +1345,20 @@ class _LegendScreenState extends State<LegendScreen>
                   child: SafeArea(child: _buildLeftPanel()),
                 )
               : null,
-          body: KeyboardListener(
+          body: Stack(children: [
+            KeyboardListener(
             focusNode: FocusNode()..requestFocus(),
             autofocus: true,
             onKeyEvent: (event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.delete) {
+              if (event is! KeyDownEvent) return;
+              final ctrl = HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed;
+              if (ctrl && event.logicalKey == LogicalKeyboardKey.keyS) {
+                _saveWorkflow();
+              } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+                setState(() { _selectedNodeId = null; _selectedEdgeId = null; });
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.slash) {
+                _showKeyboardShortcutsDialog();
+              } else if (event.logicalKey == LogicalKeyboardKey.delete) {
                 _deleteSelected();
               }
             },
@@ -1361,8 +1409,96 @@ class _LegendScreenState extends State<LegendScreen>
               ],
             ),
           ),
+          if (_showOnboarding)
+            LegendOnboarding(
+              onDismiss: () => setState(() => _showOnboarding = false),
+            ),
+          ]),
+        ),
         );
       },
+    );
+  }
+
+  Future<String?> _showUnsavedDialog() {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.border),
+        ),
+        icon: const Icon(Icons.warning_amber_rounded, color: AppTheme.gold, size: 28),
+        title: const Text('Unsaved Changes', style: TextStyle(color: AppTheme.textH, fontWeight: FontWeight.bold)),
+        content: const Text('You have unsaved changes. What would you like to do?', style: TextStyle(color: AppTheme.textB)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'discard'),
+            child: const Text('Discard', style: TextStyle(color: AppTheme.primary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.gold, foregroundColor: const Color(0xFF1E1A14)),
+            onPressed: () => Navigator.pop(context, 'save'),
+            child: const Text('Save & Leave'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showKeyboardShortcutsDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.border),
+        ),
+        title: const Text('Keyboard Shortcuts', style: TextStyle(color: AppTheme.textH, fontWeight: FontWeight.bold, fontSize: 18)),
+        content: SizedBox(
+          width: 340,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _shortcutRow('Ctrl + S', 'Save workflow'),
+              _shortcutRow('Escape', 'Deselect node/edge'),
+              _shortcutRow('Delete', 'Delete selected'),
+              _shortcutRow('Ctrl + /', 'Show shortcuts'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: AppTheme.textM)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shortcutRow(String key, String desc) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Text(key, style: const TextStyle(color: AppTheme.textH, fontSize: 12, fontWeight: FontWeight.w600, fontFamily: 'monospace')),
+        ),
+        const SizedBox(width: 16),
+        Text(desc, style: const TextStyle(color: AppTheme.textM, fontSize: 13)),
+      ]),
     );
   }
 
@@ -1414,6 +1550,29 @@ class _LegendScreenState extends State<LegendScreen>
                   const Icon(Icons.edit, size: 12, color: AppTheme.textM),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            // Sync status indicator
+            ValueListenableBuilder<SyncStatus>(
+              valueListenable: LegendService.instance.syncStatusNotifier,
+              builder: (_, status, __) => switch (status) {
+                SyncStatus.synced => Tooltip(
+                    message: 'Synced${LegendService.instance.lastSyncTime != null ? " at ${_fmtTime(LegendService.instance.lastSyncTime!)}" : ""}',
+                    child: const Icon(Icons.cloud_done_rounded, color: AppTheme.olive, size: 14),
+                  ),
+                SyncStatus.syncing => const Tooltip(
+                    message: 'Syncing...',
+                    child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.gold)),
+                  ),
+                SyncStatus.failed => Tooltip(
+                    message: LegendService.instance.syncError ?? 'Sync failed',
+                    child: GestureDetector(
+                      onTap: () => LegendService.instance.forceSyncToBackend(),
+                      child: const Icon(Icons.cloud_off_rounded, color: AppTheme.primary, size: 14),
+                    ),
+                  ),
+                SyncStatus.pending => const SizedBox.shrink(),
+              },
             ),
             const SizedBox(width: 12),
             // Zoom indicator
@@ -1523,6 +1682,12 @@ class _LegendScreenState extends State<LegendScreen>
               ),
             ),
           ],
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.help_outline_rounded,
+            label: '?',
+            onTap: _showKeyboardShortcutsDialog,
+          ),
           const SizedBox(width: 6),
           _ToolbarButton(
             icon: Icons.clear_all,
@@ -1802,34 +1967,6 @@ class _LegendScreenState extends State<LegendScreen>
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _shortcutRow(String key, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 3),
-      child: Row(
-        children: [
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-            decoration: BoxDecoration(
-              color: AppTheme.bg,
-              borderRadius: BorderRadius.circular(3),
-              border: Border.all(color: AppTheme.border),
-            ),
-            child: Text(key,
-                style: const TextStyle(
-                    color: AppTheme.textM,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(width: 6),
-          Text(desc,
-              style: const TextStyle(
-                  color: AppTheme.textM, fontSize: 9)),
         ],
       ),
     );

@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../shared/services/local_kv_store.dart';
+import '../../../shared/widgets/confirm_dialog.dart';
+import '../../../shared/widgets/page_header.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -16,27 +18,11 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         children: [
-          // ── Page title ─────────────────────────────────────────────────
-          Row(children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.settings_outlined, color: AppTheme.primary, size: 22),
-            ),
-            const SizedBox(width: 14),
-            const Text(
-              'Settings',
-              style: TextStyle(
-                color: AppTheme.textH,
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-              ),
-            ),
-          ]),
+          const PageHeader(
+            icon: Icons.settings_rounded,
+            title: 'Settings',
+            subtitle: 'Customize your experience',
+          ),
           const SizedBox(height: 28),
 
           // ── Account ────────────────────────────────────────────────────
@@ -173,23 +159,7 @@ class SettingsScreen extends StatelessWidget {
           // ── Notifications ──────────────────────────────────────────────
           const _SectionHeader(icon: Icons.notifications_outlined, title: 'NOTIFICATIONS'),
           const SizedBox(height: 8),
-          const _SettingsCard(children: [
-            _ToggleTile(
-              icon: Icons.credit_card_outlined,
-              title: 'Credit Alerts',
-              subtitle: 'Show notification when credits change',
-              value: true,
-              onChanged: null,
-            ),
-            _TileDivider(),
-            _ToggleTile(
-              icon: Icons.auto_awesome_outlined,
-              title: 'Agent Updates',
-              subtitle: 'Notify when saved agents are updated',
-              value: true,
-              onChanged: null,
-            ),
-          ]),
+          const _NotificationToggles(),
 
           const SizedBox(height: 24),
 
@@ -254,45 +224,17 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _clearAllData(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppTheme.border2),
-        ),
-        title: const Row(children: [
-          Icon(Icons.warning_amber_rounded, color: AppTheme.primary, size: 22),
-          SizedBox(width: 10),
-          Text('Clear All Data', style: TextStyle(color: AppTheme.textH)),
-        ]),
-        content: const Text(
-          'This will clear all locally stored preferences and cached data. '
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Clear All Data',
+      message: 'This will clear all locally stored preferences and cached data. '
           'Your on-chain data will not be affected.',
-          style: TextStyle(color: AppTheme.textB, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Clear Data'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Clear Data',
+      isDestructive: true,
+      icon: Icons.warning_amber_rounded,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed) return;
     if (!context.mounted) return;
 
     await LocalKvStore.instance.clear();
@@ -313,6 +255,71 @@ class SettingsScreen extends StatelessWidget {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+}
+
+// ── Notification toggles with LocalKvStore persistence ──────────────────────
+
+class _NotificationToggles extends StatefulWidget {
+  const _NotificationToggles();
+
+  @override
+  State<_NotificationToggles> createState() => _NotificationTogglesState();
+}
+
+class _NotificationTogglesState extends State<_NotificationToggles> {
+  static const _kCreditAlerts = 'settings.credit_alerts';
+  static const _kAgentUpdates = 'settings.agent_updates';
+
+  bool _creditAlerts = true;
+  bool _agentUpdates = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPrefs();
+  }
+
+  Future<void> _loadPrefs() async {
+    final kv = LocalKvStore.instance;
+    final ca = await kv.getString(_kCreditAlerts);
+    final au = await kv.getString(_kAgentUpdates);
+    if (!mounted) return;
+    setState(() {
+      _creditAlerts = ca != 'false';
+      _agentUpdates = au != 'false';
+    });
+  }
+
+  Future<void> _setCreditAlerts(bool v) async {
+    setState(() => _creditAlerts = v);
+    await LocalKvStore.instance.setString(_kCreditAlerts, v.toString());
+  }
+
+  Future<void> _setAgentUpdates(bool v) async {
+    setState(() => _agentUpdates = v);
+    await LocalKvStore.instance.setString(_kAgentUpdates, v.toString());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsCard(children: [
+      _ToggleTile(
+        icon: Icons.credit_card_outlined,
+        title: 'Credit Alerts',
+        subtitle: 'Show notification when credits change',
+        value: _creditAlerts,
+        onChanged: _setCreditAlerts,
+      ),
+      const _TileDivider(),
+      _ToggleTile(
+        icon: Icons.auto_awesome_outlined,
+        title: 'Agent Updates',
+        subtitle: 'Notify when saved agents are updated',
+        value: _agentUpdates,
+        onChanged: _setAgentUpdates,
+      ),
+    ]);
   }
 }
 

@@ -1,11 +1,16 @@
 // lib/features/profile/screens/public_profile_screen.dart
+import 'dart:js_interop';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:go_router/go_router.dart';
+import 'package:web/web.dart' as web;
+
 import '../../../app/theme.dart';
+import '../../../controllers/auth_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../store/widgets/agent_card.dart';
-import 'package:go_router/go_router.dart';
 
 class PublicProfileScreen extends StatefulWidget {
   final String wallet;
@@ -22,6 +27,30 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   void initState() {
     super.initState();
     ctrl = Get.put(_PublicProfileController(widget.wallet), tag: widget.wallet);
+  }
+
+  bool get _isOwnProfile {
+    final myWallet = AuthController.to.wallet;
+    return myWallet != null &&
+        myWallet.toLowerCase() == widget.wallet.toLowerCase();
+  }
+
+  void _shareProfile(BuildContext context) {
+    final url = '${web.window.location.origin}/profile/${widget.wallet}';
+    web.window.navigator.clipboard.writeText(url).toDart.then((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.check_circle, color: AppTheme.success, size: 16),
+              SizedBox(width: 8),
+              Text('Profile link copied to clipboard!'),
+            ]),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }).catchError((_) {});
   }
 
   @override
@@ -65,6 +94,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             ),
           ]),
           centerTitle: false,
+          actions: [
+            // Share profile
+            _ProfileActionButton(
+              icon: Icons.share_outlined,
+              tooltip: 'Share Profile',
+              onPressed: () => _shareProfile(context),
+            ),
+            // Edit profile (only if own)
+            if (_isOwnProfile)
+              _ProfileActionButton(
+                icon: Icons.edit_outlined,
+                tooltip: 'Edit Profile',
+                onPressed: () => context.go('/settings'),
+              ),
+            const SizedBox(width: 8),
+          ],
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(1),
             child: Divider(height: 1, color: AppTheme.border),
@@ -83,38 +128,97 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           // Achievements section
           if (ctrl.badges.isNotEmpty)
             SliverToBoxAdapter(child: _BadgesSection(badges: ctrl.badges)),
-          // Section title
+          // Section title + search + sort
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 4),
-              child: Row(children: [
-                const Icon(Icons.auto_awesome_outlined, size: 16, color: AppTheme.textM),
-                const SizedBox(width: 8),
-                const Text(
-                  'Created Agents',
-                  style: TextStyle(
-                    color: AppTheme.textH,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppTheme.card2,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${ctrl.agents.length}',
-                    style: const TextStyle(
-                      color: AppTheme.textM,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.auto_awesome_outlined, size: 16, color: AppTheme.textM),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Created Agents',
+                      style: TextStyle(
+                        color: AppTheme.textH,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ),
-              ]),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppTheme.card2,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${ctrl.agents.length}',
+                        style: const TextStyle(
+                          color: AppTheme.textM,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ]),
+                  if (ctrl.agents.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      // Search field
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: TextField(
+                            onChanged: ctrl.setSearchQuery,
+                            style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'Search agents...',
+                              hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
+                              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppTheme.textM),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                              filled: true,
+                              fillColor: AppTheme.card,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppTheme.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppTheme.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppTheme.gold, width: 1.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Sort chips
+                      _ProfileSortChip(
+                        label: 'Newest',
+                        isSelected: ctrl.sortMode.value == 'newest',
+                        onTap: () => ctrl.setSortMode('newest'),
+                      ),
+                      const SizedBox(width: 6),
+                      _ProfileSortChip(
+                        label: 'Most Saved',
+                        isSelected: ctrl.sortMode.value == 'most_saved',
+                        onTap: () => ctrl.setSortMode('most_saved'),
+                      ),
+                      const SizedBox(width: 6),
+                      _ProfileSortChip(
+                        label: 'Most Used',
+                        isSelected: ctrl.sortMode.value == 'most_used',
+                        onTap: () => ctrl.setSortMode('most_used'),
+                      ),
+                    ]),
+                  ],
+                ],
+              ),
             ),
           ),
           // Agents grid or empty state
@@ -161,13 +265,25 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 ),
               ),
             )
+          else if (ctrl.filteredAgents.isEmpty)
+            SliverFillRemaining(
+              child: Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.search_off_rounded, size: 48,
+                    color: AppTheme.textM.withValues(alpha: 0.5)),
+                  const SizedBox(height: 12),
+                  const Text('No matching agents',
+                    style: TextStyle(color: AppTheme.textM, fontSize: 14)),
+                ]),
+              ),
+            )
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
               sliver: SliverGrid(
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) => AgentCard(agent: ctrl.agents[i]),
-                  childCount: ctrl.agents.length,
+                  (_, i) => AgentCard(agent: ctrl.filteredAgents[i]),
+                  childCount: ctrl.filteredAgents.length,
                 ),
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 300,
@@ -635,6 +751,35 @@ class _PublicProfileController extends GetxController {
   final isLoading = true.obs;
   final error = RxnString();
 
+  // Filter/sort state
+  final searchQuery = ''.obs;
+  final sortMode = 'newest'.obs; // newest, most_saved, most_used
+
+  void setSearchQuery(String q) => searchQuery.value = q;
+  void setSortMode(String m) => sortMode.value = m;
+
+  List<AgentModel> get filteredAgents {
+    var result = agents.toList();
+
+    // Search filter
+    if (searchQuery.value.isNotEmpty) {
+      final q = searchQuery.value.toLowerCase();
+      result = result.where((a) => a.title.toLowerCase().contains(q)).toList();
+    }
+
+    // Sort
+    switch (sortMode.value) {
+      case 'most_saved':
+        result.sort((a, b) => b.saveCount.compareTo(a.saveCount));
+      case 'most_used':
+        result.sort((a, b) => b.useCount.compareTo(a.useCount));
+      default: // newest
+        result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    return result;
+  }
+
   int get agentCount =>
       (profile.value?['agent_count'] as num?)?.toInt() ?? agents.length;
   int get totalSaves =>
@@ -704,5 +849,107 @@ class _PublicProfileController extends GetxController {
       error.value = 'Failed to load profile.';
     }
     isLoading.value = false;
+  }
+}
+
+// ── Profile action button (app bar) ─────────────────────────────────────────
+
+class _ProfileActionButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  const _ProfileActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  State<_ProfileActionButton> createState() => _ProfileActionButtonState();
+}
+
+class _ProfileActionButtonState extends State<_ProfileActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _hovered ? AppTheme.card2 : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              widget.icon,
+              color: _hovered ? AppTheme.textH : AppTheme.textM,
+              size: 20,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Sort chip for profile agent list ────────────────────────────────────────
+
+class _ProfileSortChip extends StatefulWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  const _ProfileSortChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  State<_ProfileSortChip> createState() => _ProfileSortChipState();
+}
+
+class _ProfileSortChipState extends State<_ProfileSortChip> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: widget.isSelected
+                ? AppTheme.gold.withValues(alpha: 0.15)
+                : (_hovered ? AppTheme.card2 : AppTheme.card),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: widget.isSelected
+                  ? AppTheme.gold.withValues(alpha: 0.5)
+                  : (_hovered ? AppTheme.border2 : AppTheme.border),
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              color: widget.isSelected ? AppTheme.gold : AppTheme.textM,
+              fontSize: 11,
+              fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

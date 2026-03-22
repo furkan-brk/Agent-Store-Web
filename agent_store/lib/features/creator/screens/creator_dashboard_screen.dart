@@ -7,6 +7,7 @@ import '../../../app/theme.dart';
 import '../../../controllers/creator_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../../features/character/character_types.dart';
 
@@ -45,45 +46,35 @@ class CreatorDashboardScreen extends StatelessWidget {
       color: AppTheme.surface,
       border: Border(bottom: BorderSide(color: AppTheme.border)),
     ),
-    child: Row(children: [
-      const Icon(Icons.analytics_rounded, color: AppTheme.gold, size: 22),
-      const SizedBox(width: 10),
-      ShaderMask(
-        shaderCallback: (b) => const LinearGradient(
-          colors: [AppTheme.textH, AppTheme.gold],
-        ).createShader(b),
-        child: const Text(
-          'Creator Dashboard',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
+    child: PageHeader(
+      icon: Icons.dashboard_rounded,
+      iconColor: AppTheme.gold,
+      title: 'Creator Dashboard',
+      subtitle: 'Manage your published agents',
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        Obx(() => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppTheme.card2,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.border),
           ),
+          child: Text(
+            '${ctrl.agents.length} agent${ctrl.agents.length == 1 ? '' : 's'}',
+            style: const TextStyle(color: AppTheme.textM, fontSize: 12),
+          ),
+        )),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: ctrl.load,
+          icon: const Icon(Icons.refresh_rounded, color: AppTheme.textM, size: 18),
+          tooltip: 'Refresh',
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          splashRadius: 16,
         ),
-      ),
-      const Spacer(),
-      Obx(() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppTheme.card2,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppTheme.border),
-        ),
-        child: Text(
-          '${ctrl.agents.length} agent${ctrl.agents.length == 1 ? '' : 's'}',
-          style: const TextStyle(color: AppTheme.textM, fontSize: 12),
-        ),
-      )),
-      const SizedBox(width: 8),
-      IconButton(
-        onPressed: ctrl.load,
-        icon: const Icon(Icons.refresh_rounded, color: AppTheme.textM, size: 18),
-        tooltip: 'Refresh',
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        splashRadius: 16,
-      ),
-    ]),
+      ]),
+    ),
   );
 
   // -- Unauthenticated state -------------------------------------------------
@@ -179,13 +170,13 @@ class CreatorDashboardScreen extends StatelessWidget {
         if (constraints.maxWidth < 600) {
           return Wrap(
             spacing: 12, runSpacing: 12,
-            children: List.generate(4, (_) => SizedBox(
+            children: List.generate(5, (_) => SizedBox(
               width: (constraints.maxWidth - 12) / 2,
               child: const _SkeletonStatCard(),
             )),
           );
         }
-        return Row(children: List.generate(4, (i) => Expanded(
+        return Row(children: List.generate(5, (i) => Expanded(
           child: Padding(
             padding: EdgeInsets.only(left: i > 0 ? 12 : 0),
             child: const _SkeletonStatCard(),
@@ -248,7 +239,36 @@ class CreatorDashboardScreen extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _buildStatsRow(ctrl),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
+        // Search bar
+        SizedBox(
+          height: 40,
+          child: TextField(
+            onChanged: ctrl.setSearchQuery,
+            style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Search agents by title or description...',
+              hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppTheme.textM),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+              filled: true,
+              fillColor: AppTheme.card,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.gold, width: 1.5),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
         _CreatorAgentTable(ctrl: ctrl),
       ]),
     );
@@ -282,7 +302,13 @@ class CreatorDashboardScreen extends StatelessWidget {
       _StatCard(
         icon: Icons.star_rounded,
         value: '$avgScore',
-        label: 'Avg Prompt Score',
+        label: 'Avg Score',
+        accentColor: const Color(0xFFD4A843),
+      ),
+      _StatCard(
+        icon: Icons.monetization_on_rounded,
+        value: '${ctrl.totalRevenue.toStringAsFixed(1)}',
+        label: 'Total Revenue (MON)',
         accentColor: const Color(0xFFD4A843),
       ),
     ];
@@ -869,7 +895,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
         SizedBox(
           width: double.infinity,
           child: Obx(() {
-            final agents = widget.ctrl.agents;
+            final agents = widget.ctrl.filteredAgents;
             final sortedAgents = switch (_sortColumn) {
               _SortColumn.title    => _sorted(agents, (a) => a.title.toLowerCase()),
               _SortColumn.category => _sorted(agents, (a) => a.category.toLowerCase()),
