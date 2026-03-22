@@ -35,22 +35,22 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         myWallet.toLowerCase() == widget.wallet.toLowerCase();
   }
 
-  void _shareProfile(BuildContext context) {
+  Future<void> _shareProfile(BuildContext context) async {
     final url = '${web.window.location.origin}/profile/${widget.wallet}';
-    web.window.navigator.clipboard.writeText(url).toDart.then((_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.check_circle, color: AppTheme.success, size: 16),
-              SizedBox(width: 8),
-              Text('Profile link copied to clipboard!'),
-            ]),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    }).catchError((_) {});
+    try {
+      await web.window.navigator.clipboard.writeText(url).toDart;
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.check_circle, color: AppTheme.success, size: 16),
+            SizedBox(width: 8),
+            Text('Profile link copied to clipboard!'),
+          ]),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (_) {}
   }
 
   @override

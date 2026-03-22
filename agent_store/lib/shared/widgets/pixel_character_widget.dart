@@ -341,25 +341,29 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
               ],
             ),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                typeIcons[type] ?? Icons.auto_fix_high_rounded,
-                color: type.accentColor.withValues(alpha: 0.7),
-                size: widget.size * 0.35,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                type.displayName.toUpperCase(),
-                style: TextStyle(
-                  color: type.accentColor.withValues(alpha: 0.5),
-                  fontSize: (widget.size * 0.07).clamp(8, 11),
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  typeIcons[type] ?? Icons.auto_fix_high_rounded,
+                  color: type.accentColor.withValues(alpha: 0.7),
+                  size: widget.size * 0.35,
                 ),
-              ),
-            ],
+                SizedBox(height: widget.size > 48 ? 6 : 2),
+                if (widget.size > 40)
+                  Text(
+                    type.displayName.toUpperCase(),
+                    style: TextStyle(
+                      color: type.accentColor.withValues(alpha: 0.5),
+                      fontSize: (widget.size * 0.07).clamp(8, 11),
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

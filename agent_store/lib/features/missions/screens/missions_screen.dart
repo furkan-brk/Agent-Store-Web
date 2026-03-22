@@ -68,15 +68,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
   static String _categorize(MissionModel m) {
     final text = '${m.title} ${m.prompt}'.toLowerCase();
     if (text.contains('code') || text.contains('api') || text.contains('debug') ||
-        text.contains('test') || text.contains('function') || text.contains('bug')) return 'Code';
+        text.contains('test') || text.contains('function') || text.contains('bug')) {
+      return 'Code';
+    }
     if (text.contains('write') || text.contains('blog') || text.contains('email') ||
-        text.contains('copy') || text.contains('content') || text.contains('article')) return 'Writing';
+        text.contains('copy') || text.contains('content') || text.contains('article')) {
+      return 'Writing';
+    }
     if (text.contains('data') || text.contains('analy') || text.contains('report') ||
-        text.contains('metric') || text.contains('dashboard')) return 'Data';
+        text.contains('metric') || text.contains('dashboard')) {
+      return 'Data';
+    }
     if (text.contains('design') || text.contains('ui') || text.contains('ux') ||
-        text.contains('layout') || text.contains('style')) return 'Design';
+        text.contains('layout') || text.contains('style')) {
+      return 'Design';
+    }
     if (text.contains('research') || text.contains('study') || text.contains('investigat') ||
-        text.contains('review') || text.contains('compare')) return 'Research';
+        text.contains('review') || text.contains('compare')) {
+      return 'Research';
+    }
     return 'Code';
   }
 

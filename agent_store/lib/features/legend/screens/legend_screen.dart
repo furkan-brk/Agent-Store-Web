@@ -1328,13 +1328,14 @@ class _LegendScreenState extends State<LegendScreen>
           onPopInvokedWithResult: (didPop, _) async {
             if (didPop) return;
             final action = await _showUnsavedDialog();
-            if (!mounted) return;
+            if (!context.mounted) return;
             if (action == 'save') {
               await _saveWorkflow();
-              if (mounted) Navigator.of(context).maybePop();
+              if (!context.mounted) return;
+              Navigator.of(context).maybePop();
             } else if (action == 'discard') {
               _markSaved(); // clear dirty flag
-              if (mounted) Navigator.of(context).maybePop();
+              Navigator.of(context).maybePop();
             }
           },
           child: Scaffold(

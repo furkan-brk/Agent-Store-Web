@@ -54,7 +54,7 @@ class AgentStoreApp extends StatelessWidget {
             telemetry.markFirstFrame();
           });
         }
-        return SelectionArea(child: child ?? const SizedBox.shrink());
+        return child ?? const SizedBox.shrink();
       },
     );
   }

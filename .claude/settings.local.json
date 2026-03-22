@@ -79,7 +79,12 @@
       "Bash(dart analyze:*)",
       "Bash(docker-compose version:*)",
       "Bash(flutter pub:*)",
-      "Bash(find /c/Projeler/Agent-Store-Web/agent_store/lib/features -name \"*_screen.dart\" -exec wc -l {} +)"
+      "Bash(find /c/Projeler/Agent-Store-Web/agent_store/lib/features -name \"*_screen.dart\" -exec wc -l {} +)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill:*)",
+      "Bash(cmd.exe //c \"taskkill /F /PID 19180\")",
+      "Bash(flutter run:*)",
+      "Bash(cmd.exe //c \"taskkill /F /PID 18824\")"
     ]
   }
 }

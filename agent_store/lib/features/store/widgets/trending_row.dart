@@ -148,20 +148,24 @@ class _TrendingRowState extends State<TrendingRow> {
     final cardW = isMobile ? 130.0 : 140.0;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: hPad),
-      child: Row(
-        children: List.generate(6, (i) => Container(
-          width: cardW,
-          margin: EdgeInsets.only(right: i < 5 ? (isMobile ? 8 : 12) : 0),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: const LinearGradient(
-              colors: [AppTheme.card, AppTheme.card2],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(6, (i) => Container(
+            width: cardW,
+            height: 160,
+            margin: EdgeInsets.only(right: i < 5 ? (isMobile ? 8 : 12) : 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: const LinearGradient(
+                colors: [AppTheme.card, AppTheme.card2],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: AppTheme.border),
             ),
-            border: Border.all(color: AppTheme.border),
-          ),
-        )),
+          )),
+        ),
       ),
     );
   }

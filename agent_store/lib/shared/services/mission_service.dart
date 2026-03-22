@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/mission_model.dart';
 import 'api_service.dart';
 import 'local_kv_store.dart';
-import 'notification_service.dart';
+
 
 enum SyncStatus { synced, syncing, pending, failed }
 
@@ -100,47 +100,55 @@ class MissionService {
       List<MissionModel> remote = <MissionModel>[];
 
       try {
-        // Always try to sync local missions to backend first (with retry).
-        if (local.isNotEmpty) {
-          remote = await ApiService.instance.retry(
-            () => ApiService.instance.batchSyncMissions(local),
-          );
-        }
+        // 1. Always fetch remote (DB is the primary source of truth).
+        remote = await ApiService.instance.retry(
+          () => ApiService.instance.getUserMissions(),
+        );
 
-        // If batch sync failed or local was empty, fetch from backend.
-        if (remote.isEmpty) {
-          remote = await ApiService.instance.retry(
-            () => ApiService.instance.getUserMissions(),
-          );
+        // 2. If local has missions not in remote, sync them up.
+        if (local.isNotEmpty) {
+          final remoteIds = remote.map((m) => m.id).toSet();
+          final localOnly = local.where((m) => !remoteIds.contains(m.id)).toList();
+          if (localOnly.isNotEmpty) {
+            final synced = await ApiService.instance.retry(
+              () => ApiService.instance.batchSyncMissions(localOnly),
+            );
+            if (synced.isNotEmpty) {
+              // Re-fetch to get the merged state from backend.
+              remote = await ApiService.instance.retry(
+                () => ApiService.instance.getUserMissions(),
+              );
+            }
+          }
         }
       } catch (e) {
         debugPrint('MissionService: retry exhausted — $e');
       }
 
-      // Detect sync failure: authenticated + remote empty + local non-empty
       if (remote.isEmpty && local.isNotEmpty) {
-        debugPrint('MissionService: sync failed — ${local.length} missions saved locally only');
-        _syncError = 'Sync failed — ${local.length} missions saved locally only';
+        // Backend unreachable — fall back to local cache.
+        debugPrint('MissionService: sync failed — using ${local.length} local missions');
+        _syncError = 'Sync failed — using local cache';
         syncStatusNotifier.value = SyncStatus.failed;
-        await NotificationService.instance.add(
-          'Mission sync failed — ${local.length} missions saved locally only',
-          type: 'info',
-        );
+        _missions
+          ..clear()
+          ..addAll(local);
       } else {
+        // Backend is primary: use remote, merge any unsyncable local extras.
         debugPrint('MissionService: sync OK — ${remote.length} remote, ${local.length} local');
         _syncError = null;
         _lastSyncTime = DateTime.now();
         syncStatusNotifier.value = SyncStatus.synced;
+        _missions
+          ..clear()
+          ..addAll(remote);
       }
-
-      _missions
-        ..clear()
-        ..addAll(_mergeMissions(local, remote));
       _sort();
       await _saveLocal();
       return;
     }
 
+    // Not authenticated — local-only mode.
     _missions
       ..clear()
       ..addAll(local);
@@ -332,17 +340,6 @@ class MissionService {
   Future<void> _saveLocal() async {
     final data = jsonEncode(_missions.map((m) => m.toJson()).toList());
     await LocalKvStore.instance.setString(_storageKey, data);
-  }
-
-  List<MissionModel> _mergeMissions(List<MissionModel> local, List<MissionModel> remote) {
-    final merged = <String, MissionModel>{};
-    for (final mission in local) {
-      merged[mission.id] = mission;
-    }
-    for (final mission in remote) {
-      merged[mission.id] = mission;
-    }
-    return merged.values.toList();
   }
 
   void _sort() {

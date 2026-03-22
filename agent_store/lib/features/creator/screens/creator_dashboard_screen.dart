@@ -307,7 +307,7 @@ class CreatorDashboardScreen extends StatelessWidget {
       ),
       _StatCard(
         icon: Icons.monetization_on_rounded,
-        value: '${ctrl.totalRevenue.toStringAsFixed(1)}',
+        value: ctrl.totalRevenue.toStringAsFixed(1),
         label: 'Total Revenue (MON)',
         accentColor: const Color(0xFFD4A843),
       ),

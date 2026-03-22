@@ -9,7 +9,7 @@ import '../models/workflow_models.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/services/mission_service.dart' show SyncStatus;
-import '../../../shared/services/notification_service.dart';
+
 
 class LegendService {
   static final LegendService instance = LegendService._();
@@ -93,41 +93,48 @@ class LegendService {
       List<LegendWorkflow> remote = <LegendWorkflow>[];
 
       try {
-        if (local.isNotEmpty) {
-          remote = await ApiService.instance.retry(
-            () => ApiService.instance.batchSyncLegendWorkflows(local),
-          );
-        }
+        // 1. Always fetch remote (DB is the primary source of truth).
+        remote = await ApiService.instance.retry(
+          () => ApiService.instance.getLegendWorkflows(),
+        );
 
-        if (remote.isEmpty) {
-          remote = await ApiService.instance.retry(
-            () => ApiService.instance.getLegendWorkflows(),
-          );
+        // 2. If local has workflows not in remote, sync them up.
+        if (local.isNotEmpty) {
+          final remoteIds = remote.map((w) => w.id).toSet();
+          final localOnly = local.where((w) => !remoteIds.contains(w.id)).toList();
+          if (localOnly.isNotEmpty) {
+            final synced = await ApiService.instance.retry(
+              () => ApiService.instance.batchSyncLegendWorkflows(localOnly),
+            );
+            if (synced.isNotEmpty) {
+              remote = await ApiService.instance.retry(
+                () => ApiService.instance.getLegendWorkflows(),
+              );
+            }
+          }
         }
       } catch (e) {
         debugPrint('LegendService: retry exhausted — $e');
       }
 
       if (remote.isEmpty && local.isNotEmpty) {
-        debugPrint('LegendService: sync failed — ${local.length} workflows saved locally only');
-        _syncError = 'Sync failed — ${local.length} workflows saved locally only';
+        debugPrint('LegendService: sync failed — using ${local.length} local workflows');
+        _syncError = 'Sync failed — using local cache';
         syncStatusNotifier.value = SyncStatus.failed;
-        await NotificationService.instance.add(
-          'Workflow sync failed — ${local.length} workflows saved locally only',
-          type: 'info',
-        );
+        _workflows = local;
       } else {
         debugPrint('LegendService: sync OK — ${remote.length} remote, ${local.length} local');
         _syncError = null;
         _lastSyncTime = DateTime.now();
         syncStatusNotifier.value = SyncStatus.synced;
+        _workflows = remote;
       }
-
-      _workflows = _mergeWorkflows(local, remote);
       _sortWorkflows();
       await _persistLocal();
       return;
     }
+
+    // Not authenticated — local-only mode.
     _workflows = local;
     _sortWorkflows();
     syncStatusNotifier.value = SyncStatus.pending;
@@ -223,17 +230,6 @@ class LegendService {
       _storageKey,
       jsonEncode(_workflows.map((w) => w.toJson()).toList()),
     );
-  }
-
-  List<LegendWorkflow> _mergeWorkflows(List<LegendWorkflow> local, List<LegendWorkflow> remote) {
-    final merged = <String, LegendWorkflow>{};
-    for (final workflow in local) {
-      merged[workflow.id] = workflow;
-    }
-    for (final workflow in remote) {
-      merged[workflow.id] = workflow;
-    }
-    return merged.values.toList();
   }
 
   /// Create a brand-new empty workflow.
