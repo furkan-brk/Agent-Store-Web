@@ -275,7 +275,7 @@ class ClaudeExportService {
       }
 
       // END node
-      final endId = 'end_0';
+      const endId = 'end_0';
       nodes.add(WorkflowNode(
         id: endId,
         type: WorkflowNodeType.end,
@@ -390,7 +390,7 @@ class ClaudeExportService {
         i++;
       }
 
-      final endId = 'end_0';
+      const endId = 'end_0';
       nodes.add(WorkflowNode(
         id: endId,
         type: WorkflowNodeType.end,

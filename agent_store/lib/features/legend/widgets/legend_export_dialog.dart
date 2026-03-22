@@ -1,7 +1,8 @@
 // lib/features/legend/widgets/legend_export_dialog.dart
 
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
@@ -65,12 +66,16 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
 
   void _downloadFile(String content, String filename,
       {String mimeType = 'text/plain'}) {
-    final blob = html.Blob([content], mimeType);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', filename)
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    final blob = web.Blob(
+      [content.toJS].toJS,
+      web.BlobPropertyBag(type: mimeType),
+    );
+    final url = web.URL.createObjectURL(blob);
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    web.URL.revokeObjectURL(url);
   }
 
   void _showSnack(String msg) {

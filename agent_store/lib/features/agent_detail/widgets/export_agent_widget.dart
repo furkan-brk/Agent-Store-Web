@@ -1,8 +1,7 @@
 // lib/features/agent_detail/widgets/export_agent_widget.dart
-// ignore_for_file: avoid_web_libraries_in_flutter
-import 'dart:convert';
-// ignore: deprecated_member_use
-import 'dart:html' as html;
+
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,7 +18,7 @@ class ExportAgentWidget extends StatelessWidget {
   // ── File content builders ─────────────────────────────────────────────────
 
   String _buildClaudeMd() {
-    final url = '${html.window.location.origin}/agent/${agent.id}';
+    final url = '${web.window.location.origin}/agent/${agent.id}';
     final buf = StringBuffer()
       ..writeln('# ${agent.title}')
       ..writeln()
@@ -35,13 +34,16 @@ class ExportAgentWidget extends StatelessWidget {
   // ── Download helper ───────────────────────────────────────────────────────
 
   void _downloadFile(String content, String filename) {
-    final bytes = utf8.encode(content);
-    final blob = html.Blob([bytes], 'text/plain');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', filename)
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    final blob = web.Blob(
+      [content.toJS].toJS,
+      web.BlobPropertyBag(type: 'text/plain'),
+    );
+    final url = web.URL.createObjectURL(blob);
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    web.URL.revokeObjectURL(url);
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
