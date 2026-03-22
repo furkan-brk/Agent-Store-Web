@@ -162,7 +162,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: rarityColor.withValues(alpha: 0.3)),
                 ),
-                child: Center(child: Text(guild.roleIcon, style: const TextStyle(fontSize: 26))),
+                child: Center(child: Icon(guild.roleIconData, color: guild.roleIconColor, size: 26)),
               ),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -721,13 +721,13 @@ class _MemberRow extends StatefulWidget {
 class _MemberRowState extends State<_MemberRow> {
   bool _hovered = false;
 
-  String get _roleIcon => switch (widget.member.role) {
-    'Brain'     => '🧠',
-    'Shield'    => '🛡',
-    'Scout'     => '⚡',
-    'Innovator' => '💡',
-    'Striker'   => '⚔',
-    _           => '●',
+  IconData get _roleIconData => switch (widget.member.role) {
+    'Brain'     => Icons.psychology,
+    'Shield'    => Icons.shield,
+    'Scout'     => Icons.bolt,
+    'Innovator' => Icons.lightbulb_outline,
+    'Striker'   => Icons.gps_fixed,
+    _           => Icons.circle,
   };
 
   String _shortWallet(String w) => w.length <= 12 ? w : '${w.substring(0, 6)}...${w.substring(w.length - 4)}';
@@ -774,7 +774,7 @@ class _MemberRowState extends State<_MemberRow> {
             ),
             const SizedBox(height: 3),
             Row(children: [
-              Text(_roleIcon, style: const TextStyle(fontSize: 12)),
+              Icon(_roleIconData, size: 14, color: typeColor),
               const SizedBox(width: 4),
               Text(
                 '${widget.member.role} · ${agent.characterType.displayName}',

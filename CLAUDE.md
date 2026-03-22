@@ -191,7 +191,7 @@ services:
 - [x] **v2.3 — Mini chat + Radar chart + Fork butonu** (Frontend + Backend) ✅ 0 hata
 - [x] **v2.4 — Kullanıcı Profili ekranı** (Frontend + Backend) ✅ 0 hata
 - [x] **v2.5 — Blockchain Credits + Leaderboard** (Backend + Frontend) → Blok 6 + 8 ✅
-- [ ] **v2.6 — Docker rebuild + E2E test** (Team Leader) → SPRINT_V2_TRACKER.md #Blok7
+- [x] **v2.6 — Docker rebuild + E2E test** (Team Leader) ✅ 9/9 container UP, 20 E2E test passed
 - [x] **v3.0 — Legend: Touch/Touchpad + Claude Agent Export + Live Claude Execution** (Frontend + Backend) ✅ 16 task
 
 ## v3.0 Legend Sprint Detaylari (2026-03-22)

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import 'agent_model.dart';
 
 class GuildMemberModel {
@@ -96,15 +98,21 @@ class GuildModel {
 
   int get memberCount => members.length;
 
-  String get roleIcon {
-    return switch (rarity.toLowerCase()) {
-      'legendary' => '👑',
-      'epic'      => '💎',
-      'rare'      => '⭐',
-      'uncommon'  => '🔥',
-      _           => '🛡',
-    };
-  }
+  IconData get roleIconData => switch (rarity.toLowerCase()) {
+    'legendary' => Icons.workspace_premium,
+    'epic'      => Icons.diamond,
+    'rare'      => Icons.star,
+    'uncommon'  => Icons.local_fire_department,
+    _           => Icons.shield,
+  };
+
+  Color get roleIconColor => switch (rarity.toLowerCase()) {
+    'legendary' => Colors.amber,
+    'epic'      => Colors.purple,
+    'rare'      => Colors.blue,
+    'uncommon'  => Colors.orange,
+    _           => Colors.grey,
+  };
 }
 
 class GuildDetailModel {

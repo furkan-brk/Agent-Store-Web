@@ -294,7 +294,7 @@ class _GuildCardState extends State<_GuildCard> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // -- Header: icon + name
             Row(children: [
-              Text(guild.roleIcon, style: const TextStyle(fontSize: 22)),
+              Icon(guild.roleIconData, color: guild.roleIconColor, size: 22),
               const SizedBox(width: 10),
               Expanded(child: Text(
                 guild.name,

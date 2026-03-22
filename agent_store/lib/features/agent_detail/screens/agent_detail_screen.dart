@@ -292,11 +292,19 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       final screenWidth = MediaQuery.of(context).size.width;
       final isMobile = screenWidth < 768;
 
-      return Scaffold(
-        backgroundColor: AppTheme.bg,
-        body: isMobile
-            ? _buildMobileLayout(a, hasAccess)
-            : _buildDesktopLayout(a, hasAccess),
+      return CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.escape): () => context.go('/'),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Scaffold(
+            backgroundColor: AppTheme.bg,
+            body: isMobile
+                ? _buildMobileLayout(a, hasAccess)
+                : _buildDesktopLayout(a, hasAccess),
+          ),
+        ),
       );
     });
   }
@@ -2295,14 +2303,20 @@ class _HoverButton extends StatefulWidget {
 
 class _HoverButtonState extends State<_HoverButton> {
   bool _hovered = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final disabled = widget.onPressed == null;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+    return FocusableActionDetector(
+      mouseCursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onShowFocusHighlight: (v) => setState(() => _focused = v),
+      onShowHoverHighlight: (v) => setState(() => _hovered = v),
+      actions: <Type, Action<Intent>>{
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) { widget.onPressed?.call(); return null; },
+        ),
+      },
       child: GestureDetector(
         onTap: widget.onPressed,
         child: AnimatedContainer(
@@ -2311,9 +2325,12 @@ class _HoverButtonState extends State<_HoverButton> {
           decoration: BoxDecoration(
             color: disabled
                 ? widget.color.withValues(alpha: 0.4)
-                : (_hovered ? widget.color : widget.color.withValues(alpha: 0.85)),
+                : ((_hovered || _focused) ? widget.color : widget.color.withValues(alpha: 0.85)),
             borderRadius: BorderRadius.circular(10),
-            boxShadow: _hovered && !disabled
+            border: _focused && !disabled
+                ? Border.all(color: AppTheme.gold.withValues(alpha: 0.6), width: 1.5)
+                : null,
+            boxShadow: (_hovered || _focused) && !disabled
                 ? [BoxShadow(color: widget.color.withValues(alpha: 0.4), blurRadius: 12, spreadRadius: 1)]
                 : null,
           ),
@@ -2511,28 +2528,37 @@ class _HoverIconButton extends StatefulWidget {
 
 class _HoverIconButtonState extends State<_HoverIconButton> {
   bool _hovered = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final baseColor = widget.color ?? AppTheme.textM;
     return Tooltip(
       message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        cursor: SystemMouseCursors.click,
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        onShowHoverHighlight: (v) => setState(() => _hovered = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) { widget.onPressed(); return null; },
+          ),
+        },
         child: GestureDetector(
           onTap: widget.onPressed,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: _hovered ? AppTheme.card2 : Colors.transparent,
+              color: _hovered || _focused ? AppTheme.card2 : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
+              border: _focused
+                  ? Border.all(color: AppTheme.gold.withValues(alpha: 0.5))
+                  : null,
             ),
             child: Icon(
               widget.icon,
-              color: _hovered ? AppTheme.textH : baseColor,
+              color: _hovered || _focused ? AppTheme.textH : baseColor,
               size: 22,
             ),
           ),

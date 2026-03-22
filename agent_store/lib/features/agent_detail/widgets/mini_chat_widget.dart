@@ -214,7 +214,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
       setState(() {
         _messages.add((
           role: 'assistant',
-          text: reply ?? 'Bir hata olustu. Lutfen tekrar deneyin.',
+          text: reply ?? 'An error occurred. Please try again.',
         ));
         _sending = false;
 
@@ -300,7 +300,7 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                   ),
                 IconButton(
                   icon: const Icon(Icons.terminal, size: 16, color: Color(0xFF6366F1)),
-                  tooltip: 'Terminal\'den çalıştır',
+                  tooltip: 'Run from terminal',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => _showTerminalModal(context),
@@ -485,7 +485,7 @@ class _TerminalModal extends StatelessWidget {
   -X POST \\
   -H 'Content-Type: application/json' \\
   -H 'Authorization: Bearer YOUR_JWT_TOKEN' \\
-  --data-raw '{"message":"Merhaba, nasılsın?"}' ''';
+  --data-raw '{"message":"Hello, how are you?"}' ''';
 
     final pythonExample = '''import requests
 
@@ -494,7 +494,7 @@ headers = {
     "Content-Type": "application/json",
     "Authorization": "Bearer YOUR_JWT_TOKEN"
 }
-data = {"message": "Merhaba, nasılsın?"}
+data = {"message": "Hello, how are you?"}
 
 response = requests.post(url, headers=headers, json=data)
 print(response.json())''';
@@ -505,7 +505,7 @@ async function chatWithAgent() {
   try {
     const response = await axios.post(
       '$chatUrl',
-      { message: 'Merhaba, nasılsın?' },
+      { message: 'Hello, how are you?' },
       {
         headers: {
           'Content-Type': 'application/json',
@@ -536,7 +536,7 @@ chatWithAgent();''';
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Terminal\'den $agentTitle Agent\'ı Kullan',
+                    'Use $agentTitle Agent from Terminal',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -601,7 +601,7 @@ chatWithAgent();''';
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'JWT token almanız gerekiyor. Wallet bağlandıktan sonra browser developer tools\'tan Authorization header\'ını kopyalayın.',
+                    'You need a JWT token. After connecting your wallet, copy the Authorization header from browser developer tools.',
                     style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 11),
                   ),
                 ],
@@ -643,7 +643,7 @@ chatWithAgent();''';
                   onPressed: () => _copyToClipboard(code),
                   icon: const Icon(Icons.copy, size: 14, color: Color(0xFF6B7280)),
                   label: const Text(
-                    'Kopyala',
+                    'Copy',
                     style: TextStyle(color: Color(0xFF6B7280), fontSize: 11),
                   ),
                   style: TextButton.styleFrom(

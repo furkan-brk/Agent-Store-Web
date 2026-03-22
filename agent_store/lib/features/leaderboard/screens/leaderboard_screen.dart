@@ -585,7 +585,7 @@ class _RankCardState extends State<_RankCard> {
               color: _hovered
                   ? (isTopThree
                       ? medalColor.withValues(alpha: 0.6)
-                      : AppTheme.border2)
+                      : AppTheme.primary.withValues(alpha: 0.5))
                   : borderColor,
             ),
             gradient: cardGradient,
@@ -593,12 +593,12 @@ class _RankCardState extends State<_RankCard> {
                 ? [
                     BoxShadow(
                       color: (isTopThree ? medalColor : AppTheme.primary)
-                          .withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 2),
+                          .withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
                   ]
-                : null,
+                : [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)],
           ),
           child: Row(
             children: [

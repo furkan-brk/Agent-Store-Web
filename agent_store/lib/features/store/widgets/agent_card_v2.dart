@@ -39,52 +39,70 @@ class AgentCardV2 extends StatefulWidget {
 
 class _AgentCardV2State extends State<AgentCardV2> {
   bool _hovered = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
     final agent = widget.agent;
     final rc = agent.rarity.color;
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+    return FocusableActionDetector(
+      mouseCursor: SystemMouseCursors.click,
+      onShowFocusHighlight: (v) => setState(() => _focused = v),
+      onShowHoverHighlight: (v) => setState(() => _hovered = v),
+      actions: <Type, Action<Intent>>{
+        ActivateIntent: CallbackAction<ActivateIntent>(
+          onInvoke: (_) {
+            context.go('/agent/${agent.id}');
+            return null;
+          },
+        ),
+      },
       child: AnimatedScale(
         scale: _hovered ? 1.02 : 1.0,
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        child: InkWell(
+        child: GestureDetector(
           onTap: () => context.go('/agent/${agent.id}'),
-          borderRadius: BorderRadius.circular(14),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             decoration: BoxDecoration(
               color: AppTheme.card,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: _hovered
-                    ? rc.withValues(alpha: 0.6)
-                    : rc.withValues(alpha: 0.25),
-                width: 1.2,
+                color: _focused
+                    ? AppTheme.gold.withValues(alpha: 0.6)
+                    : _hovered
+                        ? rc.withValues(alpha: 0.6)
+                        : rc.withValues(alpha: 0.25),
+                width: _focused ? 1.5 : 1.2,
               ),
-              boxShadow: _hovered
+              boxShadow: _focused
                   ? [
                       BoxShadow(
-                        color: rc.withValues(alpha: 0.25),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.4),
+                        color: AppTheme.gold.withValues(alpha: 0.15),
                         blurRadius: 12,
-                        offset: const Offset(0, 4),
                       ),
                     ]
-                  : [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
+                  : _hovered
+                      ? [
+                          BoxShadow(
+                            color: rc.withValues(alpha: 0.25),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
                     ],
             ),
             child: Stack(

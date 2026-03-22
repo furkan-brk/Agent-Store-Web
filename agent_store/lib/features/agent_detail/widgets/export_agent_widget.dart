@@ -170,35 +170,45 @@ class _ExportPillButton extends StatefulWidget {
 
 class _ExportPillButtonState extends State<_ExportPillButton> {
   bool _hovered = false;
+  bool _focused = false;
 
   @override
   Widget build(BuildContext context) {
+    final active = _hovered || _focused;
     return Tooltip(
       message: widget.tooltip,
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        cursor: SystemMouseCursors.click,
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        onShowHoverHighlight: (v) => setState(() => _hovered = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) { widget.onPressed(); return null; },
+          ),
+        },
         child: GestureDetector(
           onTap: widget.onPressed,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
-              color: _hovered
+              color: active
                   ? widget.accentColor.withValues(alpha: 0.18)
                   : AppTheme.card2,
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: _hovered
-                    ? widget.accentColor.withValues(alpha: 0.6)
-                    : AppTheme.border,
-                width: _hovered ? 1.5 : 1.0,
+                color: _focused
+                    ? AppTheme.gold.withValues(alpha: 0.6)
+                    : active
+                        ? widget.accentColor.withValues(alpha: 0.6)
+                        : AppTheme.border,
+                width: active ? 1.5 : 1.0,
               ),
-              boxShadow: _hovered
+              boxShadow: active
                   ? [
                       BoxShadow(
-                        color: widget.accentColor.withValues(alpha: 0.15),
+                        color: (_focused ? AppTheme.gold : widget.accentColor)
+                            .withValues(alpha: 0.15),
                         blurRadius: 8,
                         spreadRadius: 1,
                       ),
@@ -217,7 +227,7 @@ class _ExportPillButtonState extends State<_ExportPillButton> {
                     Text(
                       widget.label,
                       style: TextStyle(
-                        color: _hovered ? widget.accentColor : AppTheme.textB,
+                        color: active ? widget.accentColor : AppTheme.textB,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -225,7 +235,7 @@ class _ExportPillButtonState extends State<_ExportPillButton> {
                     Text(
                       widget.subtitle,
                       style: TextStyle(
-                        color: _hovered
+                        color: active
                             ? widget.accentColor.withValues(alpha: 0.7)
                             : AppTheme.textM,
                         fontSize: 10,

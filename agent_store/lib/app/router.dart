@@ -43,6 +43,14 @@ class _GoLegendIntent extends Intent {
   const _GoLegendIntent();
 }
 
+class _DismissIntent extends Intent {
+  const _DismissIntent();
+}
+
+class _FocusSearchIntent extends Intent {
+  const _FocusSearchIntent();
+}
+
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/',
@@ -136,6 +144,8 @@ class _AppShellState extends State<_AppShell> {
         SingleActivator(LogicalKeyboardKey.keyC, alt: true): _GoCreateIntent(),
         SingleActivator(LogicalKeyboardKey.keyG, alt: true): _GoGuildIntent(),
         SingleActivator(LogicalKeyboardKey.keyW, alt: true): _GoLegendIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): _DismissIntent(),
+        SingleActivator(LogicalKeyboardKey.slash): _FocusSearchIntent(),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -166,6 +176,18 @@ class _AppShellState extends State<_AppShell> {
           _GoLegendIntent: CallbackAction<_GoLegendIntent>(
             onInvoke: (_) {
               context.go('/legend');
+              return null;
+            },
+          ),
+          _DismissIntent: CallbackAction<_DismissIntent>(
+            onInvoke: (_) {
+              Navigator.of(context).maybePop();
+              return null;
+            },
+          ),
+          _FocusSearchIntent: CallbackAction<_FocusSearchIntent>(
+            onInvoke: (_) {
+              // Search focus requires cross-widget state — left as no-op for now
               return null;
             },
           ),
@@ -332,8 +354,9 @@ class _Sidebar extends StatelessWidget {
       width: isDrawer ? null : 220,
       color: theme.scaffoldBackgroundColor,
       child: SafeArea(
-        child: Column(
-          children: [
+        child: FocusTraversalGroup(
+          child: Column(
+            children: [
             const SizedBox(height: 24),
             // ── Branding ──
             Padding(
@@ -454,7 +477,8 @@ class _Sidebar extends StatelessWidget {
               child: _UserFooter(isDrawer: isDrawer),
             ),
             const SizedBox(height: 12),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -625,15 +649,22 @@ class _NavItem extends StatefulWidget {
 
 class _NavItemState extends State<_NavItem> {
   bool _hovered = false;
+  bool _focused = false;
 
   bool get _selected => widget.loc == widget.path || (widget.path != '/' && widget.loc.startsWith(widget.path));
+
+  void _navigate() {
+    context.go(widget.path);
+    // Close drawer on mobile after navigation
+    if (widget.isDrawer) Navigator.of(context).maybePop();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Determine colors based on state: selected > hovered > default
+    // Determine colors based on state: selected > focused/hovered > default
     Color iconColor;
     Color labelColor;
     Color bgColor;
@@ -644,7 +675,7 @@ class _NavItemState extends State<_NavItem> {
       labelColor = colorScheme.primary;
       bgColor = colorScheme.primary.withValues(alpha: 0.12);
       fontWeight = FontWeight.w600;
-    } else if (_hovered) {
+    } else if (_hovered || _focused) {
       iconColor = colorScheme.onSurface;
       labelColor = colorScheme.onSurface;
       bgColor = colorScheme.onSurface.withValues(alpha: 0.06);
@@ -658,16 +689,20 @@ class _NavItemState extends State<_NavItem> {
 
     final item = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 1),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
+      child: FocusableActionDetector(
+        mouseCursor: SystemMouseCursors.click,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        onShowHoverHighlight: (v) => setState(() => _hovered = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              _navigate();
+              return null;
+            },
+          ),
+        },
         child: GestureDetector(
-          onTap: () {
-            context.go(widget.path);
-            // Close drawer on mobile after navigation
-            if (widget.isDrawer) Navigator.of(context).maybePop();
-          },
+          onTap: _navigate,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -679,7 +714,9 @@ class _NavItemState extends State<_NavItem> {
                   ? Border(
                       left: BorderSide(color: colorScheme.primary, width: 3),
                     )
-                  : null,
+                  : _focused
+                      ? Border.all(color: colorScheme.primary.withValues(alpha: 0.4), width: 1)
+                      : null,
             ),
             child: Row(
               children: [
