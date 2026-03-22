@@ -68,7 +68,16 @@
       "Bash(find /c/Projeler/Agent-Store-Web -name *rembg* -o -name rembg_server*)",
       "Bash(find /c/Projeler/Agent-Store-Web -type f -name *.railroad -o -name .railway* -o -name Procfile -o -name *.env* -o -name requirements.txt)",
       "Bash(xargs grep:*)",
-      "Bash(grep -n \"^[[:space:]]*//\" /c/Projeler/Agent-Store-Web/backend/services/aipipeline/rembg.go)"
+      "Bash(grep -n \"^[[:space:]]*//\" /c/Projeler/Agent-Store-Web/backend/services/aipipeline/rembg.go)",
+      "Bash(where go:*)",
+      "Read(//c/Program Files/Go/**)",
+      "Read(//c/Go/**)",
+      "Bash(cmd.exe /c \"cd /d C:\\\\Users\\\\USER\\\\Documents\\\\Code\\\\Agent-Store-Web\\\\backend && go vet ./...\" 2>&1)",
+      "Bash(find /c/Users/USER/Documents/Code/Agent-Store-Web/backend -name *character* -o -name *gamif* -o -name *ai* -o -name *agent*)",
+      "Bash(grep -E \"\\\\.go$\")",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin:/c/Go/bin:$HOME/go/bin\")",
+      "Bash(dart analyze:*)",
+      "Bash(docker-compose version:*)"
     ]
   }
 }

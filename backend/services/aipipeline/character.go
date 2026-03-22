@@ -31,66 +31,145 @@ var characterMap = map[string]CharacterResult{
 }
 
 var keywordMap = map[string]string{
+	// ── Wizard (Backend / Code / DevOps) ──
 	"backend": "wizard", "golang": "wizard", "python": "wizard", "api": "wizard",
 	"database": "wizard", "server": "wizard", "kod": "wizard", "code": "wizard",
 	"developer": "wizard", "sql": "wizard", "java": "wizard", "programmer": "wizard",
+	"rust": "wizard", "typescript": "wizard", "javascript": "wizard", "node": "wizard",
+	"docker": "wizard", "kubernetes": "wizard", "microservice": "wizard", "cli": "wizard",
+	"script": "wizard", "algorithm": "wizard", "compiler": "wizard", "debug": "wizard",
+	"refactor": "wizard", "git": "wizard", "deploy": "wizard", "terraform": "wizard",
+	"lambda": "wizard", "redis": "wizard", "mongodb": "wizard", "graphql": "wizard",
+	"grpc": "wizard", "geliştirici": "wizard", "yazılım": "wizard", "programlama": "wizard",
+
+	// ── Strategist (Planning / PM / Leadership) ──
 	"plan": "strategist", "strategy": "strategist", "project": "strategist",
 	"manager": "strategist", "roadmap": "strategist", "agile": "strategist",
 	"scrum": "strategist", "task": "strategist", "stratejist": "strategist",
+	"lead": "strategist", "coordinate": "strategist", "prioritize": "strategist",
+	"deadline": "strategist", "sprint": "strategist", "okr": "strategist",
+	"milestone": "strategist", "gantt": "strategist", "kanban": "strategist",
+	"delegate": "strategist", "decision": "strategist", "stakeholder": "strategist",
+	"resource": "strategist", "timeline": "strategist", "objective": "strategist",
+	"planlama": "strategist", "yönetim": "strategist", "hedef": "strategist",
+	"organize": "strategist", "schedule": "strategist", "workflow": "strategist",
+
+	// ── Oracle (Data / Analytics / AI/ML) ──
 	"data": "oracle", "analytics": "oracle", "analiz": "oracle", "insight": "oracle",
 	"statistics": "oracle", "ml": "oracle", "machine learning": "oracle",
+	"artificial intelligence": "oracle", "neural": "oracle", "deep learning": "oracle",
+	"dataset": "oracle", "visualization": "oracle", "prediction": "oracle",
+	"tableau": "oracle", "powerbi": "oracle", "pandas": "oracle", "numpy": "oracle",
+	"tensorflow": "oracle", "pytorch": "oracle", "regression": "oracle",
+	"classification": "oracle", "clustering": "oracle", "nlp": "oracle",
+	"llm": "oracle", "embedding": "oracle", "vector": "oracle", "rag": "oracle",
+	"veri": "oracle", "tahmin": "oracle", "model": "oracle", "forecast": "oracle",
+	"metric": "oracle", "dashboard": "oracle", "bigquery": "oracle",
+
+	// ── Guardian (Security / Infrastructure / Reliability) ──
 	"security": "guardian", "güvenlik": "guardian", "firewall": "guardian",
 	"pentest": "guardian", "infra": "guardian", "hacker": "guardian",
+	"encrypt": "guardian", "auth": "guardian", "vulnerability": "guardian",
+	"devops": "guardian", "cloud": "guardian", "aws": "guardian", "azure": "guardian",
+	"monitoring": "guardian", "backup": "guardian", "ssl": "guardian", "tls": "guardian",
+	"oauth": "guardian", "jwt": "guardian", "penetration": "guardian",
+	"compliance": "guardian", "audit": "guardian", "sre": "guardian",
+	"incident": "guardian", "disaster recovery": "guardian",
+	"antivirus": "guardian", "malware": "guardian", "phishing": "guardian",
+	"koruma": "guardian", "şifre": "guardian", "saldırı": "guardian",
+	"vpn": "guardian", "proxy": "guardian", "sandbox": "guardian",
+
+	// ── Artisan (Frontend / Design / UX) ──
 	"frontend": "artisan", "ui": "artisan", "ux": "artisan", "design": "artisan",
-	"flutter": "artisan", "react": "artisan", "css": "artisan", "web": "artisan",
+	"flutter": "artisan", "react": "artisan", "css": "artisan",
+	"figma": "artisan", "prototype": "artisan", "responsive": "artisan",
+	"layout": "artisan", "animation": "artisan", "tailwind": "artisan",
+	"component": "artisan", "widget": "artisan", "sketch": "artisan",
+	"wireframe": "artisan", "pixel": "artisan", "color scheme": "artisan",
+	"typography": "artisan", "icon": "artisan", "illustration": "artisan",
+	"accessibility": "artisan", "mobile app": "artisan", "swiftui": "artisan",
+	"tasarım": "artisan", "arayüz": "artisan", "görsel": "artisan",
+	"html": "artisan", "sass": "artisan", "bootstrap": "artisan",
+
+	// ── Bard (Creative / Writing / Communication) ──
 	"write": "bard", "yaz": "bard", "story": "bard", "creative": "bard",
 	"content": "bard", "blog": "bard", "copy": "bard",
+	"poem": "bard", "translate": "bard", "email": "bard", "summarize": "bard",
+	"tone": "bard", "chat": "bard", "conversation": "bard", "dialogue": "bard",
+	"screenplay": "bard", "novel": "bard", "fiction": "bard", "essay": "bard",
+	"slogan": "bard", "headline": "bard", "caption": "bard", "lyric": "bard",
+	"speech": "bard", "presentation": "bard", "pitch": "bard",
+	"metin": "bard", "hikaye": "bard", "çeviri": "bard", "şiir": "bard",
+	"narrative": "bard", "persona": "bard", "roleplay": "bard",
+	"letter": "bard", "report": "bard",
+
+	// ── Scholar (Research / Education / Knowledge) ──
 	"research": "scholar", "araştır": "scholar", "study": "scholar",
 	"academic": "scholar", "science": "scholar", "learn": "scholar",
+	"explain": "scholar", "teach": "scholar", "tutor": "scholar",
+	"knowledge": "scholar", "history": "scholar", "math": "scholar",
+	"physics": "scholar", "chemistry": "scholar", "biology": "scholar",
+	"philosophy": "scholar", "literature": "scholar", "encyclopedia": "scholar",
+	"thesis": "scholar", "paper": "scholar", "journal": "scholar",
+	"lecture": "scholar", "curriculum": "scholar", "exam": "scholar",
+	"eğitim": "scholar", "öğren": "scholar", "bilim": "scholar", "ders": "scholar",
+	"university": "scholar", "professor": "scholar", "textbook": "scholar",
+	"quiz": "scholar", "homework": "scholar",
+
+	// ── Merchant (Business / Finance / Marketing) ──
 	"business": "merchant", "sales": "merchant", "marketing": "merchant",
 	"growth": "merchant", "revenue": "merchant", "startup": "merchant",
+	"finance": "merchant", "ecommerce": "merchant", "pricing": "merchant",
+	"customer": "merchant", "roi": "merchant", "brand": "merchant",
+	"negotiate": "merchant", "profit": "merchant", "investment": "merchant",
+	"stock": "merchant", "crypto": "merchant", "blockchain": "merchant",
+	"seo": "merchant", "ads": "merchant", "campaign": "merchant",
+	"funnel": "merchant", "conversion": "merchant", "churn": "merchant",
+	"retention": "merchant", "b2b": "merchant", "saas": "merchant",
+	"ticaret": "merchant", "pazarlama": "merchant", "müşteri": "merchant",
+	"gelir": "merchant", "fiyat": "merchant", "satış": "merchant",
 }
 
 var subclassKeywords = map[string]map[string][]string{
 	"wizard": {
-		"archmage":   {"architect", "senior", "system design", "enterprise", "principal"},
-		"sorcerer":   {"fullstack", "versatile", "all", "everything", "general"},
-		"hex_master": {"debug", "fix", "bug", "error", "patch", "troubleshoot"},
+		"archmage":   {"architect", "senior", "system design", "enterprise", "principal", "distributed", "scalable", "microservice", "infrastructure"},
+		"sorcerer":   {"fullstack", "versatile", "all", "everything", "general", "polyglot", "multi-language", "jack of all"},
+		"hex_master": {"debug", "fix", "bug", "error", "patch", "troubleshoot", "diagnose", "stacktrace", "crash", "memory leak"},
 	},
 	"strategist": {
-		"war_commander": {"scale", "growth", "ambitious", "expand", "aggressive"},
-		"tactician":     {"step", "process", "structured", "workflow", "systematic"},
-		"diplomat":      {"collaborate", "team", "stakeholder", "align", "negotiate"},
+		"war_commander": {"scale", "growth", "ambitious", "expand", "aggressive", "vision", "transform", "disrupt", "10x"},
+		"tactician":     {"step", "process", "structured", "workflow", "systematic", "checklist", "sop", "procedure", "framework"},
+		"diplomat":      {"collaborate", "team", "stakeholder", "align", "negotiate", "consensus", "facilitate", "mediate", "cross-functional"},
 	},
 	"oracle": {
-		"prophet": {"predict", "forecast", "ml", "model", "future", "trend"},
-		"analyst": {"metrics", "kpi", "measure", "report", "dashboard"},
-		"seer":    {"pattern", "visualization", "chart", "graph", "insight"},
+		"prophet": {"predict", "forecast", "ml", "model", "future", "trend", "time series", "anomaly", "neural network"},
+		"analyst": {"metrics", "kpi", "measure", "report", "dashboard", "sql", "query", "aggregate", "cohort"},
+		"seer":    {"pattern", "visualization", "chart", "graph", "insight", "heatmap", "correlation", "segment", "funnel"},
 	},
 	"guardian": {
-		"sentinel": {"pentest", "exploit", "hack", "vulnerability", "offensive"},
-		"warden":   {"uptime", "monitor", "alert", "sre", "reliability"},
-		"paladin":  {"compliance", "audit", "policy", "gdpr", "governance"},
+		"sentinel": {"pentest", "exploit", "hack", "vulnerability", "offensive", "ctf", "red team", "injection", "xss"},
+		"warden":   {"uptime", "monitor", "alert", "sre", "reliability", "prometheus", "grafana", "oncall", "latency"},
+		"paladin":  {"compliance", "audit", "policy", "gdpr", "governance", "hipaa", "soc2", "regulation", "privacy"},
 	},
 	"artisan": {
-		"sculptor": {"animation", "3d", "motion", "interactive", "canvas"},
-		"weaver":   {"component", "design system", "library", "storybook"},
-		"painter":  {"visual", "aesthetic", "brand", "color", "palette"},
+		"sculptor": {"animation", "3d", "motion", "interactive", "canvas", "webgl", "three.js", "particle", "transition"},
+		"weaver":   {"component", "design system", "library", "storybook", "reusable", "atomic", "theme", "token"},
+		"painter":  {"visual", "aesthetic", "brand", "color", "palette", "gradient", "shadow", "glassmorphism", "illustration"},
 	},
 	"bard": {
-		"storyteller": {"narrative", "essay", "long", "article", "fiction"},
-		"lyricist":    {"headline", "copy", "tagline", "hook", "viral"},
-		"chronicler":  {"documentation", "guide", "manual", "readme", "wiki"},
+		"storyteller": {"narrative", "essay", "long", "article", "fiction", "worldbuilding", "character arc", "plot", "chapter"},
+		"lyricist":    {"headline", "copy", "tagline", "hook", "viral", "slogan", "punchline", "catchy", "snappy"},
+		"chronicler":  {"documentation", "guide", "manual", "readme", "wiki", "changelog", "release notes", "faq", "how-to"},
 	},
 	"scholar": {
-		"sage":      {"theory", "thesis", "academic", "paper", "philosophy"},
-		"professor": {"teach", "tutorial", "course", "lesson", "explain"},
-		"librarian": {"organize", "catalog", "archive", "curate", "index"},
+		"sage":      {"theory", "thesis", "academic", "paper", "philosophy", "epistemology", "logic", "reasoning", "axiom"},
+		"professor": {"teach", "tutorial", "course", "lesson", "explain", "curriculum", "syllabus", "lecture", "student"},
+		"librarian": {"organize", "catalog", "archive", "curate", "index", "taxonomy", "tag", "classify", "reference"},
 	},
 	"merchant": {
-		"entrepreneur": {"startup", "mvp", "pivot", "launch", "bootstrapped"},
-		"trader":       {"sales", "revenue", "funnel", "conversion", "deal"},
-		"ambassador":   {"brand", "community", "viral", "influencer", "partner"},
+		"entrepreneur": {"startup", "mvp", "pivot", "launch", "bootstrapped", "product-market fit", "seed", "venture", "disrupt"},
+		"trader":       {"sales", "revenue", "funnel", "conversion", "deal", "pipeline", "quota", "close", "upsell"},
+		"ambassador":   {"brand", "community", "viral", "influencer", "partner", "advocacy", "ambassador", "outreach", "engagement"},
 	},
 }
 
@@ -111,7 +190,14 @@ var defaultSubclass = map[string]string{
 	"scholar": "sage", "merchant": "entrepreneur",
 }
 
+// allCharacterTypes enumerates every valid character type for random selection.
+var allCharacterTypes = []string{
+	"wizard", "strategist", "oracle", "guardian",
+	"artisan", "bard", "scholar", "merchant",
+}
+
 // DetermineCharacterType uses keyword matching to classify a prompt into a character type.
+// When no keywords match (bestScore == 0), a random type is selected instead of defaulting to wizard.
 func DetermineCharacterType(prompt string) string {
 	lower := strings.ToLower(prompt)
 	scores := make(map[string]int)
@@ -120,12 +206,16 @@ func DetermineCharacterType(prompt string) string {
 			scores[charType]++
 		}
 	}
-	best, bestScore := "wizard", 0
+	best := ""
+	bestScore := 0
 	for charType, score := range scores {
 		if score > bestScore {
 			bestScore = score
 			best = charType
 		}
+	}
+	if bestScore == 0 {
+		return allCharacterTypes[rand.Intn(len(allCharacterTypes))]
 	}
 	return best
 }

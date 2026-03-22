@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 	"sync"
@@ -300,7 +301,8 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		if imageProfile == nil {
 			imageProfile = &client.AgentProfile{Name: agentConcept}
 		}
-		charType := "wizard" // preliminary; overridden if analysis completes first
+		prelimTypes := []string{"wizard", "strategist", "oracle", "guardian", "artisan", "bard", "scholar", "merchant"}
+		charType := prelimTypes[rand.Intn(len(prelimTypes))]
 		imagePrompt := "A " + charType + " character with unique abilities and tools"
 		avatarRes, _ = s.aiClient.Avatar(ctx, imageProfile, imagePrompt, charType)
 	}()
@@ -310,12 +312,14 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	// Handle analysis result
 	if analysisErr != nil {
 		log.Printf("[Agent] analysis failed, using fallback: %v", analysisErr)
+		allTypes := []string{"wizard", "strategist", "oracle", "guardian", "artisan", "bard", "scholar", "merchant"}
+		fallbackType := allTypes[rand.Intn(len(allTypes))]
 		analysis = &client.AnalysisResult{
-			CharacterType: "wizard",
+			CharacterType: fallbackType,
 			Category:      "general",
 			Tags:          []string{"agent"},
 			Rarity:        "common",
-			ImagePrompt:   "A wizard character with unique abilities and tools",
+			ImagePrompt:   "A " + fallbackType + " character with unique abilities and tools",
 		}
 	}
 

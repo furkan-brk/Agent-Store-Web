@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../shared/models/agent_model.dart';
@@ -27,24 +28,90 @@ class CreateAgentController extends GetxController {
     }
   }
 
+  static final _rng = Random();
+
+  /// Keyword map for scoring-based character type detection.
+  /// Each type has ~30 keywords; all types compete equally via score count.
+  static const _keywords = <CharacterType, List<String>>{
+    CharacterType.wizard: [
+      'backend', 'golang', 'python', 'api', 'database', 'server', 'code',
+      'developer', 'sql', 'java', 'programmer', 'rust', 'typescript',
+      'javascript', 'node', 'docker', 'kubernetes', 'microservice', 'cli',
+      'script', 'algorithm', 'compiler', 'debug', 'refactor', 'git',
+      'deploy', 'terraform', 'lambda', 'redis', 'mongodb', 'graphql',
+      'grpc', 'yazılım', 'programlama',
+    ],
+    CharacterType.strategist: [
+      'plan', 'strategy', 'project', 'manager', 'roadmap', 'agile',
+      'scrum', 'task', 'lead', 'coordinate', 'prioritize', 'deadline',
+      'sprint', 'okr', 'milestone', 'kanban', 'delegate', 'decision',
+      'stakeholder', 'timeline', 'objective', 'organize', 'schedule',
+      'workflow', 'yönetim', 'hedef', 'planlama',
+    ],
+    CharacterType.oracle: [
+      'data', 'analytics', 'insight', 'statistics', 'machine learning',
+      'neural', 'deep learning', 'dataset', 'visualization', 'prediction',
+      'tableau', 'pandas', 'numpy', 'tensorflow', 'pytorch', 'regression',
+      'classification', 'clustering', 'nlp', 'llm', 'embedding', 'vector',
+      'rag', 'model', 'forecast', 'metric', 'dashboard', 'bigquery',
+      'analiz', 'veri', 'tahmin',
+    ],
+    CharacterType.guardian: [
+      'security', 'firewall', 'pentest', 'infra', 'hacker', 'encrypt',
+      'auth', 'vulnerability', 'devops', 'cloud', 'aws', 'azure',
+      'monitoring', 'backup', 'ssl', 'tls', 'oauth', 'jwt',
+      'compliance', 'audit', 'sre', 'incident', 'malware', 'phishing',
+      'vpn', 'proxy', 'sandbox', 'güvenlik', 'koruma', 'şifre',
+    ],
+    CharacterType.artisan: [
+      'frontend', 'ui', 'ux', 'design', 'flutter', 'react', 'css',
+      'figma', 'prototype', 'responsive', 'layout', 'animation',
+      'tailwind', 'component', 'widget', 'wireframe', 'pixel',
+      'typography', 'icon', 'illustration', 'accessibility', 'swiftui',
+      'html', 'sass', 'bootstrap', 'tasarım', 'arayüz', 'görsel',
+    ],
+    CharacterType.bard: [
+      'write', 'story', 'creative', 'content', 'blog', 'copy', 'poem',
+      'translate', 'email', 'summarize', 'tone', 'chat', 'conversation',
+      'dialogue', 'screenplay', 'novel', 'fiction', 'essay', 'slogan',
+      'headline', 'caption', 'speech', 'presentation', 'pitch',
+      'narrative', 'persona', 'roleplay', 'letter', 'hikaye', 'çeviri',
+      'şiir', 'metin',
+    ],
+    CharacterType.scholar: [
+      'research', 'study', 'academic', 'science', 'learn', 'explain',
+      'teach', 'tutor', 'knowledge', 'history', 'math', 'physics',
+      'chemistry', 'biology', 'philosophy', 'literature', 'encyclopedia',
+      'thesis', 'paper', 'journal', 'lecture', 'curriculum', 'exam',
+      'university', 'professor', 'textbook', 'quiz', 'homework',
+      'eğitim', 'öğren', 'bilim', 'ders', 'araştır',
+    ],
+    CharacterType.merchant: [
+      'business', 'sales', 'marketing', 'growth', 'revenue', 'startup',
+      'finance', 'ecommerce', 'pricing', 'customer', 'roi', 'brand',
+      'negotiate', 'profit', 'investment', 'stock', 'crypto', 'blockchain',
+      'seo', 'ads', 'campaign', 'funnel', 'conversion', 'churn',
+      'retention', 'b2b', 'saas', 'ticaret', 'pazarlama', 'müşteri',
+      'gelir', 'fiyat', 'satış',
+    ],
+  };
+
   void detectCharacterType(String promptText) {
     final p = promptText.toLowerCase();
-    CharacterType t = CharacterType.wizard;
-    if (p.contains('plan') || p.contains('strateg') || p.contains('manager')) {
-      t = CharacterType.strategist;
-    } else if (p.contains('data') || p.contains('analyt') || p.contains('ml')) {
-      t = CharacterType.oracle;
-    } else if (p.contains('security') || p.contains('infra')) {
-      t = CharacterType.guardian;
-    } else if (p.contains('frontend') || p.contains('ui') || p.contains('design')) {
-      t = CharacterType.artisan;
-    } else if (p.contains('write') || p.contains('creat') || p.contains('story')) {
-      t = CharacterType.bard;
-    } else if (p.contains('research') || p.contains('learn') || p.contains('study')) {
-      t = CharacterType.scholar;
-    } else if (p.contains('business') || p.contains('sales') || p.contains('market')) {
-      t = CharacterType.merchant;
+    final scores = <CharacterType, int>{};
+    for (final entry in _keywords.entries) {
+      int score = 0;
+      for (final kw in entry.value) {
+        if (p.contains(kw)) score++;
+      }
+      if (score > 0) scores[entry.key] = score;
     }
+    CharacterType? t;
+    if (scores.isNotEmpty) {
+      t = scores.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+    }
+    // Random fallback when no keywords match (mirrors backend behavior)
+    t ??= CharacterType.values[_rng.nextInt(CharacterType.values.length)];
     preview.value = t;
   }
 

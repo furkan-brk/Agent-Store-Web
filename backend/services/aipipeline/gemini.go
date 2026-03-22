@@ -39,28 +39,32 @@ type AgentProfile struct {
 }
 
 var charTypeStyles = map[string]string{
-	"wizard":     "medieval fantasy wizard, deep purple robes, tall pointed hat, crystal-topped staff, arcane runes glowing",
-	"strategist": "medieval fantasy knight commander, crimson cloak over plate armor, golden war medals, commanding pose",
-	"oracle":     "medieval fantasy mystic seer, flowing amber robes, glowing crystal orb, astrolabe instruments",
-	"guardian":   "medieval fantasy armored knight, heavy steel plate armor, tower shield, castle battlements behind",
-	"artisan":    "medieval fantasy master craftsman, leather apron over fine tunic, woodcarving tools, workshop setting",
-	"bard":       "medieval fantasy bard troubadour, emerald green travelling cloak, ornate lute, tavern warmth",
-	"scholar":    "medieval fantasy monk scholar, brown monastic robes, round spectacles, candle-lit scriptorium",
-	"merchant":   "medieval fantasy guild merchant, gold-trimmed doublet, feathered cap, market stall with wares",
+	"wizard":     "medieval fantasy wizard portrait, deep purple robes, tall pointed hat with glowing star, crystal-topped staff floating nearby, arcane runes orbiting, ancient spell tome pages fluttering",
+	"strategist": "medieval fantasy knight commander portrait, crimson cloak over polished plate armor, golden war medals on chest, battle maps and strategy symbols floating around, crown or helm with plume",
+	"oracle":     "medieval fantasy mystic seer portrait, flowing amber and teal robes, third-eye gemstone on forehead, floating constellation maps and star charts, crystal orb hovering nearby, celestial symbols",
+	"guardian":   "medieval fantasy armored knight portrait, heavy ornate steel plate armor, blue heraldic tabard, protective ward runes glowing on armor, stone gargoyle perched on shoulder, shield emblem visible",
+	"artisan":    "medieval fantasy master craftsman portrait, paint-flecked beret, leather apron visible at shoulders, enchanted paint droplets and color swirls floating around, tiny magical tools orbiting",
+	"bard":       "medieval fantasy bard troubadour portrait, wide-brimmed feathered hat with emerald plume, velvet doublet collar visible, shimmering musical notes floating in air, golden lute neck visible at shoulder",
+	"scholar":    "medieval fantasy monk scholar portrait, round brass spectacles on weathered face, brown monastic hood, floating open books with glowing text, enchanted candle flame hovering above shoulder",
+	"merchant":   "medieval fantasy guild merchant portrait, jeweled velvet cap with peacock feather, gold-trimmed brocade collar, floating coins and gems, trained raven perched on shoulder, weighing scales nearby",
 }
 
-const avatarPrompt = `Single character on a solid flat magenta backdrop (#FF00FF). ` +
-	`The entire backdrop must be uniform bright magenta with no gradients, no scenery, no patterns. ` +
-	`The magenta color extends to every pixel of all four edges of the image with no margin, no border, no frame. ` +
-	`Upper-body depiction from the belly upward, centered in the image, square 1:1 composition. ` +
-	`The character's head may be slightly cropped by the top edge of the image. ` +
-	`Detailed 2D medieval fantasy character, clean digital painting style with defined edges, warm rich colors. ` +
-	`The character fills most of the image vertically. Arms close to the body, held items overlap the torso, compact silhouette. ` +
+const avatarPrompt = `Single character portrait on a solid flat white backdrop (#FFFFFF). ` +
+	`The entire backdrop must be uniform pure white with no gradients, no scenery, no patterns, no shadows on the background. ` +
+	`The white extends to every pixel of all four edges with no margin, border, or frame. ` +
+	`PORTRAIT COMPOSITION: Head, neck, shoulders, and upper chest only — cut off just below the collarbones/shoulders. ` +
+	`No arms, no hands, no waist, no torso below the chest. Think classic RPG character portrait or profile picture. ` +
+	`The character's head is large and centered, filling roughly 60-70%% of the image height. Square 1:1 composition. ` +
+	`Richly detailed 2D medieval fantasy character portrait, clean digital painting style with defined edges, warm saturated colors. ` +
+	`FACE AND EXPRESSION: Highly detailed expressive face with distinctive features — piercing or glowing eyes, unique facial markings, scars, or magical tattoos where appropriate. The face tells a story. ` +
 	`Outfit color: %s with %s trim and accents. ` +
-	`Head: %s. Attire: %s. %s. ` +
-	`A soft %s magical glow emanates from their hands. Holds %s. ` +
-	`The character must have a thin dark ink outline along all edges of their silhouette, separating them clearly from the magenta backdrop. ` +
-	`The character should avoid using bright magenta (#FF00FF) as a primary clothing color, but may freely include pink, rose, fuchsia, or purple tones in accents, effects, and details. ` +
+	`Head/face: %s. Visible attire on shoulders/collar: %s. ` +
+	`MAGICAL ARTIFACTS AND PERSONALITY: %s. ` +
+	`Floating magical elements surround the character's head and shoulders: enchanted runes, glowing sigils, swirling arcane particles, ethereal wisps of %s-colored magical energy, mystical symbols orbiting slowly. ` +
+	`%s hovers or floats near the character's shoulder or behind their head, emanating a soft magical glow. ` +
+	`The character must have a thin dark ink outline along all edges of their silhouette, separating them clearly from the white backdrop. ` +
+	`The character should avoid using pure white (#FFFFFF) as a primary clothing or hair color, but may freely include cream, silver, ivory, or light grey tones. ` +
+	`Rich atmospheric details: magical sparkles, tiny floating crystals, wisps of enchanted smoke, or domain-specific mystical particles around the portrait. ` +
 	`No text, letters, numbers, words, or symbols anywhere in the image.`
 
 var (
@@ -81,14 +85,16 @@ var (
 		"overhead lantern light with soft shadows below",
 	}
 	expressionVariants = []string{
-		"confident and commanding",
-		"wise and contemplative",
-		"fierce and battle-ready",
-		"serene and all-knowing",
-		"cunning with a subtle smirk",
-		"noble and dignified",
-		"mysterious and enigmatic",
-		"warm and approachable",
+		"confident and commanding with piercing eyes",
+		"wise and contemplative with ancient knowing gaze",
+		"fierce and battle-ready with a determined set jaw",
+		"serene and all-knowing with softly glowing eyes",
+		"cunning with a subtle knowing smirk and sharp eyes",
+		"noble and dignified with regal bearing",
+		"mysterious and enigmatic with heterochromatic eyes",
+		"warm and approachable with laugh lines and kind eyes",
+		"intensely focused with magical energy reflected in their pupils",
+		"weathered veteran with a thousand-yard stare and old scars",
 	}
 )
 
@@ -150,6 +156,8 @@ func (g *GeminiService) AnalyzePrompt(prompt string) (*PromptAnalysis, error) {
 Type->subclasses: wizard(archmage,sorcerer,hex_master) strategist(war_commander,tactician,diplomat) oracle(prophet,analyst,seer) guardian(sentinel,warden,paladin) artisan(sculptor,weaver,painter) bard(storyteller,lyricist,chronicler) scholar(sage,professor,librarian) merchant(entrepreneur,trader,ambassador)
 
 Type hints: wizard=code/backend, strategist=planning/PM, oracle=data/ML, guardian=security/infra, artisan=frontend/design, bard=writing/creative, scholar=research/education, merchant=business/marketing
+
+IMPORTANT: Distribute character types broadly. Do NOT default to wizard. Only assign wizard if the prompt is clearly about backend programming, coding, or software development. For general-purpose, conversational, or ambiguous prompts, consider: bard (creative/writing/conversation), scholar (knowledge/education/research), or strategist (planning/organization). Aim for variety across all 8 types.
 
 Rarity: common(<80chars,generic) uncommon(somewhat specific) rare(detailed+personality) epic(very detailed,specific tools) legendary(>400chars,complex,multi-role)
 
@@ -243,10 +251,10 @@ Return ONLY valid JSON matching this schema:
   "secondary_color": "Accent/trim color that complements the primary. No neon.",
   "tablet_glow_color": "Color of the character's magical aura or enchanted glow",
   "characteristics": [
-    "Headwear or facial feature: a specific descriptive phrase",
-    "Outfit detail: a specific descriptive phrase",
-    "Unique distinguishing visual feature: something memorable",
-    "Held item: the primary object the character carries"
+    "Headwear or facial feature: distinctive head/face detail visible in a close-up portrait",
+    "Shoulder/collar attire detail: visible outfit detail at neck, shoulders, and upper chest level",
+    "Magical artifact or aura: floating enchanted objects, glowing runes, mystical particles surrounding the character",
+    "Signature item: an iconic object that floats near the shoulder or behind the head, emanating magical energy"
   ]
 }
 
@@ -468,7 +476,7 @@ func sanitizeAnalysis(a PromptAnalysis) PromptAnalysis {
 
 	a.CharacterType = strings.ToLower(strings.TrimSpace(a.CharacterType))
 	if !validTypes[a.CharacterType] {
-		a.CharacterType = "wizard"
+		a.CharacterType = allCharacterTypes[rand.Intn(len(allCharacterTypes))]
 	}
 	a.Category = strings.ToLower(strings.TrimSpace(a.Category))
 	if !validCategories[a.Category] {

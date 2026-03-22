@@ -114,14 +114,26 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
   /// Whether the widget has a resolved image source (URL or base64 bytes).
   bool get _hasImage => _resolvedImageUrl != null || _imageBytes != null;
 
+  /// Whether the caller explicitly requested an image (even if it hasn't loaded yet).
+  /// When true but _hasImage is false, we show a shimmer loader.
+  /// When false, we show the character-type placeholder instead.
+  bool get _expectsImage =>
+      (widget.imageUrl != null && widget.imageUrl!.isNotEmpty) ||
+      (widget.generatedImage != null && widget.generatedImage!.isNotEmpty);
+
   /// Manages the animation controller lifecycle:
-  /// - No image: always loop (drives shimmer skeleton).
+  /// - Expects image but not loaded: always loop (drives shimmer skeleton).
+  /// - No image expected: gentle loop for floating effect on placeholder.
   /// - Image loaded + rare+: loop with rarity-specific duration (drives effects).
   /// - Image loaded + common/uncommon: stop (static, no wasted CPU).
   void _refreshAnimation() {
-    if (!_hasImage) {
+    if (!_hasImage && _expectsImage) {
       // Shimmer mode — fast loop regardless of rarity
       _ctrl.duration = const Duration(milliseconds: 1200);
+      if (!_ctrl.isAnimating) _ctrl.repeat();
+    } else if (!_hasImage && !_expectsImage) {
+      // Placeholder mode — gentle floating animation
+      _ctrl.duration = const Duration(seconds: 3);
       if (!_ctrl.isAnimating) _ctrl.repeat();
     } else if (_shouldAnimate(widget.rarity)) {
       // Image + animated rarity — switch to rarity timing
@@ -188,7 +200,8 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
           animation: _anim,
           builder: (_, __) {
             if (_hasImage) return _buildImageWithEffects(_anim.value);
-            return _loadingShimmer(_anim.value);
+            if (_expectsImage) return _loadingShimmer(_anim.value);
+            return _characterPlaceholder(_anim.value);
           },
         ),
       ),
@@ -291,6 +304,66 @@ class _PixelCharacterWidgetState extends State<PixelCharacterWidget>
     }
 
     return Transform.translate(offset: Offset(0, floatY), child: img);
+  }
+
+  // -- Character placeholder (shown when no image is expected) -----------------
+
+  Widget _characterPlaceholder(double v) {
+    final type = widget.characterType;
+    final floatY = math.sin(v * 2 * math.pi) * 2;
+
+    // Icon mapping per character type
+    const typeIcons = {
+      CharacterType.wizard: Icons.auto_fix_high_rounded,
+      CharacterType.strategist: Icons.psychology_rounded,
+      CharacterType.oracle: Icons.visibility_rounded,
+      CharacterType.guardian: Icons.shield_rounded,
+      CharacterType.artisan: Icons.palette_rounded,
+      CharacterType.bard: Icons.edit_note_rounded,
+      CharacterType.scholar: Icons.menu_book_rounded,
+      CharacterType.merchant: Icons.storefront_rounded,
+    };
+
+    return Transform.translate(
+      offset: Offset(0, floatY),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          width: widget.size,
+          height: widget.size,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                type.secondaryColor,
+                type.primaryColor.withValues(alpha: 0.4),
+              ],
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                typeIcons[type] ?? Icons.auto_fix_high_rounded,
+                color: type.accentColor.withValues(alpha: 0.7),
+                size: widget.size * 0.35,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                type.displayName.toUpperCase(),
+                style: TextStyle(
+                  color: type.accentColor.withValues(alpha: 0.5),
+                  fontSize: (widget.size * 0.07).clamp(8, 11),
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // -- Shimmer skeleton (shown when generatedImage is null/pending) ------------

@@ -8,7 +8,10 @@ import (
 	"image/draw"
 	_ "image/jpeg"
 	"image/png"
+	"io"
 	"log"
+	"mime/multipart"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -19,12 +22,20 @@ import (
 //
 // The Imagen avatar prompt always requests a solid magenta background, so a
 // well-tuned chroma-key algorithm is sufficient for clean extraction.
-type BgRemover struct{}
+type BgRemover struct {
+	clipDropAPIKey string
+}
 
-// NewBgRemover creates a BgRemover.  No configuration is required because
-// the pipeline no longer depends on an external rembg service.
-func NewBgRemover() *BgRemover {
-	return &BgRemover{}
+// NewBgRemover creates a BgRemover.  When clipDropAPIKey is non-empty the
+// ClipDrop background-removal API is tried first; on failure (or when the
+// key is empty) the built-in chroma-key algorithm is used as a fallback.
+func NewBgRemover(clipDropAPIKey string) *BgRemover {
+	if clipDropAPIKey != "" {
+		log.Println("[BG-Remove] ClipDrop API key configured — will use ClipDrop with chroma-key fallback")
+	} else {
+		log.Println("[BG-Remove] No ClipDrop API key — using chroma-key algorithm only")
+	}
+	return &BgRemover{clipDropAPIKey: clipDropAPIKey}
 }
 
 // RemoveBackground decodes a base64-encoded image, removes the magenta
@@ -54,6 +65,21 @@ func (r *BgRemover) RemoveBackground(base64Image string) ([]byte, string) {
 		return nil, ""
 	}
 
+	// --- Try ClipDrop API first if configured ---
+	if r.clipDropAPIKey != "" {
+		clipResult, clipErr := r.clipDropRemoveBackground(imgBytes)
+		if clipErr == nil {
+			elapsed := time.Since(start)
+			log.Printf("[BG-Remove] ClipDrop API succeeded | input=%d bytes | output=%d bytes (%.1f%% of original) | elapsed=%s",
+				len(imgBytes), len(clipResult),
+				float64(len(clipResult))/float64(len(imgBytes))*100,
+				elapsed.Round(time.Millisecond))
+			return clipResult, "png"
+		}
+		log.Printf("[BG-Remove] ClipDrop API failed: %v — falling back to chroma-key", clipErr)
+	}
+
+	// --- Fallback: chroma-key algorithm ---
 	processed, format, err := chromaKeyRemove(imgBytes)
 	if err != nil {
 		log.Printf("[BG-Remove] chroma-key failed: %v — returning original image", err)
@@ -67,6 +93,49 @@ func (r *BgRemover) RemoveBackground(base64Image string) ([]byte, string) {
 		elapsed.Round(time.Millisecond))
 
 	return processed, format
+}
+
+// clipDropRemoveBackground calls the ClipDrop remove-background API and
+// returns the processed image bytes (PNG with transparent background).
+func (r *BgRemover) clipDropRemoveBackground(imgBytes []byte) ([]byte, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+
+	part, err := writer.CreateFormFile("image_file", "image.png")
+	if err != nil {
+		return nil, fmt.Errorf("create form file: %w", err)
+	}
+	if _, err := part.Write(imgBytes); err != nil {
+		return nil, fmt.Errorf("write image data: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("close multipart writer: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "https://clipdrop-api.co/remove-background/v1", &body)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("x-api-key", r.clipDropAPIKey)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("clipdrop request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("clipdrop returned HTTP %d: %s", resp.StatusCode, string(respBytes))
+	}
+
+	return respBytes, nil
 }
 
 // ---------------------------------------------------------------------------

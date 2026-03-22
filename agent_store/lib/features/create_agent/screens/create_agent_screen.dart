@@ -645,51 +645,64 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   // ── Step indicator ────────────────────────────────────────────────────────
 
   Widget _buildStepIndicator() {
+    final currentStep = _ctrl.step.value;
     return Column(
       children: [
         Row(
-          children: List.generate(3, (i) {
-            final active = i == _ctrl.step.value;
-            final done = i < _ctrl.step.value;
-            return Expanded(
-              child: Row(
-                children: [
-                  _StepCircle(
-                    index: i,
-                    active: active,
-                    done: done,
-                    icon: _stepIcons[i],
-                  ),
-                  if (i < 2)
-                    Expanded(
-                      child: Container(
-                        height: 2,
-                        decoration: BoxDecoration(
-                          color: done
-                              ? AppTheme.primary
-                              : AppTheme.border.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ),
-                ],
+          children: [
+            _StepCircle(
+              index: 0,
+              active: currentStep == 0,
+              done: currentStep > 0,
+              icon: _stepIcons[0],
+            ),
+            Expanded(
+              child: Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  color: currentStep > 0
+                      ? AppTheme.primary
+                      : AppTheme.border.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(1),
+                ),
               ),
-            );
-          }),
+            ),
+            _StepCircle(
+              index: 1,
+              active: currentStep == 1,
+              done: currentStep > 1,
+              icon: _stepIcons[1],
+            ),
+            Expanded(
+              child: Container(
+                height: 2,
+                decoration: BoxDecoration(
+                  color: currentStep > 1
+                      ? AppTheme.primary
+                      : AppTheme.border.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ),
+            _StepCircle(
+              index: 2,
+              active: currentStep == 2,
+              done: currentStep > 2,
+              icon: _stepIcons[2],
+            ),
+          ],
         ),
         const SizedBox(height: 10),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: List.generate(3, (i) {
-            final active = i == _ctrl.step.value;
-            final done = i < _ctrl.step.value;
-            return Expanded(
+            final active = i == currentStep;
+            final done = i < currentStep;
+            return SizedBox(
+              width: 70,
               child: Text(
                 _stepLabels[i],
-                textAlign: i == 0
-                    ? TextAlign.left
-                    : i == 2
-                        ? TextAlign.right
-                        : TextAlign.center,
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: active
                       ? AppTheme.primary

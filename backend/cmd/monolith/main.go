@@ -61,7 +61,7 @@ func main() {
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
 	claudeSvc := aipipeline.NewAIService("")
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
-	bgRemover := aipipeline.NewBgRemover()
+	bgRemover := aipipeline.NewBgRemover(cfg.ClipDropAPIKey)
 	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, scoreSvc, bgRemover)
 	pipelineHandler := aipipeline.NewHandler(pipeline)
 

@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 enum CharacterType { wizard, strategist, oracle, guardian, artisan, bard, scholar, merchant }
@@ -207,6 +208,8 @@ extension CharacterRarityExt on CharacterRarity {
   };
 }
 
+final _charTypeRng = Random();
+
 CharacterType characterTypeFromString(String s) => switch (s.toLowerCase()) {
   'strategist' => CharacterType.strategist,
   'oracle'     => CharacterType.oracle,
@@ -215,7 +218,9 @@ CharacterType characterTypeFromString(String s) => switch (s.toLowerCase()) {
   'bard'       => CharacterType.bard,
   'scholar'    => CharacterType.scholar,
   'merchant'   => CharacterType.merchant,
-  _            => CharacterType.wizard,
+  'wizard'     => CharacterType.wizard,
+  // Random fallback for unknown strings (mirrors backend behavior)
+  _            => CharacterType.values[_charTypeRng.nextInt(CharacterType.values.length)],
 };
 
 CharacterSubclass subclassFromString(String s) => switch (s.toLowerCase().replaceAll(' ', '_')) {
