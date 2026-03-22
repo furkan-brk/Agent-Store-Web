@@ -26,7 +26,7 @@ func main() {
 	imageSvc := agent.NewImageService("./uploads", "")
 	cacheStore := cache.NewStore()
 
-	agentSvc := agent.NewAgentService(aiClient, imageSvc, cacheStore)
+	agentSvc := agent.NewAgentService(aiClient, imageSvc, cacheStore, cfg.CreditsContract, cfg.TreasuryWallet)
 	handler := agent.NewHandler(agentSvc)
 	router := agent.SetupRouter(handler)
 

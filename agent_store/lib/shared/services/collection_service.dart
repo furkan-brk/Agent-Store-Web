@@ -88,8 +88,11 @@ class CollectionService {
   }
 
   Future<AgentCollection> create(String name, String color) async {
+    // Use microseconds + random suffix to avoid ID collisions on rapid creation
+    final ts = DateTime.now().microsecondsSinceEpoch;
+    final suffix = (ts % 10000).toRadixString(36);
     final collection = AgentCollection(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: '${DateTime.now().millisecondsSinceEpoch}_$suffix',
       name: name.trim().isEmpty ? 'Unnamed' : name.trim(),
       agentIds: [],
       color: color,

@@ -51,6 +51,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("", handler.ListAgents)
 		agents.GET("/trending", handler.TrendingAgents)
 		agents.GET("/categories", handler.GetCategories)
+		agents.POST("/batch", optionalAuth, handler.BatchGetAgents)
 		agents.GET("/:id", optionalAuth, handler.GetAgent)
 		agents.POST("", auth, createRL.WalletMiddleware(), handler.CreateAgent)
 		agents.PUT("/:id", auth, handler.UpdateAgent)
@@ -83,6 +84,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 
 	// Internal endpoints for cross-service communication
 	internal := r.Group("/internal")
+	internal.Use(dbReady)
 	{
 		internal.GET("/agents/:id", handler.InternalGetAgent)
 		internal.POST("/agents/:id/increment-use", handler.InternalIncrementUse)

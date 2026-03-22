@@ -685,6 +685,24 @@ func (h *Handler) SetAgentPrice(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"price": body.Price, "agent_id": id})
 }
 
+// BatchGetAgents handles POST /api/v1/agents/batch
+func (h *Handler) BatchGetAgents(c *gin.Context) {
+	var body struct {
+		IDs []uint `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	wallet := c.GetString("wallet") // may be empty (optional auth)
+	agents, err := h.agentSvc.BatchGetAgents(body.IDs, wallet)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"agents": agents})
+}
+
 // --- Internal endpoints for cross-service communication ---
 
 // InternalGetAgent handles GET /internal/agents/:id

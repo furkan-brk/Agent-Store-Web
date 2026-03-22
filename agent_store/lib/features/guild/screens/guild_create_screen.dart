@@ -30,6 +30,7 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _nameFocus.dispose();
+    Get.delete<_GuildCreateController>();
     super.dispose();
   }
 
@@ -336,10 +337,19 @@ class _GuildCreateController extends GetxController {
     isCreating.value = true; error.value = null;
     final guild = await ApiService.instance.createGuild(name: n);
     if (guild == null) { error.value = 'Failed to create guild'; isCreating.value = false; return; }
+    final failedMembers = <int>[];
     for (final agentId in selectedIds) {
-      await ApiService.instance.addGuildMember(guild.id, agentId);
+      try {
+        final ok = await ApiService.instance.addGuildMember(guild.id, agentId);
+        if (!ok) failedMembers.add(agentId);
+      } catch (_) {
+        failedMembers.add(agentId);
+      }
     }
     isCreating.value = false;
+    if (failedMembers.isNotEmpty) {
+      error.value = 'Guild created but ${failedMembers.length} member(s) failed to add.';
+    }
     if (ctx.mounted) ctx.go('/guild/${guild.id}');
   }
 }

@@ -30,7 +30,7 @@ class AppNotification {
     id: j['id'] as String,
     message: j['message'] as String,
     type: j['type'] as String? ?? 'info',
-    createdAt: DateTime.parse(j['createdAt'] as String),
+    createdAt: DateTime.tryParse(j['createdAt'] as String? ?? '') ?? DateTime.now(),
     read: j['read'] as bool? ?? false,
   );
 }

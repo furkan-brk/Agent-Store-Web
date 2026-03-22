@@ -13,7 +13,10 @@ import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/mission_service.dart';
 import '../models/workflow_models.dart';
+import '../../../core/utils/input_mode.dart';
+import '../services/claude_export_service.dart';
 import '../services/legend_service.dart';
+import '../widgets/legend_export_dialog.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +50,8 @@ class _LegendScreenState extends State<LegendScreen>
   List<WorkflowEdge> _edges = [];
   Offset _canvasOffset = Offset.zero;
   double _zoom = 1.0;
+  double _baseZoom = 1.0;
+  Offset _lastFocalPoint = Offset.zero;
   String? _selectedNodeId;
   String? _selectedEdgeId;
 
@@ -411,6 +416,7 @@ class _LegendScreenState extends State<LegendScreen>
         x: (n.x + delta.dx / _zoom).clamp(0.0, 4000.0),
         y: (n.y + delta.dy / _zoom).clamp(0.0, 3000.0),
         refId: n.refId,
+        metadata: n.metadata,
       );
     });
   }
@@ -495,7 +501,7 @@ class _LegendScreenState extends State<LegendScreen>
 
   String? _findNearestPortId(Offset localOffset) {
     if (_nodes.isEmpty) return null;
-    const maxDistance = 28.0;
+    final maxDistance = InputModeDetector.portSnapDistance;
     String? nearestPortId;
     var nearestDist = double.infinity;
 
@@ -561,15 +567,54 @@ class _LegendScreenState extends State<LegendScreen>
 
   // ── Canvas pan & zoom ─────────────────────────────────────────────────────
 
-  void _onCanvasPan(DragUpdateDetails d) {
-    setState(() => _canvasOffset += d.delta);
+  void _onCanvasScaleStart(ScaleStartDetails d) {
+    _baseZoom = _zoom;
+    _lastFocalPoint = d.focalPoint;
+  }
+
+  void _onCanvasScaleUpdate(ScaleUpdateDetails d) {
+    setState(() {
+      if (d.scale == 1.0) {
+        // Pan
+        final delta = d.focalPoint - _lastFocalPoint;
+        _canvasOffset += delta;
+        if (_dragFromPort != null) {
+          _onPortDragUpdate(d.focalPoint);
+        }
+      } else {
+        // Pinch zoom toward focal point
+        final newZoom = (_baseZoom * d.scale).clamp(0.3, 2.0);
+        final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+        if (box != null) {
+          final localFocal = box.globalToLocal(d.focalPoint);
+          final focalBefore = (localFocal - _canvasOffset) / _zoom;
+          _zoom = newZoom;
+          _canvasOffset = localFocal - focalBefore * _zoom;
+        } else {
+          _zoom = newZoom;
+        }
+      }
+      _lastFocalPoint = d.focalPoint;
+    });
   }
 
   void _onCanvasZoom(PointerSignalEvent event) {
     if (event is PointerScrollEvent) {
       setState(() {
-        final delta = event.scrollDelta.dy > 0 ? -0.05 : 0.05;
-        _zoom = (_zoom + delta).clamp(0.3, 2.0);
+        final step = event.kind == PointerDeviceKind.trackpad ? 0.01 : 0.05;
+        final delta = event.scrollDelta.dy > 0 ? -step : step;
+        final newZoom = (_zoom + delta).clamp(0.3, 2.0);
+
+        // Zoom toward cursor position
+        final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+        if (box != null) {
+          final localPos = box.globalToLocal(event.position);
+          final focalBefore = (localPos - _canvasOffset) / _zoom;
+          _zoom = newZoom;
+          _canvasOffset = localPos - focalBefore * _zoom;
+        } else {
+          _zoom = newZoom;
+        }
       });
     }
   }
@@ -931,6 +976,130 @@ class _LegendScreenState extends State<LegendScreen>
     );
   }
 
+  // ── Node settings dialog ─────────────────────────────────────────────────
+
+  void _showNodeSettingsDialog(WorkflowNode node) {
+    final meta = node.metadata ?? {};
+    var engine = meta['engine'] as String? ?? 'gemini';
+    var model = meta['model'] as String? ?? 'sonnet';
+    var label = node.label;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppTheme.card,
+            title: const Row(
+              children: [
+                Icon(Icons.settings, color: AppTheme.gold, size: 18),
+                SizedBox(width: 8),
+                Text('Node Settings', style: TextStyle(color: AppTheme.textH, fontSize: 16)),
+              ],
+            ),
+            content: SizedBox(
+              width: 340,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Label
+                  const Text('Label', style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    initialValue: label,
+                    style: const TextStyle(color: AppTheme.textB, fontSize: 13),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppTheme.bg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    onChanged: (v) => label = v,
+                  ),
+                  const SizedBox(height: 14),
+                  // Engine
+                  const Text('Execution Engine', style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      _SettingsChip(label: 'Claude', selected: engine == 'claude', color: const Color(0xFF8B5CF6),
+                          onTap: () => setDialogState(() => engine = 'claude')),
+                      const SizedBox(width: 8),
+                      _SettingsChip(label: 'Gemini', selected: engine == 'gemini', color: const Color(0xFF3B82F6),
+                          onTap: () => setDialogState(() => engine = 'gemini')),
+                    ],
+                  ),
+                  if (engine == 'claude') ...[
+                    const SizedBox(height: 14),
+                    const Text('Model', style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        _SettingsChip(label: 'Haiku (1cr)', selected: model == 'haiku', color: const Color(0xFF10B981),
+                            onTap: () => setDialogState(() => model = 'haiku')),
+                        const SizedBox(width: 6),
+                        _SettingsChip(label: 'Sonnet (3cr)', selected: model == 'sonnet', color: const Color(0xFFF59E0B),
+                            onTap: () => setDialogState(() => model = 'sonnet')),
+                        const SizedBox(width: 6),
+                        _SettingsChip(label: 'Opus (10cr)', selected: model == 'opus', color: const Color(0xFFEF4444),
+                            onTap: () => setDialogState(() => model = 'opus')),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.gold, foregroundColor: AppTheme.bg),
+                onPressed: () {
+                  final idx = _nodes.indexWhere((n) => n.id == node.id);
+                  if (idx >= 0) {
+                    final newMeta = Map<String, dynamic>.from(meta);
+                    newMeta['engine'] = engine;
+                    if (engine == 'claude') newMeta['model'] = model;
+                    setState(() {
+                      _nodes[idx] = _nodes[idx].copyWith(
+                        label: label.trim().isNotEmpty ? label.trim() : null,
+                        metadata: newMeta,
+                      );
+                    });
+                  }
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  int _calculateTotalCredits() {
+    int total = 0;
+    for (final node in _nodes) {
+      if (node.type != WorkflowNodeType.agent) continue;
+      final engine = node.metadata?['engine'] as String? ?? 'gemini';
+      if (engine == 'claude') {
+        final model = node.metadata?['model'] as String? ?? 'sonnet';
+        switch (model) {
+          case 'haiku': total += 1; break;
+          case 'sonnet': total += 3; break;
+          case 'opus': total += 10; break;
+        }
+      } else {
+        total += 1; // gemini = 1 credit
+      }
+    }
+    return total;
+  }
+
   // ── Split guild node ─────────────────────────────────────────────────────
 
   Future<void> _splitGuildNode(WorkflowNode guildNode) async {
@@ -1055,7 +1224,11 @@ class _LegendScreenState extends State<LegendScreen>
 
     showDialog(
       context: context,
-      builder: (_) => _ExportJsonDialog(json: json),
+      builder: (_) => LegendExportDialog(
+        workflow: wf,
+        workflowJson: json,
+        lastExecution: _lastExecution,
+      ),
     );
   }
 
@@ -1121,98 +1294,145 @@ class _LegendScreenState extends State<LegendScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: KeyboardListener(
-        focusNode: FocusNode()..requestFocus(),
-        autofocus: true,
-        onKeyEvent: (event) {
-          if (event is KeyDownEvent &&
-              event.logicalKey == LogicalKeyboardKey.delete) {
-            _deleteSelected();
-          }
-        },
-        child: Column(
-          children: [
-            _buildToolbar(),
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildLeftPanel(),
-                  const VerticalDivider(width: 1, color: AppTheme.border),
-                  Expanded(child: _buildCanvas()),
-                  if (_showResultsPanel) ...[
-                    const VerticalDivider(width: 1, color: AppTheme.border),
-                    _buildResultsPanel(),
-                  ],
-                ],
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 768;
+        return Scaffold(
+          backgroundColor: AppTheme.bg,
+          drawer: isMobile
+              ? Drawer(
+                  backgroundColor: AppTheme.surface,
+                  child: SafeArea(child: _buildLeftPanel()),
+                )
+              : null,
+          body: KeyboardListener(
+            focusNode: FocusNode()..requestFocus(),
+            autofocus: true,
+            onKeyEvent: (event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.delete) {
+                _deleteSelected();
+              }
+            },
+            child: Column(
+              children: [
+                _buildToolbar(isMobile: isMobile),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (!isMobile) _buildLeftPanel(),
+                          if (!isMobile) const VerticalDivider(width: 1, color: AppTheme.border),
+                          Expanded(child: _buildCanvas()),
+                          if (_showResultsPanel) ...[
+                            const VerticalDivider(width: 1, color: AppTheme.border),
+                            _buildResultsPanel(),
+                          ],
+                        ],
+                      ),
+                      // Floating zoom controls for mobile
+                      if (isMobile)
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _ZoomFab(icon: Icons.add, onTap: () => setState(() {
+                                _zoom = (_zoom + 0.1).clamp(0.3, 2.0);
+                              })),
+                              const SizedBox(height: 6),
+                              _ZoomFab(icon: Icons.remove, onTap: () => setState(() {
+                                _zoom = (_zoom - 0.1).clamp(0.3, 2.0);
+                              })),
+                              const SizedBox(height: 6),
+                              _ZoomFab(icon: Icons.crop_free, onTap: () => setState(() {
+                                _zoom = 1.0;
+                                _canvasOffset = Offset.zero;
+                              })),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
   // ── Toolbar ────────────────────────────────────────────────────────────────
 
-  Widget _buildToolbar() {
+  Widget _buildToolbar({bool isMobile = false}) {
     return Container(
       height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 16),
       decoration: const BoxDecoration(
         color: AppTheme.surface,
         border: Border(bottom: BorderSide(color: AppTheme.border)),
       ),
       child: Row(
         children: [
+          if (isMobile)
+            IconButton(
+              icon: const Icon(Icons.menu, color: AppTheme.textM, size: 20),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
           const Icon(Icons.auto_awesome, color: AppTheme.gold, size: 18),
-          const SizedBox(width: 8),
-          const Text(
-            'LEGEND',
-            style: TextStyle(
-              color: AppTheme.gold,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 2,
+          if (!isMobile) ...[
+            const SizedBox(width: 8),
+            const Text(
+              'LEGEND',
+              style: TextStyle(
+                color: AppTheme.gold,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: _showRenameDialog,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '· $_workflowName',
-                  style: TextStyle(
-                    color: AppTheme.textM.withValues(alpha: 0.8),
-                    fontSize: 12,
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: _showRenameDialog,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '· $_workflowName',
+                    style: TextStyle(
+                      color: AppTheme.textM.withValues(alpha: 0.8),
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.edit, size: 12, color: AppTheme.textM),
-              ],
+                  const SizedBox(width: 4),
+                  const Icon(Icons.edit, size: 12, color: AppTheme.textM),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // Zoom indicator
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppTheme.card,
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: AppTheme.border),
+            const SizedBox(width: 12),
+            // Zoom indicator
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.card,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Text(
+                '${(_zoom * 100).round()}%',
+                style: const TextStyle(
+                    color: AppTheme.textM,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600),
+              ),
             ),
-            child: Text(
-              '${(_zoom * 100).round()}%',
-              style: const TextStyle(
-                  color: AppTheme.textM,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600),
-            ),
-          ),
+          ],
           const Spacer(),
           _ToolbarButton(
             icon: Icons.add_box_outlined,
@@ -1288,6 +1508,21 @@ class _LegendScreenState extends State<LegendScreen>
             onTap: _executing ? null : _showExecuteDialog,
             pulseAnimation: _pulseAnim,
           ),
+          if (_nodes.any((n) => n.type == WorkflowNodeType.agent)) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.gold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                '${_calculateTotalCredits()} cr',
+                style: const TextStyle(color: AppTheme.gold, fontSize: 10, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
           const SizedBox(width: 6),
           _ToolbarButton(
             icon: Icons.clear_all,
@@ -1609,6 +1844,7 @@ class _LegendScreenState extends State<LegendScreen>
         final highlight = candidates.isNotEmpty;
         return Listener(
           onPointerSignal: _onCanvasZoom,
+          onPointerDown: (e) => InputModeDetector.detectFromPointerEvent(e),
           child: Container(
             decoration: BoxDecoration(
               color: AppTheme.bg,
@@ -1618,12 +1854,9 @@ class _LegendScreenState extends State<LegendScreen>
             ),
             child: ClipRect(
               child: GestureDetector(
-                onPanUpdate: (d) {
-                  _onCanvasPan(d);
-                  if (_dragFromPort != null) {
-                    _onPortDragUpdate(d.globalPosition);
-                  }
-                },
+                onScaleStart: _onCanvasScaleStart,
+                onScaleUpdate: _onCanvasScaleUpdate,
+                onScaleEnd: (_) {},
                 onTap: _onCanvasTap,
                 behavior: HitTestBehavior.opaque,
                 child: Stack(
@@ -1669,8 +1902,9 @@ class _LegendScreenState extends State<LegendScreen>
                           child: GestureDetector(
                             behavior: HitTestBehavior.opaque,
                             onTap: () => _onNodeTap(node),
-                            onDoubleTap: () =>
-                                _showRenameNodeDialog(node),
+                            onDoubleTap: () => node.type == WorkflowNodeType.agent
+                                ? _showNodeSettingsDialog(node)
+                                : _showRenameNodeDialog(node),
                             onPanUpdate: (d) =>
                                 _moveNode(node.id, d.delta),
                             child: _NodeCard(
@@ -2107,6 +2341,7 @@ class _ToolbarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 768;
     final Color fg = danger
         ? AppTheme.error
         : accent
@@ -2117,26 +2352,31 @@ class _ToolbarButton extends StatelessWidget {
         : accent
             ? AppTheme.gold.withValues(alpha: 0.12)
             : AppTheme.card;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(6),
-          border:
-              Border.all(color: fg.withValues(alpha: accent ? 0.5 : 0.25)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 5),
-            Text(label,
-                style: TextStyle(
-                    color: fg, fontSize: 12, fontWeight: FontWeight.w500)),
-          ],
+    return Tooltip(
+      message: label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 7 : 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(6),
+            border:
+                Border.all(color: fg.withValues(alpha: accent ? 0.5 : 0.25)),
+          ),
+          child: isMobile
+              ? Icon(icon, size: 14, color: fg)
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 14, color: fg),
+                    const SizedBox(width: 5),
+                    Text(label,
+                        style: TextStyle(
+                            color: fg, fontSize: 12, fontWeight: FontWeight.w500)),
+                  ],
+                ),
         ),
       ),
     );
@@ -2897,6 +3137,41 @@ class _NodeCard extends StatelessWidget {
                 ],
               ),
             ),
+            // Engine/model badge
+            if (node.type == WorkflowNodeType.agent && node.metadata?['engine'] != null)
+              Positioned(
+                left: 6,
+                bottom: 4,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: node.metadata!['engine'] == 'claude'
+                            ? const Color(0xFF8B5CF6)
+                            : const Color(0xFF3B82F6),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      node.metadata!['engine'] == 'claude'
+                          ? (node.metadata!['model'] as String? ?? 'sonnet').substring(0, 1).toUpperCase() +
+                            (node.metadata!['model'] as String? ?? 'sonnet').substring(1)
+                          : 'Gemini',
+                      style: TextStyle(
+                        color: node.metadata!['engine'] == 'claude'
+                            ? const Color(0xFF8B5CF6)
+                            : const Color(0xFF3B82F6),
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // Execution result indicator
             if (hasResult)
               Positioned(
@@ -2912,8 +3187,8 @@ class _NodeCard extends StatelessWidget {
               ),
             // Input port (left) — large hit area, small visual dot
             Positioned(
-              left: -14,
-              top: _kNodeH / 2 - 14,
+              left: -(InputModeDetector.portHitSize / 2),
+              top: _kNodeH / 2 - InputModeDetector.portHitSize / 2,
               child: _PortHandle(
                 portId: '${portId}_input',
                 dotColor: AppTheme.border2,
@@ -2925,8 +3200,8 @@ class _NodeCard extends StatelessWidget {
             ),
             // Output port (right) — large hit area, small visual dot
             Positioned(
-              right: -14,
-              top: _kNodeH / 2 - 14,
+              right: -(InputModeDetector.portHitSize / 2),
+              top: _kNodeH / 2 - InputModeDetector.portHitSize / 2,
               child: _PortHandle(
                 portId: '${portId}_output',
                 dotColor: AppTheme.gold,
@@ -2981,14 +3256,15 @@ class _PortHandleState extends State<_PortHandle> {
         onPanStart: (_) => widget.onPortDragStart?.call(widget.portId),
         onPanUpdate: (d) => widget.onPortDragUpdate?.call(d.globalPosition),
         onPanEnd: (_) => widget.onPortDragEnd?.call(widget.portId),
+        onLongPressStart: (_) => widget.onPortDragStart?.call(widget.portId),
         child: SizedBox(
-          width: 28,
-          height: 28,
+          width: InputModeDetector.portHitSize,
+          height: InputModeDetector.portHitSize,
           child: Center(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
-              width: _hovered ? 16 : 12,
-              height: _hovered ? 16 : 12,
+              width: _hovered ? (InputModeDetector.isTouch ? 18 : 16) : (InputModeDetector.isTouch ? 14 : 12),
+              height: _hovered ? (InputModeDetector.isTouch ? 18 : 16) : (InputModeDetector.isTouch ? 14 : 12),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: widget.dotColor,
@@ -3636,69 +3912,56 @@ class _MentionTextField extends StatelessWidget {
 
 // ── Export JSON Dialog ──────────────────────────────────────────────────────
 
-class _ExportJsonDialog extends StatelessWidget {
-  final String json;
-  const _ExportJsonDialog({required this.json});
+class _ZoomFab extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ZoomFab({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppTheme.card,
-      title: const Row(
-        children: [
-          Icon(Icons.data_object, color: AppTheme.gold, size: 20),
-          SizedBox(width: 8),
-          Text('Export Workflow JSON',
-              style: TextStyle(color: AppTheme.textH, fontSize: 16)),
-        ],
+    return Material(
+      color: AppTheme.surface,
+      shape: const CircleBorder(side: BorderSide(color: AppTheme.border)),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(icon, size: 18, color: AppTheme.textB),
+        ),
       ),
-      content: SizedBox(
-        width: 560,
-        height: 420,
+    );
+  }
+}
+
+class _SettingsChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _SettingsChip({required this.label, required this.selected, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? color.withValues(alpha: 0.2) : AppTheme.bg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: AppTheme.bg,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppTheme.border),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? color : AppTheme.border, width: selected ? 1.5 : 1),
           ),
-          child: SingleChildScrollView(
-            child: SelectableText(
-              json,
-              style: const TextStyle(
-                color: AppTheme.textB,
-                fontSize: 11,
-                height: 1.5,
-                fontFamily: 'monospace',
-              ),
-            ),
-          ),
+          child: Text(label, style: TextStyle(color: selected ? color : AppTheme.textM, fontSize: 11, fontWeight: selected ? FontWeight.w600 : FontWeight.normal)),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close', style: TextStyle(color: AppTheme.textM)),
-        ),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.gold,
-            foregroundColor: AppTheme.bg,
-          ),
-          icon: const Icon(Icons.copy, size: 14),
-          label: const Text('Copy'),
-          onPressed: () {
-            Clipboard.setData(ClipboardData(text: json));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('JSON copied to clipboard'),
-                backgroundColor: AppTheme.success,
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
-        ),
-      ],
     );
   }
 }
@@ -3715,6 +3978,15 @@ class _ImportJsonDialog extends StatefulWidget {
 class _ImportJsonDialogState extends State<_ImportJsonDialog> {
   final _controller = TextEditingController();
   String? _error;
+  int _selectedTab = 0; // 0=Workflow JSON, 1=Claude Team Config, 2=Claude Agent .md, 3=Claude Context
+
+  static const _tabLabels = ['Workflow JSON', 'Team Config', 'Agent .md', 'Context'];
+  static const _tabHints = [
+    '{\n  "id": "...",\n  "name": "...",\n  "nodes": [...],\n  "edges": [...]\n}',
+    '{\n  "team_name": "...",\n  "agents": [\n    {"name": "...", "system_prompt": "..."}\n  ]\n}',
+    '---\nname: my-agent\nmodel: sonnet\ncolor: blue\n---\n\nYour agent prompt here...',
+    '# Workflow Execution Context: ...\n\n### Step 1: Agent Name (type)\n**Output:**\n...',
+  ];
 
   @override
   void dispose() {
@@ -3728,19 +4000,96 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
       setState(() => _error = null);
       return;
     }
-    try {
-      final decoded = jsonDecode(text);
-      if (decoded is! Map<String, dynamic>) {
-        setState(() => _error = 'JSON must be an object with nodes and edges.');
-        return;
-      }
-      if (decoded['nodes'] == null) {
-        setState(() => _error = 'Missing "nodes" field.');
-        return;
-      }
-      setState(() => _error = null);
-    } catch (e) {
-      setState(() => _error = 'Invalid JSON syntax.');
+
+    switch (_selectedTab) {
+      case 0: // Workflow JSON
+        try {
+          final decoded = jsonDecode(text);
+          if (decoded is! Map<String, dynamic>) {
+            setState(() => _error = 'JSON must be an object with nodes and edges.');
+            return;
+          }
+          if (decoded['nodes'] == null) {
+            setState(() => _error = 'Missing "nodes" field.');
+            return;
+          }
+          setState(() => _error = null);
+        } catch (e) {
+          setState(() => _error = 'Invalid JSON syntax.');
+        }
+        break;
+      case 1: // Claude Team Config
+        try {
+          final decoded = jsonDecode(text);
+          if (decoded is! Map<String, dynamic>) {
+            setState(() => _error = 'JSON must be an object.');
+            return;
+          }
+          if (decoded['agents'] == null || decoded['agents'] is! List) {
+            setState(() => _error = 'Missing or invalid "agents" array.');
+            return;
+          }
+          setState(() => _error = null);
+        } catch (e) {
+          setState(() => _error = 'Invalid JSON syntax.');
+        }
+        break;
+      case 2: // Claude Agent .md
+        if (!text.contains('---')) {
+          setState(() => _error = 'Missing frontmatter delimiters (---).');
+          return;
+        }
+        final parts = text.split('---');
+        if (parts.length < 3) {
+          setState(() => _error = 'Need opening and closing --- for frontmatter.');
+          return;
+        }
+        setState(() => _error = null);
+        break;
+      case 3: // Claude Context
+        if (!text.contains('### Step')) {
+          setState(() => _error = 'No execution steps found. Expected "### Step N: ..." blocks.');
+          return;
+        }
+        setState(() => _error = null);
+        break;
+    }
+  }
+
+  String? _buildImportResult() {
+    final text = _controller.text.trim();
+
+    switch (_selectedTab) {
+      case 0: // Workflow JSON — return as-is
+        return text;
+      case 1: // Claude Team Config — parse and convert to workflow JSON
+        final wf = ClaudeExportService.parseTeamConfig(text);
+        if (wf == null) return null;
+        return jsonEncode(wf.toJson());
+      case 2: // Claude Agent .md — parse and create single-node workflow
+        final result = ClaudeExportService.parseAgentMd(text);
+        if (result == null) return null;
+        final wf = LegendWorkflow(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: result.node.label,
+          nodes: [
+            WorkflowNode(id: 'start_0', type: WorkflowNodeType.start, label: 'START', x: 50, y: 200),
+            result.node,
+            WorkflowNode(id: 'end_0', type: WorkflowNodeType.end, label: 'END', x: 550, y: 200),
+          ],
+          edges: [
+            WorkflowEdge(id: 'e_start_agent', fromId: 'start_0', toId: result.node.id),
+            WorkflowEdge(id: 'e_agent_end', fromId: result.node.id, toId: 'end_0'),
+          ],
+          updatedAt: DateTime.now(),
+        );
+        return jsonEncode(wf.toJson());
+      case 3: // Claude Context — parse execution context markdown
+        final wf = ClaudeExportService.parseClaudeContext(text);
+        if (wf == null) return null;
+        return jsonEncode(wf.toJson());
+      default:
+        return null;
     }
   }
 
@@ -3760,22 +4109,67 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
         children: [
           Icon(Icons.upload_outlined, color: AppTheme.gold, size: 20),
           SizedBox(width: 8),
-          Text('Import Workflow JSON',
+          Text('Import Workflow',
               style: TextStyle(color: AppTheme.textH, fontSize: 16)),
         ],
       ),
       content: SizedBox(
         width: 560,
-        height: 460,
+        height: 500,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Tab buttons
+            Row(
+              children: List.generate(_tabLabels.length, (i) {
+                final selected = _selectedTab == i;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Material(
+                    color: selected
+                        ? AppTheme.gold.withValues(alpha: 0.15)
+                        : AppTheme.bg,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        setState(() {
+                          _selectedTab = i;
+                          _error = null;
+                        });
+                        if (_controller.text.isNotEmpty) _validate();
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        child: Text(
+                          _tabLabels[i],
+                          style: TextStyle(
+                            color: selected ? AppTheme.gold : AppTheme.textM,
+                            fontSize: 11,
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Paste a workflow JSON exported from Legend.',
-                    style: TextStyle(color: AppTheme.textM, fontSize: 12),
+                    _selectedTab == 0
+                        ? 'Paste a workflow JSON exported from Legend.'
+                        : _selectedTab == 1
+                            ? 'Paste a Claude team config.json.'
+                            : _selectedTab == 2
+                                ? 'Paste a Claude agent .md file content.'
+                                : 'Paste an execution context markdown.',
+                    style: const TextStyle(color: AppTheme.textM, fontSize: 12),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -3812,9 +4206,9 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
                     height: 1.5,
                     fontFamily: 'monospace',
                   ),
-                  decoration: const InputDecoration(
-                    hintText: '{\n  "id": "...",\n  "name": "...",\n  "nodes": [...],\n  "edges": [...]\n}',
-                    hintStyle: TextStyle(color: AppTheme.textM, fontSize: 11),
+                  decoration: InputDecoration(
+                    hintText: _tabHints[_selectedTab],
+                    hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 11),
                     border: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
@@ -3847,7 +4241,14 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
           label: const Text('Import'),
           onPressed: _controller.text.trim().isEmpty || _error != null
               ? null
-              : () => Navigator.pop(context, _controller.text.trim()),
+              : () {
+                  final result = _buildImportResult();
+                  if (result == null) {
+                    setState(() => _error = 'Failed to parse content. Check format.');
+                    return;
+                  }
+                  Navigator.pop(context, result);
+                },
         ),
       ],
     );

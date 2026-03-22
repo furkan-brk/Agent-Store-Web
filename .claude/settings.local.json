@@ -77,7 +77,8 @@
       "Bash(grep -E \"\\\\.go$\")",
       "Bash(export PATH=\"$PATH:/c/Program Files/Go/bin:/c/Go/bin:$HOME/go/bin\")",
       "Bash(dart analyze:*)",
-      "Bash(docker-compose version:*)"
+      "Bash(docker-compose version:*)",
+      "Bash(flutter pub:*)"
     ]
   }
 }

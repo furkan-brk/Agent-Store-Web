@@ -72,13 +72,6 @@ class LibraryController extends GetxController {
   void updateAgentPrice(int agentId, double newPrice) {
     final idx = created.indexWhere((a) => a.id == agentId);
     if (idx == -1) return;
-    final a = created[idx];
-    created[idx] = AgentModel(
-      id: a.id, title: a.title, description: a.description, prompt: a.prompt,
-      category: a.category, creatorWallet: a.creatorWallet, characterType: a.characterType,
-      subclass: a.subclass, rarity: a.rarity, stats: a.stats, traits: a.traits,
-      tags: a.tags, useCount: a.useCount, saveCount: a.saveCount,
-      generatedImage: a.generatedImage, imageUrl: a.imageUrl, createdAt: a.createdAt, price: newPrice,
-    );
+    created[idx] = created[idx].copyWith(price: newPrice);
   }
 }

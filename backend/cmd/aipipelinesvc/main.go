@@ -14,7 +14,7 @@ func main() {
 
 	// Create all AI sub-services.
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
-	claudeSvc := aipipeline.NewAIService("") // Claude API key from env if needed
+	claudeSvc := aipipeline.NewAIService(cfg.ClaudeAPIKey)
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
 
 	bgRemover := aipipeline.NewBgRemover(cfg.ClipDropAPIKey)

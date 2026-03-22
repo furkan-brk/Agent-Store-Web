@@ -1,7 +1,7 @@
 // lib/features/agent_detail/screens/agent_detail_screen.dart
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 
-import 'dart:html' as html;
+import 'dart:js_interop';
+import 'package:web/web.dart' as web;
 
 import 'package:agent_store/features/character/character_types.dart';
 import 'package:flutter/material.dart';
@@ -60,6 +60,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
   @override
   void dispose() {
     _tabCtrl.dispose();
+    Get.delete<AgentDetailController>(tag: '${_ctrl.agentId}');
     super.dispose();
   }
 
@@ -251,9 +252,9 @@ class _AgentDetailViewState extends State<_AgentDetailView>
   // _handleTrial removed — trial now runs server-side via _buildTrialTab chat UI
 
   void _shareAgent(AgentModel agent) {
-    final url = '${html.window.location.origin}/agent/${agent.id}';
+    final url = '${web.window.location.origin}/agent/${agent.id}';
     final text = '${agent.title} — ${agent.characterType.displayName} on AgentStore\n$url';
-    html.window.navigator.clipboard?.writeText(text).then((_) {
+    web.window.navigator.clipboard.writeText(text).toDart.then((_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Row(mainAxisSize: MainAxisSize.min, children: [

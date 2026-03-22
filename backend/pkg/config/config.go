@@ -11,6 +11,7 @@ type Config struct {
 	PostgresDSN     string
 	JWTSecret       string
 	GeminiAPIKey    string
+	ClaudeAPIKey    string
 	ClipDropAPIKey  string
 	AllowedOrigins  string
 	MonadRPCURL     string
@@ -39,6 +40,7 @@ func Load() *Config {
 		PostgresDSN:     buildDSN(),
 		JWTSecret:       jwtSecret,
 		GeminiAPIKey:    getEnv("GEMINI_API_KEY", ""),
+		ClaudeAPIKey:    getEnv("CLAUDE_API_KEY", ""),
 		ClipDropAPIKey:  getEnv("CLIPDROP_API_KEY", ""),
 		AllowedOrigins:  getEnv("ALLOWED_ORIGINS", "http://localhost:80,http://localhost:3000,https://agent-store-web-final.vercel.app,https://agent-store-web-seven.vercel.app"),
 		MonadRPCURL:     getEnv("MONAD_RPC_URL", "https://testnet-rpc.monad.xyz"),

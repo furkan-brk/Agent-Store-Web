@@ -79,7 +79,7 @@ class WalletService {
       if (addr == null) return null;
       _wallet = addr.toLowerCase();
       // Persist to LocalKvStore so it survives page refresh
-      LocalKvStore.instance.setString(_kWalletKey, _wallet!);
+      await LocalKvStore.instance.setString(_kWalletKey, _wallet!);
       return _wallet;
     } catch (e) {
       debugPrint('connectWallet: $e');
@@ -125,10 +125,10 @@ class WalletService {
     }
   }
 
-  void disconnect() {
+  Future<void> disconnect() async {
     _wallet = null;
     // Clear persisted wallet address
-    LocalKvStore.instance.remove(_kWalletKey);
+    await LocalKvStore.instance.remove(_kWalletKey);
   }
 
   // ── JS bridge implementations ─────────────────────────────────────────────

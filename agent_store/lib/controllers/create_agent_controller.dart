@@ -139,18 +139,19 @@ class CreateAgentController extends GetxController {
     loadingMsg.value = 'Analyzing prompt…';
 
     Future.delayed(const Duration(seconds: 4), () {
-      if (isLoading.value) loadingMsg.value = 'Building character profile…';
+      if (!isClosed && isLoading.value) loadingMsg.value = 'Building character profile…';
     });
     Future.delayed(const Duration(seconds: 14), () {
-      if (isLoading.value) loadingMsg.value = 'Generating avatar image…';
+      if (!isClosed && isLoading.value) loadingMsg.value = 'Generating avatar image…';
     });
     Future.delayed(const Duration(seconds: 55), () {
-      if (isLoading.value) loadingMsg.value = 'Almost there…';
+      if (!isClosed && isLoading.value) loadingMsg.value = 'Almost there…';
     });
 
     final agent = await ApiService.instance.createAgent(
       title: title, description: description, prompt: prompt,
     );
+    if (isClosed) return agent;
     isLoading.value = false;
     if (agent != null) createdAgent.value = agent;
     return agent;

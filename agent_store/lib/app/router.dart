@@ -81,7 +81,7 @@ class AppRouter {
           GoRoute(
             path: '/guild-master',
             builder: (_, s) {
-              final extra = s.extra as Map<String, dynamic>?;
+              final extra = s.extra is Map<String, dynamic> ? s.extra as Map<String, dynamic> : null;
               final agents = extra?['agents'] as List<Map<String, dynamic>>?;
               final guildName = extra?['guild_name'] as String?;
               return GuildMasterScreen(
@@ -98,7 +98,14 @@ class AppRouter {
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           GoRoute(
             path: '/profile/:wallet',
-            builder: (_, s) => PublicProfileScreen(wallet: s.pathParameters['wallet']!),
+            builder: (ctx, s) {
+              final wallet = s.pathParameters['wallet'];
+              if (wallet == null || wallet.isEmpty) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => ctx.go('/'));
+                return const SizedBox.shrink();
+              }
+              return PublicProfileScreen(wallet: wallet);
+            },
           ),
         ],
       ),

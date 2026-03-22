@@ -100,6 +100,7 @@ func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, er
 
 // GenerateJWT issues a signed JWT containing the wallet address claim.
 func (s *AuthService) GenerateJWT(wallet string) (string, error) {
+	wallet = strings.ToLower(wallet)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"wallet": wallet,
 		"exp":    time.Now().Add(24 * time.Hour).Unix(),

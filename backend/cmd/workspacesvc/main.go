@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/agentstore/backend/pkg/claude"
 	"github.com/agentstore/backend/pkg/config"
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/services/workspace"
@@ -22,9 +23,10 @@ func main() {
 
 	aiClient := client.NewAIClient(cfg.AIPipelineServiceURL)
 	agentClient := client.NewAgentClient(cfg.AgentServiceURL)
+	claudeClient := claude.NewClient(cfg.ClaudeAPIKey)
 
 	missionSvc := workspace.NewMissionService()
-	legendSvc := workspace.NewLegendService(aiClient, agentClient, missionSvc)
+	legendSvc := workspace.NewLegendService(aiClient, agentClient, missionSvc, claudeClient)
 	handler := workspace.NewHandler(missionSvc, legendSvc)
 	router := workspace.SetupRouter(handler)
 

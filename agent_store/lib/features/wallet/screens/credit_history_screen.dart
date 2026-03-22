@@ -9,7 +9,9 @@ class CreditHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(_CreditHistoryController());
+    final ctrl = Get.isRegistered<_CreditHistoryController>()
+        ? Get.find<_CreditHistoryController>()
+        : Get.put(_CreditHistoryController());
     return Obx(() => Scaffold(
       backgroundColor: AppTheme.bg,
       body: Column(children: [

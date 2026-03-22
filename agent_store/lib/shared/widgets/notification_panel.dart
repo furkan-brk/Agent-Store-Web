@@ -87,7 +87,7 @@ class _NotificationDialog extends StatefulWidget {
 }
 
 class _NotificationDialogState extends State<_NotificationDialog> {
-  late List<AppNotification> _notifications;
+  List<AppNotification> _notifications = [];
 
   @override
   void initState() {
