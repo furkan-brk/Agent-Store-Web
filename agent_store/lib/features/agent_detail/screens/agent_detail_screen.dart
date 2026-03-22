@@ -60,6 +60,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
   @override
   void dispose() {
     _tabCtrl.dispose();
+    Get.delete<AgentDetailController>(tag: '${_ctrl.agentId}');
     super.dispose();
   }
 

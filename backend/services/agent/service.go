@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -66,17 +67,21 @@ func (e *TrialError) Error() string { return e.Message }
 
 // AgentService handles all agent-related business logic.
 type AgentService struct {
-	aiClient *client.AIClient
-	imageSvc *ImageService
-	cache    *cache.Store
+	aiClient        *client.AIClient
+	imageSvc        *ImageService
+	cache           *cache.Store
+	creditsContract string
+	treasuryWallet  string
 }
 
 // NewAgentService creates a new AgentService.
-func NewAgentService(aiClient *client.AIClient, imageSvc *ImageService, c *cache.Store) *AgentService {
+func NewAgentService(aiClient *client.AIClient, imageSvc *ImageService, c *cache.Store, creditsContract, treasuryWallet string) *AgentService {
 	return &AgentService{
-		aiClient: aiClient,
-		imageSvc: imageSvc,
-		cache:    c,
+		aiClient:        aiClient,
+		imageSvc:        imageSvc,
+		cache:           c,
+		creditsContract: strings.ToLower(creditsContract),
+		treasuryWallet:  strings.ToLower(treasuryWallet),
 	}
 }
 
@@ -660,20 +665,24 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 	if err := database.DB.First(&agent, agentID).Error; err != nil {
 		return fmt.Errorf("agent not found: %w", err)
 	}
-	var existing models.PurchasedAgent
-	if database.DB.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&existing).Error == nil {
-		return nil
-	}
-	if err := verifyMonadTransaction(txHash, buyerWallet); err != nil {
+
+	if err := verifyMonadTransaction(txHash, buyerWallet, s.expectedToAddresses(), amountMon); err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
-	purchase := models.PurchasedAgent{
-		BuyerWallet: buyerWallet,
-		AgentID:     agentID,
-		TxHash:      txHash,
-		AmountMon:   amountMon,
-	}
-	return database.DB.Create(&purchase).Error
+
+	return database.DB.Transaction(func(dbTx *gorm.DB) error {
+		var existing models.PurchasedAgent
+		if dbTx.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&existing).Error == nil {
+			return nil // already purchased
+		}
+		purchase := models.PurchasedAgent{
+			BuyerWallet: buyerWallet,
+			AgentID:     agentID,
+			TxHash:      txHash,
+			AmountMon:   amountMon,
+		}
+		return dbTx.Create(&purchase).Error
+	})
 }
 
 // IsPurchased checks if a wallet has purchased the agent.
@@ -845,7 +854,7 @@ func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) er
 		return fmt.Errorf("minimum top-up is 0.1 MON (10 credits)")
 	}
 
-	if err := verifyMonadTransaction(txHash, wallet); err != nil {
+	if err := verifyMonadTransaction(txHash, wallet, s.expectedToAddresses(), amountMon); err != nil {
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
@@ -912,6 +921,28 @@ func (s *AgentService) GetUserProfile(wallet string) (*UserProfile, error) {
 	}, nil
 }
 
+// BatchGetAgents returns agents by IDs. Prompts are only visible to the agent creator.
+func (s *AgentService) BatchGetAgents(ids []uint, requestingWallet string) ([]models.Agent, error) {
+	if len(ids) == 0 {
+		return []models.Agent{}, nil
+	}
+	if len(ids) > 50 {
+		return nil, fmt.Errorf("maximum 50 IDs per batch request")
+	}
+	var agents []models.Agent
+	if err := database.DB.Where("id IN ?", ids).Find(&agents).Error; err != nil {
+		return nil, err
+	}
+	// Hide prompt for non-owned agents
+	requestingWallet = strings.ToLower(requestingWallet)
+	for i := range agents {
+		if strings.ToLower(agents[i].CreatorWallet) != requestingWallet {
+			agents[i].Prompt = ""
+		}
+	}
+	return agents, nil
+}
+
 // DeductCreditsExternal is exposed for other services (Workspace) via internal API.
 func (s *AgentService) DeductCreditsExternal(wallet string, amount int64, txType string, agentID *uint) error {
 	return s.deductCredits(wallet, amount, txType, agentID)
@@ -924,12 +955,26 @@ func (s *AgentService) IncrementUseCount(agentID uint) {
 		UpdateColumn("use_count", gorm.Expr("use_count + 1"))
 }
 
+// expectedToAddresses returns the set of valid destination addresses for on-chain payments.
+func (s *AgentService) expectedToAddresses() []string {
+	var addrs []string
+	if s.creditsContract != "" {
+		addrs = append(addrs, s.creditsContract)
+	}
+	if s.treasuryWallet != "" {
+		addrs = append(addrs, s.treasuryWallet)
+	}
+	return addrs
+}
+
 // verifyMonadTransaction verifies a transaction on Monad testnet.
-func verifyMonadTransaction(txHash, expectedFrom string) error {
+// It checks that the tx succeeded, was sent by expectedFrom, was sent to one of
+// the allowedTo addresses (if any are configured), and that the value covers expectedAmountMon.
+func verifyMonadTransaction(txHash, expectedFrom string, allowedTo []string, expectedAmountMon float64) error {
 	rpcURL := "https://testnet-rpc.monad.xyz"
 	payload := map[string]any{
 		"jsonrpc": "2.0",
-		"method":  "eth_getTransactionReceipt",
+		"method":  "eth_getTransactionByHash",
 		"params":  []string{txHash},
 		"id":      1,
 	}
@@ -939,35 +984,106 @@ func verifyMonadTransaction(txHash, expectedFrom string) error {
 	}
 
 	httpClient := &http.Client{Timeout: 15 * time.Second}
+
+	// Fetch full transaction to get To and Value fields.
 	resp, err := httpClient.Post(rpcURL, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("monad rpc request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var rpcResp struct {
+	var txResp struct {
 		Result *struct {
-			Status string `json:"status"`
-			From   string `json:"from"`
+			From  string `json:"from"`
+			To    string `json:"to"`
+			Value string `json:"value"`
 		} `json:"result"`
 		Error *struct {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&txResp); err != nil {
 		return fmt.Errorf("decode rpc response: %w", err)
 	}
+	if txResp.Error != nil {
+		return fmt.Errorf("rpc error: %s", txResp.Error.Message)
+	}
+	if txResp.Result == nil {
+		return fmt.Errorf("transaction not found on chain: %s", txHash)
+	}
+
+	// Verify sender
+	if !strings.EqualFold(txResp.Result.From, expectedFrom) {
+		return fmt.Errorf("transaction sender mismatch: expected %s, got %s", expectedFrom, txResp.Result.From)
+	}
+
+	// Verify recipient — must be one of the configured contract/treasury addresses
+	if len(allowedTo) > 0 {
+		toMatch := false
+		for _, addr := range allowedTo {
+			if strings.EqualFold(txResp.Result.To, addr) {
+				toMatch = true
+				break
+			}
+		}
+		if !toMatch {
+			return fmt.Errorf("transaction recipient %s is not a recognized platform address", txResp.Result.To)
+		}
+	}
+
+	// Verify value — parse hex wei and compare against expected MON (1 MON = 1e18 wei)
+	if expectedAmountMon > 0 && txResp.Result.Value != "" {
+		valueHex := strings.TrimPrefix(txResp.Result.Value, "0x")
+		// Parse hex value as uint64 — sufficient for reasonable MON amounts
+		valueWei, parseErr := strconv.ParseUint(valueHex, 16, 64)
+		if parseErr == nil {
+			// Convert expected MON to wei (1 MON = 1e18 wei)
+			expectedWei := uint64(expectedAmountMon * 1e18)
+			// Allow 1% tolerance for gas/rounding
+			minWei := expectedWei - expectedWei/100
+			if valueWei < minWei {
+				return fmt.Errorf("transaction value too low: expected ~%.4f MON, got %d wei", expectedAmountMon, valueWei)
+			}
+		}
+	}
+
+	// Now verify the receipt to confirm the transaction succeeded
+	receiptPayload := map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_getTransactionReceipt",
+		"params":  []string{txHash},
+		"id":      2,
+	}
+	receiptBody, err := json.Marshal(receiptPayload)
+	if err != nil {
+		return fmt.Errorf("marshal receipt request: %w", err)
+	}
+	receiptResp, err := httpClient.Post(rpcURL, "application/json", bytes.NewReader(receiptBody))
+	if err != nil {
+		return fmt.Errorf("monad receipt rpc request failed: %w", err)
+	}
+	defer receiptResp.Body.Close()
+
+	var rpcResp struct {
+		Result *struct {
+			Status string `json:"status"`
+		} `json:"result"`
+		Error *struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(receiptResp.Body).Decode(&rpcResp); err != nil {
+		return fmt.Errorf("decode receipt response: %w", err)
+	}
 	if rpcResp.Error != nil {
-		return fmt.Errorf("rpc error: %s", rpcResp.Error.Message)
+		return fmt.Errorf("receipt rpc error: %s", rpcResp.Error.Message)
 	}
 	if rpcResp.Result == nil {
-		return fmt.Errorf("transaction not found on chain: %s", txHash)
+		return fmt.Errorf("transaction receipt not found: %s (may be pending)", txHash)
 	}
 	if rpcResp.Result.Status != "0x1" {
 		return fmt.Errorf("transaction failed on chain (status: %s)", rpcResp.Result.Status)
 	}
-	if !strings.EqualFold(rpcResp.Result.From, expectedFrom) {
-		return fmt.Errorf("transaction sender mismatch: expected %s, got %s", expectedFrom, rpcResp.Result.From)
-	}
+
 	return nil
 }

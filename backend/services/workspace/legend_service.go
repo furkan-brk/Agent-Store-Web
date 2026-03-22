@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agentstore/backend/pkg/claude"
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/pkg/models"
 	"github.com/agentstore/backend/services/workspace/client"
@@ -16,17 +17,19 @@ import (
 
 // LegendService handles legend workflow CRUD, validation, and execution.
 type LegendService struct {
-	aiClient    *client.AIClient
-	agentClient *client.AgentClient
-	missionSvc  *MissionService
+	aiClient     *client.AIClient
+	agentClient  *client.AgentClient
+	missionSvc   *MissionService
+	claudeClient *claude.Client
 }
 
 // NewLegendService creates a new LegendService.
-func NewLegendService(aiClient *client.AIClient, agentClient *client.AgentClient, missionSvc *MissionService) *LegendService {
+func NewLegendService(aiClient *client.AIClient, agentClient *client.AgentClient, missionSvc *MissionService, claudeClient *claude.Client) *LegendService {
 	return &LegendService{
-		aiClient:    aiClient,
-		agentClient: agentClient,
-		missionSvc:  missionSvc,
+		aiClient:     aiClient,
+		agentClient:  agentClient,
+		missionSvc:   missionSvc,
+		claudeClient: claudeClient,
 	}
 }
 
@@ -50,12 +53,13 @@ type LegendWorkflowDTO struct {
 
 // WorkflowNodeParsed is the internal representation of a workflow node.
 type WorkflowNodeParsed struct {
-	ID    string  `json:"id"`
-	Type  string  `json:"type"`
-	Label string  `json:"label"`
-	X     float64 `json:"x"`
-	Y     float64 `json:"y"`
-	RefID string  `json:"ref_id"`
+	ID       string          `json:"id"`
+	Type     string          `json:"type"`
+	Label    string          `json:"label"`
+	X        float64         `json:"x"`
+	Y        float64         `json:"y"`
+	RefID    string          `json:"ref_id"`
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
 // WorkflowEdgeParsed is the internal representation of a workflow edge.
@@ -80,6 +84,8 @@ type NodeExecutionResult struct {
 // ExecuteWorkflowInput is the request payload for workflow execution.
 type ExecuteWorkflowInput struct {
 	InputMessage string `json:"input_message" binding:"required"`
+	Engine       string `json:"engine"`  // "claude" or "gemini" (default)
+	Context      string `json:"context"` // previous execution context to prepend
 }
 
 // ExecutionStatusDTO is the response representation of a workflow execution.
@@ -353,9 +359,25 @@ func topologicalSort(nodes []WorkflowNodeParsed, adj map[string][]string, inDegr
 	return order, nil
 }
 
+// nodeMetadata holds parsed metadata from a workflow node.
+type nodeMetadata struct {
+	Engine string `json:"engine"` // "claude" or "gemini"
+	Model  string `json:"model"`  // "haiku", "sonnet", "opus"
+	Prompt string `json:"prompt"` // override prompt for virtual/imported agents
+}
+
+// parseNodeMetadata extracts metadata from the node's raw JSON. Returns defaults if absent.
+func parseNodeMetadata(raw json.RawMessage) nodeMetadata {
+	var m nodeMetadata
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &m)
+	}
+	return m
+}
+
 // executeNode runs a single workflow node and returns its output.
-// Agent nodes use the AI Pipeline HTTP client; mission nodes use local DB.
-func (s *LegendService) executeNode(ctx context.Context, node WorkflowNodeParsed, contextInput, wallet string) (string, error) {
+// Agent nodes use the AI Pipeline HTTP client or Claude API depending on engine setting.
+func (s *LegendService) executeNode(ctx context.Context, node WorkflowNodeParsed, contextInput, wallet, globalEngine string) (string, error) {
 	switch node.Type {
 	case "start":
 		return contextInput, nil
@@ -375,22 +397,57 @@ func (s *LegendService) executeNode(ctx context.Context, node WorkflowNodeParsed
 		return mission.Prompt, nil
 
 	case "agent":
-		agentID, err := strconv.ParseUint(node.RefID, 10, 64)
-		if err != nil {
-			return "", fmt.Errorf("invalid agent ref_id %q: %w", node.RefID, err)
+		meta := parseNodeMetadata(node.Metadata)
+
+		// Determine the agent prompt: metadata override or fetch from agent service.
+		var agentPrompt string
+		var agentID uint64
+		if meta.Prompt != "" {
+			agentPrompt = meta.Prompt
+		} else {
+			var err error
+			agentID, err = strconv.ParseUint(node.RefID, 10, 64)
+			if err != nil {
+				return "", fmt.Errorf("invalid agent ref_id %q: %w", node.RefID, err)
+			}
+			agent, err := s.agentClient.GetAgent(ctx, uint(agentID))
+			if err != nil {
+				return "", fmt.Errorf("agent %d not found: %w", agentID, err)
+			}
+			agentPrompt = agent.Prompt
 		}
-		// Fetch agent from Agent Service via HTTP client.
-		agent, err := s.agentClient.GetAgent(ctx, uint(agentID))
-		if err != nil {
-			return "", fmt.Errorf("agent %d not found: %w", agentID, err)
+
+		// Determine engine: node-level metadata overrides global, then default gemini.
+		engine := meta.Engine
+		if engine == "" {
+			engine = globalEngine
 		}
-		// Call AI Pipeline chat with the agent's prompt as system instruction.
-		output, err := s.aiClient.Chat(ctx, agent.Prompt, contextInput)
-		if err != nil {
-			return "", fmt.Errorf("ai chat failed for agent %d: %w", agentID, err)
+
+		var output string
+		if engine == "claude" && s.claudeClient != nil && s.claudeClient.IsConfigured() {
+			model := meta.Model
+			if model == "" {
+				model = "sonnet"
+			}
+			messages := []claude.Message{{Role: "user", Content: contextInput}}
+			var err error
+			output, err = s.claudeClient.SendMessage(ctx, model, agentPrompt, messages)
+			if err != nil {
+				return "", fmt.Errorf("claude chat failed for node %q: %w", node.ID, err)
+			}
+		} else {
+			// Default: use Gemini via AI Pipeline.
+			var err error
+			output, err = s.aiClient.Chat(ctx, agentPrompt, contextInput)
+			if err != nil {
+				return "", fmt.Errorf("ai chat failed for node %q: %w", node.ID, err)
+			}
 		}
-		// Increment agent use_count via Agent Service.
-		_ = s.agentClient.IncrementUseCount(ctx, uint(agentID))
+
+		// Increment agent use_count if we have a real agent ID.
+		if agentID > 0 {
+			_ = s.agentClient.IncrementUseCount(ctx, uint(agentID))
+		}
 		return output, nil
 
 	case "guild":
@@ -459,11 +516,30 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 	}
 
 	// 4. Count agent and guild-member nodes to determine credit cost.
+	// Credit cost is model-dependent when using Claude engine.
+	globalEngine := input.Engine // "claude" or "" (default gemini)
 	var requiredCredits int64
 	for _, n := range nodes {
 		switch n.Type {
 		case "agent":
-			requiredCredits++
+			meta := parseNodeMetadata(n.Metadata)
+			engine := meta.Engine
+			if engine == "" {
+				engine = globalEngine
+			}
+			if engine == "claude" {
+				model := meta.Model
+				if model == "" {
+					model = "sonnet"
+				}
+				if cost, ok := claude.CreditCost[model]; ok {
+					requiredCredits += cost
+				} else {
+					requiredCredits += claude.CreditCost["sonnet"]
+				}
+			} else {
+				requiredCredits++
+			}
 		case "guild":
 			guildID, err := strconv.ParseUint(n.RefID, 10, 64)
 			if err != nil {
@@ -516,6 +592,12 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 	}
 
 	// 8. Execute nodes in topological order.
+	// If previous execution context is provided, prepend it to the initial input.
+	effectiveInput := input.InputMessage
+	if input.Context != "" {
+		effectiveInput = input.Context + "\n\n---\n\n" + input.InputMessage
+	}
+
 	nodeOutputs := make(map[string]string, len(nodes))
 	var nodeResults []NodeExecutionResult
 
@@ -526,7 +608,7 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 		var contextInput string
 		preds := predecessors[nodeID]
 		if len(preds) == 0 {
-			contextInput = input.InputMessage
+			contextInput = effectiveInput
 		} else {
 			parts := make([]string, 0, len(preds))
 			for _, predID := range preds {
@@ -538,7 +620,7 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 		}
 
 		startTime := time.Now()
-		output, execErr := s.executeNode(ctx, *node, contextInput, wallet)
+		output, execErr := s.executeNode(ctx, *node, contextInput, wallet, globalEngine)
 		durationMs := time.Since(startTime).Milliseconds()
 
 		// Truncate output to 10000 chars max.

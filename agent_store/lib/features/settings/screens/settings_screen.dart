@@ -296,6 +296,8 @@ class SettingsScreen extends StatelessWidget {
     if (!context.mounted) return;
 
     await LocalKvStore.instance.clear();
+    // Disconnect auth to keep UI in sync after clearing local data
+    AuthController.to.disconnect();
 
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

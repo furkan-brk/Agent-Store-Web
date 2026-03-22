@@ -1480,7 +1480,7 @@ class _AddToCollectionSheet extends StatefulWidget {
 }
 
 class _AddToCollectionSheetState extends State<_AddToCollectionSheet> {
-  late List<AgentCollection> _collections;
+  List<AgentCollection> _collections = [];
   @override
   void initState() {
     super.initState();

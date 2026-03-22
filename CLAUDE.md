@@ -192,7 +192,17 @@ services:
 - [x] **v2.4 — Kullanıcı Profili ekranı** (Frontend + Backend) ✅ 0 hata
 - [x] **v2.5 — Blockchain Credits + Leaderboard** (Backend + Frontend) → Blok 6 + 8 ✅
 - [ ] **v2.6 — Docker rebuild + E2E test** (Team Leader) → SPRINT_V2_TRACKER.md #Blok7
+- [x] **v3.0 — Legend: Touch/Touchpad + Claude Agent Export + Live Claude Execution** (Frontend + Backend) ✅ 16 task
 
-## Sprint Takip Dosyaları
-- `SPRINT_V2.md` — Detaylı plan ve teknik kararlar
-- `SPRINT_V2_TRACKER.md` — Task bazlı ilerleme takibi (Team Leader günceller)
+## v3.0 Legend Sprint Detaylari (2026-03-22)
+3 feature, 16 task tamamlandi:
+- **Touch & Touchpad**: onPan→onScale, pinch-zoom, two-finger pan, adaptive port sizes (44px touch), trackpad 0.01 step zoom, mobile layout (<768px drawer + floating FABs)
+- **Claude Export**: ClaudeExportService (8 format: team config, agent .md, CLAUDE.md, .cursorrules, JSON, clipboard, context, CLI package), DAG topological sort, import parser (team config + agent .md + context)
+- **Live Claude Execution**: backend/pkg/claude/client.go, dual-engine (Gemini/Claude), per-node model selection (haiku=1cr, sonnet=3cr, opus=10cr), execution context feeding
+- **Yeni dosyalar**: input_mode.dart, dag_utils.dart, claude_export_service.dart, legend_export_dialog.dart, backend/pkg/claude/client.go
+- **Karar**: JSZip yerine combined JSON (dependency-free), WorkflowNode metadata nullable (backward compat)
+
+## Sprint Takip Dosyalari
+- `SPRINT_V2.md` — Detayli plan ve teknik kararlar
+- `SPRINT_V2_TRACKER.md` — Task bazli ilerleme takibi (Team Leader gunceller)
+- `.claude/tasks/agent-store/LEGEND_V3_PLAN.md` — Legend v3.0 sprint plani

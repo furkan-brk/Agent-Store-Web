@@ -162,6 +162,26 @@ class ApiService {
     return null;
   }
 
+  Future<List<AgentModel>> batchGetAgents(List<int> ids) async {
+    if (ids.isEmpty) return [];
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.agents}/batch'),
+        headers: _headers,
+        body: jsonEncode({'ids': ids}),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['agents'] as List)
+            .map((j) => AgentModel.fromJson(j as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('batchGetAgents: $e');
+    }
+    return [];
+  }
+
   Future<AgentModel?> createAgent({
     required String title,
     required String description,

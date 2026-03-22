@@ -36,25 +36,26 @@ class AgentDetailController extends GetxController {
   Future<void> load() async {
     isLoading.value = true;
     try {
-      final futures = <Future<dynamic>>[
-        ApiService.instance.getAgent(agentId),
-      ];
+      // Fetch agent data (always)
+      final agentFuture = ApiService.instance.getAgent(agentId);
+
+      // Fetch auth-dependent data in parallel when authenticated
+      Future<bool>? purchaseFuture;
+      Future<List<AgentModel>>? libraryFuture;
+      Future<int>? creditsFuture;
       if (ApiService.instance.isAuthenticated) {
-        futures.addAll([
-          ApiService.instance.getPurchaseStatus(agentId),
-          ApiService.instance.getLibrary(),
-          ApiService.instance.getCredits(),
-        ]);
+        purchaseFuture = ApiService.instance.getPurchaseStatus(agentId);
+        libraryFuture = ApiService.instance.getLibrary();
+        creditsFuture = ApiService.instance.getCredits();
       }
-      final results = await Future.wait(futures);
 
-      agent.value = results[0] as AgentModel?;
+      agent.value = await agentFuture;
 
-      if (results.length > 1) {
-        isPurchased.value = results[1] as bool? ?? false;
-        final library = results[2] as List<AgentModel>? ?? [];
+      if (purchaseFuture != null) {
+        isPurchased.value = await purchaseFuture;
+        final library = await libraryFuture ?? [];
         inLibrary.value = library.any((m) => m.id == agentId);
-        credits.value = results[3] as int? ?? 999;
+        credits.value = await creditsFuture ?? 999;
       }
 
       // Load similar agents
@@ -94,8 +95,10 @@ class AgentDetailController extends GetxController {
     final p = agent.value?.prompt;
     if (p == null) return;
     await Clipboard.setData(ClipboardData(text: p));
+    if (isClosed) return;
     copied.value = true;
     await Future.delayed(const Duration(seconds: 2));
+    if (isClosed) return;
     copied.value = false;
   }
 

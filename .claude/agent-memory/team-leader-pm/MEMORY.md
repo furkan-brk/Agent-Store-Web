@@ -1,6 +1,7 @@
 # Team Leader PM — Agent Memory Index
 
 ## Project
+- [project_legend_v3_sprint.md](project_legend_v3_sprint.md) — Legend v3.0 sprint completed 2026-03-22: Touch/touchpad support + Claude Agent export (8 formats) + Live Claude execution (dual-engine)
 - [project_security_hardening_2026_03_16.md](project_security_hardening_2026_03_16.md) — Full security audit + 22 findings fixed (on-chain tx verify, prompt leak sealing, rate limiting, nonce rotation)
 - [project_perf_sprint_2026_03_15.md](project_perf_sprint_2026_03_15.md) — Performance & DB fix sprint: parallelized AI pipeline, fixed DB race condition, added image fallback chain
 - [project_sprint_v27.md](project_sprint_v27.md) — Sprint v2.7: speed optimization, Claude Code export, guild refinement, 10 agent seeding

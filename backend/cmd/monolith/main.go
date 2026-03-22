@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agentstore/backend/pkg/cache"
+	"github.com/agentstore/backend/pkg/claude"
 	"github.com/agentstore/backend/pkg/config"
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/pkg/middleware"
@@ -59,7 +60,7 @@ func main() {
 
 	// AI Pipeline (no DB needed)
 	geminiSvc := aipipeline.NewGeminiService(cfg.GeminiAPIKey)
-	claudeSvc := aipipeline.NewAIService("")
+	claudeSvc := aipipeline.NewAIService(cfg.ClaudeAPIKey)
 	scoreSvc := aipipeline.NewScoreService(cfg.GeminiAPIKey)
 	bgRemover := aipipeline.NewBgRemover()
 	pipeline := aipipeline.NewPipelineService(geminiSvc, claudeSvc, scoreSvc, bgRemover)
@@ -69,7 +70,7 @@ func main() {
 	agentAIClient := agentclient.NewAIClient(selfURL)
 	imageSvc := agent.NewImageService("./uploads", "")
 	cacheStore := cache.NewStore()
-	agentSvc := agent.NewAgentService(agentAIClient, imageSvc, cacheStore)
+	agentSvc := agent.NewAgentService(agentAIClient, imageSvc, cacheStore, cfg.CreditsContract, cfg.TreasuryWallet)
 	agentHandler := agent.NewHandler(agentSvc)
 
 	// Guild
@@ -82,8 +83,9 @@ func main() {
 	// Workspace
 	wsAIClient := wsclient.NewAIClient(selfURL)
 	wsAgentClient := wsclient.NewAgentClient(selfURL)
+	claudeClient := claude.NewClient(cfg.ClaudeAPIKey)
 	missionSvc := workspace.NewMissionService()
-	legendSvc := workspace.NewLegendService(wsAIClient, wsAgentClient, missionSvc)
+	legendSvc := workspace.NewLegendService(wsAIClient, wsAgentClient, missionSvc, claudeClient)
 	workspaceHandler := workspace.NewHandler(missionSvc, legendSvc)
 
 	// --- Single Gin Engine ---
@@ -148,6 +150,7 @@ func main() {
 		agents.GET("", agentHandler.ListAgents)
 		agents.GET("/trending", agentHandler.TrendingAgents)
 		agents.GET("/categories", agentHandler.GetCategories)
+		agents.POST("/batch", optionalAuth, agentHandler.BatchGetAgents)
 		agents.GET("/:id", optionalAuth, agentHandler.GetAgent)
 		agents.POST("", authMW, createRL.WalletMiddleware(), agentHandler.CreateAgent)
 		agents.PUT("/:id", authMW, agentHandler.UpdateAgent)

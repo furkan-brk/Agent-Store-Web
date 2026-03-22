@@ -37,6 +37,8 @@ void main() async {
 class AgentStoreApp extends StatelessWidget {
   const AgentStoreApp({super.key});
 
+  static bool _firstFrameMarked = false;
+
   @override
   Widget build(BuildContext context) {
     final telemetry = Get.find<AppTelemetryService>();
@@ -46,9 +48,12 @@ class AgentStoreApp extends StatelessWidget {
       theme: AppTheme.dark,
       routerConfig: AppRouter.router,
       builder: (context, child) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          telemetry.markFirstFrame();
-        });
+        if (!_firstFrameMarked) {
+          _firstFrameMarked = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            telemetry.markFirstFrame();
+          });
+        }
         return SelectionArea(child: child ?? const SizedBox.shrink());
       },
     );

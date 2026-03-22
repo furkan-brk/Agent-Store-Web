@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/models/mission_model.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/services/mission_service.dart';
@@ -478,7 +479,9 @@ class _TerminalModal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final curlCommand = '''curl 'http://localhost:8080/api/v1/agents/$agentId/chat' \\
+    final chatUrl = '${ApiConstants.baseUrl}/api/v1/agents/$agentId/chat';
+
+    final curlCommand = '''curl '$chatUrl' \\
   -X POST \\
   -H 'Content-Type: application/json' \\
   -H 'Authorization: Bearer YOUR_JWT_TOKEN' \\
@@ -486,7 +489,7 @@ class _TerminalModal extends StatelessWidget {
 
     final pythonExample = '''import requests
 
-url = "http://localhost:8080/api/v1/agents/$agentId/chat"
+url = "$chatUrl"
 headers = {
     "Content-Type": "application/json",
     "Authorization": "Bearer YOUR_JWT_TOKEN"
@@ -501,7 +504,7 @@ print(response.json())''';
 async function chatWithAgent() {
   try {
     const response = await axios.post(
-      'http://localhost:8080/api/v1/agents/$agentId/chat',
+      '$chatUrl',
       { message: 'Merhaba, nasılsın?' },
       {
         headers: {

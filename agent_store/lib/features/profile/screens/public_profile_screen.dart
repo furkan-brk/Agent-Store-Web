@@ -7,13 +7,31 @@ import '../../../shared/services/api_service.dart';
 import '../../store/widgets/agent_card.dart';
 import 'package:go_router/go_router.dart';
 
-class PublicProfileScreen extends StatelessWidget {
+class PublicProfileScreen extends StatefulWidget {
   final String wallet;
   const PublicProfileScreen({super.key, required this.wallet});
 
   @override
+  State<PublicProfileScreen> createState() => _PublicProfileScreenState();
+}
+
+class _PublicProfileScreenState extends State<PublicProfileScreen> {
+  late final _PublicProfileController ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    ctrl = Get.put(_PublicProfileController(widget.wallet), tag: widget.wallet);
+  }
+
+  @override
+  void dispose() {
+    Get.delete<_PublicProfileController>(tag: widget.wallet);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(_PublicProfileController(wallet), tag: wallet);
     return Obx(() => Scaffold(
       backgroundColor: AppTheme.bg,
       body: CustomScrollView(slivers: [
@@ -36,7 +54,7 @@ class PublicProfileScreen extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             SelectableText(
-              _shorten(wallet),
+              _shorten(widget.wallet),
               style: const TextStyle(
                 color: AppTheme.textH,
                 fontSize: 15,
@@ -59,7 +77,7 @@ class PublicProfileScreen extends StatelessWidget {
         else if (ctrl.error.value != null)
           SliverFillRemaining(child: _buildErrorState(ctrl))
         else ...[
-          SliverToBoxAdapter(child: _ProfileHeader(wallet: wallet, ctrl: ctrl)),
+          SliverToBoxAdapter(child: _ProfileHeader(wallet: widget.wallet, ctrl: ctrl)),
           // Stats row
           SliverToBoxAdapter(child: _StatsRow(ctrl: ctrl)),
           // Achievements section
@@ -345,7 +363,7 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   SelectableText(
-                    PublicProfileScreen._shorten(wallet),
+                    _PublicProfileScreenState._shorten(wallet),
                     style: const TextStyle(
                       color: AppTheme.textM,
                       fontSize: 12,
@@ -354,7 +372,7 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                 ] else
                   SelectableText(
-                    PublicProfileScreen._shorten(wallet),
+                    _PublicProfileScreenState._shorten(wallet),
                     style: const TextStyle(
                       color: AppTheme.textH,
                       fontSize: 18,

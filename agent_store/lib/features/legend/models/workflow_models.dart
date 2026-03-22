@@ -22,6 +22,7 @@ class WorkflowNode {
   double y;
   /// For agent nodes: agentId as string. For mission nodes: mission slug.
   final String? refId;
+  final Map<String, dynamic>? metadata;
 
   WorkflowNode({
     required this.id,
@@ -30,15 +31,17 @@ class WorkflowNode {
     required this.x,
     required this.y,
     this.refId,
+    this.metadata,
   });
 
-  WorkflowNode copyWith({String? label, double? x, double? y}) => WorkflowNode(
+  WorkflowNode copyWith({String? label, double? x, double? y, Map<String, dynamic>? metadata}) => WorkflowNode(
     id: id,
     type: type,
     label: label ?? this.label,
     x: x ?? this.x,
     y: y ?? this.y,
     refId: refId,
+    metadata: metadata ?? this.metadata,
   );
 
   Map<String, dynamic> toJson() => {
@@ -48,6 +51,7 @@ class WorkflowNode {
     'x': x,
     'y': y,
     'ref_id': refId,
+    if (metadata != null) 'metadata': metadata,
   };
 
   factory WorkflowNode.fromJson(Map<String, dynamic> j) => WorkflowNode(
@@ -60,6 +64,7 @@ class WorkflowNode {
     x: (j['x'] as num?)?.toDouble() ?? 0,
     y: (j['y'] as num?)?.toDouble() ?? 0,
     refId: j['ref_id'] as String?,
+    metadata: (j['metadata'] as Map<String, dynamic>?),
   );
 }
 

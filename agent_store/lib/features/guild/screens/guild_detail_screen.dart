@@ -12,13 +12,31 @@ import '../widgets/team_formation_widget.dart';
 import '../widgets/synergy_badge_widget.dart';
 import '../widgets/team_workflow_modal.dart';
 
-class GuildDetailScreen extends StatelessWidget {
+class GuildDetailScreen extends StatefulWidget {
   final int guildId;
   const GuildDetailScreen({super.key, required this.guildId});
 
   @override
+  State<GuildDetailScreen> createState() => _GuildDetailScreenState();
+}
+
+class _GuildDetailScreenState extends State<GuildDetailScreen> {
+  late final _GuildDetailCtrl ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    ctrl = Get.put(_GuildDetailCtrl(widget.guildId), tag: '${widget.guildId}');
+  }
+
+  @override
+  void dispose() {
+    Get.delete<_GuildDetailCtrl>(tag: '${widget.guildId}');
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ctrl = Get.put(_GuildDetailCtrl(guildId), tag: '$guildId');
     return Obx(() => Scaffold(
       backgroundColor: AppTheme.bg,
       appBar: AppBar(
@@ -464,7 +482,7 @@ class _GuildDetailCtrl extends GetxController {
   }
 
   Future<void> join(BuildContext context) async {
-    if (!ApiService.instance.isAuthenticated) { GuildDetailScreen._showWalletDialog(context); return; }
+    if (!ApiService.instance.isAuthenticated) { _GuildDetailScreenState._showWalletDialog(context); return; }
     joinLoading.value = true;
     final ok = await ApiService.instance.joinGuild(guildId);
     joinLoading.value = false;
