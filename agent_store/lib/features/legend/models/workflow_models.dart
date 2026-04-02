@@ -108,7 +108,7 @@ class LegendWorkflow {
     'name': name,
     'nodes': nodes.map((n) => n.toJson()).toList(),
     'edges': edges.map((e) => e.toJson()).toList(),
-    'updated_at': updatedAt.toIso8601String(),
+    'updated_at': updatedAt.toUtc().toIso8601String(),
   };
 
   factory LegendWorkflow.fromJson(Map<String, dynamic> j) => LegendWorkflow(

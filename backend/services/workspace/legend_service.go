@@ -33,13 +33,35 @@ func NewLegendService(aiClient *client.AIClient, agentClient *client.AgentClient
 	}
 }
 
+// flexTime is a time.Time that can unmarshal both RFC3339 (with timezone)
+// and ISO 8601 without timezone (e.g. from Dart's DateTime.toIso8601String()).
+type flexTime struct{ time.Time }
+
+var flexTimeFormats = []string{
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02T15:04:05.999999999",
+	"2006-01-02T15:04:05",
+}
+
+func (ft *flexTime) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	for _, fmt := range flexTimeFormats {
+		if t, err := time.Parse(fmt, s); err == nil {
+			ft.Time = t.UTC()
+			return nil
+		}
+	}
+	return fmt.Errorf("cannot parse time %q", s)
+}
+
 // SaveLegendWorkflowInput is the request payload for creating or updating a workflow.
 type SaveLegendWorkflowInput struct {
 	ID        string          `json:"id" binding:"required"`
 	Name      string          `json:"name" binding:"required"`
 	Nodes     json.RawMessage `json:"nodes" binding:"required"`
 	Edges     json.RawMessage `json:"edges" binding:"required"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	UpdatedAt flexTime        `json:"updated_at"`
 }
 
 // LegendWorkflowDTO is the response representation of a workflow.
@@ -151,7 +173,7 @@ func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflow
 			ClientID:   input.ID,
 		}
 	}
-	updatedAt := input.UpdatedAt
+	updatedAt := input.UpdatedAt.Time
 	if updatedAt.IsZero() {
 		updatedAt = time.Now()
 	}
@@ -200,7 +222,7 @@ func (s *LegendService) BatchSyncWorkflows(wallet string, inputs []SaveLegendWor
 				ClientID:   input.ID,
 			}
 		}
-		updatedAt := input.UpdatedAt
+		updatedAt := input.UpdatedAt.Time
 		if updatedAt.IsZero() {
 			updatedAt = time.Now()
 		}
