@@ -48,6 +48,10 @@ class AuthController extends GetxController {
       // workflows) can still read/write the DB. The user just can't
       // perform wallet-specific actions until they reconnect MetaMask.
       isConnected.value = false;
+    } else if (!hasToken && hasWallet) {
+      // MetaMask is still connected but JWT was lost (e.g. cookies cleared).
+      // Silently re-authenticate to restore the session.
+      await connect();
     }
     // If neither token nor wallet, user is simply not logged in — nothing to do.
   }

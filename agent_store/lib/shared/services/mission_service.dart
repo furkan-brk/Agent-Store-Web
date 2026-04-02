@@ -234,12 +234,16 @@ class MissionService {
     );
     _missions.add(mission);
     _sort();
+    debugPrint('MissionService.addMission: isAuthenticated=${ApiService.instance.isAuthenticated}, title=$cleanTitle');
     if (ApiService.instance.isAuthenticated) {
       final saved = await ApiService.instance.saveMission(mission);
+      debugPrint('MissionService.addMission: saveMission result=${saved?.toJson()}');
       if (saved != null) {
         final idx = _missions.indexWhere((m) => m.id == mission.id);
         if (idx != -1) _missions[idx] = saved;
       }
+    } else {
+      debugPrint('MissionService.addMission: NOT authenticated — saving locally only');
     }
     await _save();
   }
