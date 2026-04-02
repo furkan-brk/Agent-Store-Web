@@ -18,6 +18,7 @@ import '../services/claude_export_service.dart';
 import '../services/legend_service.dart';
 import '../widgets/legend_export_dialog.dart';
 import '../widgets/legend_onboarding.dart';
+import '../widgets/legend_templates_dialog.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,11 @@ class _LegendScreenState extends State<LegendScreen>
 
   // ── Onboarding ────────────────────────────────────────────────────────────
   bool _showOnboarding = false;
+
+  // ── Undo / Redo ────────────────────────────────────────────────────────────
+  final List<_CanvasSnapshot> _history = [];
+  final List<_CanvasSnapshot> _redoStack = [];
+  static const int _maxHistory = 50;
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -160,6 +166,32 @@ class _LegendScreenState extends State<LegendScreen>
 
   void _markSaved() {
     _lastSavedState = jsonEncode({'nodes': _nodes.map((n) => n.toJson()).toList(), 'edges': _edges.map((e) => e.toJson()).toList()});
+  }
+
+  void _pushHistory() {
+    _redoStack.clear();
+    _history.add(_CanvasSnapshot(List.of(_nodes), List.of(_edges)));
+    if (_history.length > _maxHistory) _history.removeAt(0);
+  }
+
+  void _undo() {
+    if (_history.isEmpty) return;
+    _redoStack.add(_CanvasSnapshot(List.of(_nodes), List.of(_edges)));
+    final snap = _history.removeLast();
+    setState(() {
+      _nodes = snap.nodes;
+      _edges = snap.edges;
+    });
+  }
+
+  void _redo() {
+    if (_redoStack.isEmpty) return;
+    _history.add(_CanvasSnapshot(List.of(_nodes), List.of(_edges)));
+    final snap = _redoStack.removeLast();
+    setState(() {
+      _nodes = snap.nodes;
+      _edges = snap.edges;
+    });
   }
 
   String _fmtTime(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -354,6 +386,54 @@ class _LegendScreenState extends State<LegendScreen>
     });
   }
 
+  void _showTemplatesDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => LegendTemplatesDialog(
+        onTemplateSelected: (tpl) {
+          _confirmReplaceCanvas(() {
+            final workflow = LegendService.instance.newWorkflow(tpl.name);
+            // Remap node/edge IDs to avoid conflicts with saved workflows
+            final ts = DateTime.now().millisecondsSinceEpoch;
+            final idMap = <String, String>{};
+            final newNodes = tpl.nodes.asMap().entries.map((e) {
+              final newId = '${workflow.id}_${e.key}_$ts';
+              idMap[e.value.id] = newId;
+              return WorkflowNode(
+                id: newId,
+                type: e.value.type,
+                label: e.value.label,
+                x: e.value.x,
+                y: e.value.y,
+                refId: e.value.refId,
+                metadata: e.value.metadata,
+              );
+            }).toList();
+            final newEdges = tpl.edges.map((e) => WorkflowEdge(
+              id: '${idMap[e.fromId] ?? e.fromId}_${idMap[e.toId] ?? e.toId}',
+              fromId: idMap[e.fromId] ?? e.fromId,
+              toId: idMap[e.toId] ?? e.toId,
+            )).toList();
+            _pushHistory();
+            setState(() {
+              _workflowName = workflow.name;
+              _currentWorkflowId = workflow.id;
+              _nodes = newNodes;
+              _edges = newEdges;
+              _selectedNodeId = null;
+              _selectedEdgeId = null;
+              _canvasOffset = Offset.zero;
+              _zoom = 1.0;
+              _lastExecution = null;
+              _showResultsPanel = false;
+            });
+            _showNotice('Template loaded: ${tpl.name}', background: AppTheme.success);
+          });
+        },
+      ),
+    );
+  }
+
   String? _validateWorkflow() {
     if (_workflowName.trim().isEmpty) return 'Workflow name cannot be empty.';
     if (_nodes.length < 2) return 'Add at least two nodes before saving.';
@@ -384,6 +464,7 @@ class _LegendScreenState extends State<LegendScreen>
     final cy = (local.dy - _canvasOffset.dy) / _zoom - _kNodeH / 2;
 
     final id = '${DateTime.now().millisecondsSinceEpoch}_${_nodes.length}';
+    _pushHistory();
     setState(() {
       _nodes.add(WorkflowNode(
         id: id,
@@ -398,6 +479,7 @@ class _LegendScreenState extends State<LegendScreen>
 
   void _deleteSelected() {
     if (_selectedEdgeId != null) {
+      _pushHistory();
       setState(() {
         _edges.removeWhere((e) => e.id == _selectedEdgeId);
         _selectedEdgeId = null;
@@ -405,6 +487,7 @@ class _LegendScreenState extends State<LegendScreen>
       return;
     }
     if (_selectedNodeId == null) return;
+    _pushHistory();
     setState(() {
       _edges.removeWhere(
           (e) => e.fromId == _selectedNodeId || e.toId == _selectedNodeId);
@@ -497,6 +580,7 @@ class _LegendScreenState extends State<LegendScreen>
           final alreadyExists = _edges
               .any((e) => e.fromId == from.nodeId && e.toId == to.nodeId);
           if (!alreadyExists) {
+            _pushHistory();
             setState(() {
               _edges.add(WorkflowEdge(
                 id: '${from.nodeId}_${to.nodeId}',
@@ -740,7 +824,7 @@ class _LegendScreenState extends State<LegendScreen>
           title: const Text('Load Workflow',
               style: TextStyle(color: AppTheme.textH)),
           content: SizedBox(
-            width: 420,
+            width: 460,
             child: _savedWorkflows.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(16),
@@ -762,13 +846,55 @@ class _LegendScreenState extends State<LegendScreen>
                           style: const TextStyle(
                               color: AppTheme.textM, fontSize: 11),
                         ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              size: 18, color: AppTheme.textM),
-                          onPressed: () async {
-                            await _deleteWorkflow(wf.id);
-                            setDlg(() {});
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.copy_all_outlined,
+                                  size: 16, color: AppTheme.textM),
+                              tooltip: 'Duplicate',
+                              onPressed: () async {
+                                await _duplicateWorkflow(wf);
+                                setDlg(() {});
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline,
+                                  size: 16, color: AppTheme.textM),
+                              tooltip: 'Delete',
+                              onPressed: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (_) => AlertDialog(
+                                    backgroundColor: AppTheme.card,
+                                    title: const Text('Delete Workflow?',
+                                        style: TextStyle(color: AppTheme.textH)),
+                                    content: Text(
+                                      '"${wf.name}" will be permanently deleted.',
+                                      style: const TextStyle(color: AppTheme.textM),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx, false),
+                                        child: const Text('Cancel',
+                                            style: TextStyle(color: AppTheme.textM)),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppTheme.error),
+                                        onPressed: () => Navigator.pop(ctx, true),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed == true) {
+                                  await _deleteWorkflow(wf.id);
+                                  setDlg(() {});
+                                }
+                              },
+                            ),
+                          ],
                         ),
                         onTap: () => _loadWorkflow(wf),
                       );
@@ -785,6 +911,41 @@ class _LegendScreenState extends State<LegendScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _duplicateWorkflow(LegendWorkflow wf) async {
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final newId = 'wf_dup_$ts';
+    // Remap node IDs to avoid collision, and update edge references
+    final idMap = <String, String>{};
+    final newNodes = wf.nodes.asMap().entries.map((e) {
+      final newNodeId = 'n_${ts}_${e.key}';
+      idMap[e.value.id] = newNodeId;
+      return WorkflowNode(
+        id: newNodeId,
+        type: e.value.type,
+        label: e.value.label,
+        x: e.value.x,
+        y: e.value.y,
+        refId: e.value.refId,
+        metadata: e.value.metadata,
+      );
+    }).toList();
+    final newEdges = wf.edges.map((e) => WorkflowEdge(
+      id: '${idMap[e.fromId] ?? e.fromId}_${idMap[e.toId] ?? e.toId}',
+      fromId: idMap[e.fromId] ?? e.fromId,
+      toId: idMap[e.toId] ?? e.toId,
+    )).toList();
+    final copy = LegendWorkflow(
+      id: newId,
+      name: '${wf.name} (Copy)',
+      nodes: newNodes,
+      edges: newEdges,
+      updatedAt: DateTime.now(),
+    );
+    await LegendService.instance.saveWorkflow(copy);
+    setState(() => _savedWorkflows = LegendService.instance.workflows);
+    _showNotice('Duplicated as "${copy.name}"', background: AppTheme.success);
   }
 
   // ── Execute workflow ──────────────────────────────────────────────────────
@@ -915,7 +1076,7 @@ class _LegendScreenState extends State<LegendScreen>
     );
   }
 
-  Future<void> _executeWorkflow(String inputMessage) async {
+  Future<void> _executeWorkflow(String inputMessage, {bool isRerun = false}) async {
     if (_currentWorkflowId == null || _executing) return;
 
     // Auto-save before execution
@@ -976,6 +1137,10 @@ class _LegendScreenState extends State<LegendScreen>
             _showResultsPanel = true;
           });
         },
+        onRerun: (exec) {
+          Navigator.pop(context);
+          _executeWorkflow(exec.inputMessage, isRerun: true);
+        },
       ),
     );
   }
@@ -993,6 +1158,7 @@ class _LegendScreenState extends State<LegendScreen>
           if (newLabel.trim().isNotEmpty) {
             final idx = _nodes.indexWhere((n) => n.id == node.id);
             if (idx >= 0) {
+              _pushHistory();
               setState(
                   () => _nodes[idx] = _nodes[idx].copyWith(label: newLabel.trim()));
             }
@@ -1089,6 +1255,7 @@ class _LegendScreenState extends State<LegendScreen>
                     final newMeta = Map<String, dynamic>.from(meta);
                     newMeta['engine'] = engine;
                     if (engine == 'claude') newMeta['model'] = model;
+                    _pushHistory();
                     setState(() {
                       _nodes[idx] = _nodes[idx].copyWith(
                         label: label.trim().isNotEmpty ? label.trim() : null,
@@ -1216,6 +1383,7 @@ class _LegendScreenState extends State<LegendScreen>
       }
     }
 
+    _pushHistory();
     setState(() {
       _nodes.removeWhere((n) => n.id == guildNode.id);
       _nodes.addAll(newNodes);
@@ -1286,6 +1454,7 @@ class _LegendScreenState extends State<LegendScreen>
       }
 
       _confirmReplaceCanvas(() {
+        _pushHistory();
         setState(() {
           _nodes
             ..clear()
@@ -1355,6 +1524,10 @@ class _LegendScreenState extends State<LegendScreen>
               final ctrl = HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed;
               if (ctrl && event.logicalKey == LogicalKeyboardKey.keyS) {
                 _saveWorkflow();
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.keyZ) {
+                _undo();
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.keyY) {
+                _redo();
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
                 setState(() { _selectedNodeId = null; _selectedEdgeId = null; });
               } else if (ctrl && event.logicalKey == LogicalKeyboardKey.slash) {
@@ -1468,6 +1641,8 @@ class _LegendScreenState extends State<LegendScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               _shortcutRow('Ctrl + S', 'Save workflow'),
+              _shortcutRow('Ctrl + Z', 'Undo'),
+              _shortcutRow('Ctrl + Y', 'Redo'),
               _shortcutRow('Escape', 'Deselect node/edge'),
               _shortcutRow('Delete', 'Delete selected'),
               _shortcutRow('Ctrl + /', 'Show shortcuts'),
@@ -1604,6 +1779,26 @@ class _LegendScreenState extends State<LegendScreen>
             icon: Icons.auto_fix_high_outlined,
             label: 'Starter',
             onTap: _buildStarterWorkflow,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.auto_awesome_mosaic,
+            label: 'Templates',
+            onTap: _showTemplatesDialog,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.undo,
+            label: 'Undo',
+            onTap: _undo,
+            disabled: _history.isEmpty,
+          ),
+          const SizedBox(width: 2),
+          _ToolbarButton(
+            icon: Icons.redo,
+            label: 'Redo',
+            onTap: _redo,
+            disabled: _redoStack.isEmpty,
           ),
           const SizedBox(width: 6),
           if (_selectedNodeId != null || _selectedEdgeId != null) ...[
@@ -2468,6 +2663,7 @@ class _ToolbarButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool accent;
   final bool danger;
+  final bool disabled;
 
   const _ToolbarButton({
     required this.icon,
@@ -2475,25 +2671,30 @@ class _ToolbarButton extends StatelessWidget {
     required this.onTap,
     this.accent = false,
     this.danger = false,
+    this.disabled = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
-    final Color fg = danger
-        ? AppTheme.error
-        : accent
-            ? AppTheme.gold
-            : AppTheme.textB;
-    final Color bg = danger
-        ? AppTheme.error.withValues(alpha: 0.12)
-        : accent
-            ? AppTheme.gold.withValues(alpha: 0.12)
-            : AppTheme.card;
+    final Color fg = disabled
+        ? AppTheme.textM.withValues(alpha: 0.35)
+        : danger
+            ? AppTheme.error
+            : accent
+                ? AppTheme.gold
+                : AppTheme.textB;
+    final Color bg = disabled
+        ? AppTheme.card.withValues(alpha: 0.5)
+        : danger
+            ? AppTheme.error.withValues(alpha: 0.12)
+            : accent
+                ? AppTheme.gold.withValues(alpha: 0.12)
+                : AppTheme.card;
     return Tooltip(
       message: label,
       child: InkWell(
-        onTap: onTap,
+        onTap: disabled ? null : onTap,
         borderRadius: BorderRadius.circular(6),
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: isMobile ? 7 : 10, vertical: 6),
@@ -2880,10 +3081,12 @@ class _NodeResultCardState extends State<_NodeResultCard> {
 class _ExecutionHistoryDialog extends StatefulWidget {
   final String? workflowId;
   final Function(WorkflowExecution) onViewExecution;
+  final Function(WorkflowExecution) onRerun;
 
   const _ExecutionHistoryDialog({
     this.workflowId,
     required this.onViewExecution,
+    required this.onRerun,
   });
 
   @override
@@ -2895,6 +3098,7 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
   List<WorkflowExecution> _executions = [];
   bool _loading = true;
   int _total = 0;
+  final Set<int> _expanded = {};
 
   @override
   void initState() {
@@ -2928,13 +3132,12 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
               style: TextStyle(color: AppTheme.textH, fontSize: 16)),
           const Spacer(),
           Text('$_total total',
-              style: const TextStyle(
-                  color: AppTheme.textM, fontSize: 11)),
+              style: const TextStyle(color: AppTheme.textM, fontSize: 11)),
         ],
       ),
       content: SizedBox(
-        width: 520,
-        height: 400,
+        width: 560,
+        height: 440,
         child: _loading
             ? const Center(
                 child: CircularProgressIndicator(color: AppTheme.gold))
@@ -2946,11 +3149,29 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
                     itemCount: _executions.length,
                     itemBuilder: (_, i) {
                       final exec = _executions[i];
+                      final isExpanded = _expanded.contains(exec.id);
                       final statusColor = exec.isCompleted
                           ? AppTheme.success
                           : exec.isFailed
                               ? AppTheme.error
                               : AppTheme.gold;
+                      final statusIcon = exec.isCompleted
+                          ? Icons.check_circle
+                          : exec.isFailed
+                              ? Icons.error
+                              : Icons.hourglass_empty;
+
+                      final dur = exec.duration;
+                      final durLabel = dur == null
+                          ? ''
+                          : dur.inSeconds < 60
+                              ? ' · ${dur.inSeconds}s'
+                              : ' · ${dur.inMinutes}m${dur.inSeconds.remainder(60)}s';
+
+                      final input = exec.inputMessage.length > 48
+                          ? '${exec.inputMessage.substring(0, 48)}…'
+                          : exec.inputMessage;
+
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
@@ -2958,38 +3179,191 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: AppTheme.border),
                         ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4),
-                          leading: Icon(
-                            exec.isCompleted
-                                ? Icons.check_circle
-                                : exec.isFailed
-                                    ? Icons.error
-                                    : Icons.sync,
-                            color: statusColor,
-                            size: 20,
-                          ),
-                          title: Text(
-                            exec.workflowName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                color: AppTheme.textH,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600),
-                          ),
-                          subtitle: Text(
-                            '${exec.completedNodes}/${exec.totalNodes} nodes · ${exec.creditsUsed} credits · ${_formatTime(exec.startedAt)}',
-                            style: const TextStyle(
-                                color: AppTheme.textM, fontSize: 10),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.visibility_outlined,
-                                size: 18, color: AppTheme.gold),
-                            onPressed: () =>
-                                widget.onViewExecution(exec),
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Main row
+                            InkWell(
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(8)),
+                              onTap: () => setState(() {
+                                if (isExpanded) {
+                                  _expanded.remove(exec.id);
+                                } else {
+                                  _expanded.add(exec.id);
+                                }
+                              }),
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                                child: Row(
+                                  children: [
+                                    Icon(statusIcon,
+                                        color: statusColor, size: 18),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            input.isEmpty
+                                                ? exec.workflowName
+                                                : '"$input"',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                                color: AppTheme.textH,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '${exec.completedNodes}/${exec.totalNodes} nodes · ${exec.creditsUsed} cr$durLabel · ${_formatTime(exec.startedAt)}',
+                                            style: const TextStyle(
+                                                color: AppTheme.textM,
+                                                fontSize: 10),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    // Rerun button (completed only)
+                                    if (exec.isCompleted) ...[
+                                      const SizedBox(width: 4),
+                                      Tooltip(
+                                        message: 'Rerun with same input',
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(4),
+                                          onTap: () => widget.onRerun(exec),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 7, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.gold
+                                                  .withValues(alpha: 0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: AppTheme.gold
+                                                      .withValues(alpha: 0.3)),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.replay,
+                                                    size: 12,
+                                                    color: AppTheme.gold),
+                                                SizedBox(width: 3),
+                                                Text('Rerun',
+                                                    style: TextStyle(
+                                                        color: AppTheme.gold,
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const SizedBox(width: 4),
+                                    // View button
+                                    IconButton(
+                                      icon: const Icon(Icons.visibility_outlined,
+                                          size: 16, color: AppTheme.gold),
+                                      tooltip: 'View results',
+                                      onPressed: () =>
+                                          widget.onViewExecution(exec),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                          minWidth: 28, minHeight: 28),
+                                    ),
+                                    // Expand toggle
+                                    Icon(
+                                      isExpanded
+                                          ? Icons.expand_less
+                                          : Icons.expand_more,
+                                      size: 16,
+                                      color: AppTheme.textM,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Expanded node details
+                            if (isExpanded && exec.nodeResults.isNotEmpty) ...[
+                              const Divider(
+                                  height: 1, color: AppTheme.border),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: exec.nodeResults.map((nr) {
+                                    final hasErr =
+                                        nr.error != null && nr.error!.isNotEmpty;
+                                    return Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 6),
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            hasErr
+                                                ? Icons.error_outline
+                                                : Icons.check_circle_outline,
+                                            size: 12,
+                                            color: hasErr
+                                                ? AppTheme.error
+                                                : AppTheme.success,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '${nr.nodeLabel} (${nr.nodeType})',
+                                                  style: const TextStyle(
+                                                      color: AppTheme.textH,
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w600),
+                                                ),
+                                                if (hasErr)
+                                                  Text(
+                                                    nr.error!,
+                                                    style: const TextStyle(
+                                                        color: AppTheme.error,
+                                                        fontSize: 10),
+                                                  )
+                                                else if (nr.output.isNotEmpty)
+                                                  Text(
+                                                    nr.output.length > 120
+                                                        ? '${nr.output.substring(0, 120)}…'
+                                                        : nr.output,
+                                                    style: const TextStyle(
+                                                        color: AppTheme.textM,
+                                                        fontSize: 10,
+                                                        height: 1.4),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                          Text(
+                                            '${nr.durationMs}ms',
+                                            style: const TextStyle(
+                                                color: AppTheme.textM,
+                                                fontSize: 9),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       );
                     },
@@ -2998,8 +3372,7 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child:
-              const Text('Close', style: TextStyle(color: AppTheme.textM)),
+          child: const Text('Close', style: TextStyle(color: AppTheme.textM)),
         ),
       ],
     );
@@ -4391,4 +4764,17 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
       ],
     );
   }
+}
+
+// ── Canvas Snapshot (for undo/redo) ───────────────────────────────────────────
+
+class _CanvasSnapshot {
+  final List<WorkflowNode> nodes;
+  final List<WorkflowEdge> edges;
+
+  _CanvasSnapshot(List<WorkflowNode> n, List<WorkflowEdge> e)
+      : nodes = n.map((x) => x.copyWith()).toList(),
+        edges = e
+            .map((x) => WorkflowEdge(id: x.id, fromId: x.fromId, toId: x.toId))
+            .toList();
 }
