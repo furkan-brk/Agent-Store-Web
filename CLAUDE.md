@@ -195,6 +195,7 @@ services:
 - [x] **v3.0 — Legend: Touch/Touchpad + Claude Agent Export + Live Claude Execution** (Frontend + Backend) ✅ 16 task
 - [x] **v3.1 — UX Improvement Sprint** (Frontend) ✅ Guild emoji→Material Icon, keyboard nav, Mission redesign, hover consistency
 - [x] **v3.2 — UX Overhaul + DB Persistence Fix** (Frontend + Backend) ✅ 24 task
+- [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 
 ## v3.2 UX Overhaul + DB Persistence Fix (2026-03-22)
 6 feature, 24 task:
@@ -222,6 +223,15 @@ services:
 - **Live Claude Execution**: backend/pkg/claude/client.go, dual-engine (Gemini/Claude), per-node model selection (haiku=1cr, sonnet=3cr, opus=10cr), execution context feeding
 - **Yeni dosyalar**: input_mode.dart, dag_utils.dart, claude_export_service.dart, legend_export_dialog.dart, backend/pkg/claude/client.go
 - **Karar**: JSZip yerine combined JSON (dependency-free), WorkflowNode metadata nullable (backward compat)
+
+## v3.3 Legend v3.5 (2026-04-02)
+4 feature, tüm Flutter frontend:
+- **Undo/Redo**: `_CanvasSnapshot` history stack (max 50), `_pushHistory()` tüm canvas mutation'larında, toolbar Undo/Redo butonları (disabled state ile), Ctrl+Z/Ctrl+Y kısayolları
+- **Workflow Templates**: `legend_templates.dart` (6 şablon: Blank, Multi-Agent Pipeline, Research+Summarize, Code Review Chain, Mission-Led, Guild Collaboration), `legend_templates_dialog.dart` hover kartlı modal, toolbar Templates butonu, ID remapping ile çakışma önleme
+- **Clone/Duplicate + Delete Confirm**: `_duplicateWorkflow()` tam node ID remapping ile, Load dialog'a Duplicate ikonu, silme işlemi için onay AlertDialog
+- **Execution History UI**: Her çalışma satırı genişletilebilir (expandable node detayları), süre etiketi (Xs/Xm), tamamlanan çalışmalar için Rerun butonu, `onRerun` callback
+- **Yeni dosyalar**: `legend_templates.dart`, `legend_templates_dialog.dart`
+- **`_ToolbarButton`**: `disabled` parametresi eklendi (gri renk + onTap=null)
 
 ## Sprint Takip Dosyalari
 - `SPRINT_V2.md` — Detayli plan ve teknik kararlar
