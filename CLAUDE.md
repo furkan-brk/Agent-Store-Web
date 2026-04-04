@@ -6,6 +6,7 @@ AI Agent prompt paylaşım platformu. Kullanıcılar agent promptlarını keşfe
 
 ---
 
+
 ## Teknoloji Yığını
 | Katman | Teknoloji |
 |---|---|
