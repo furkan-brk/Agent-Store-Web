@@ -15,6 +15,7 @@
 
 ---
 
+
 ## 🧙 Proje Nedir?
 
 **Agent Store**, AI prompt ajanlarını bir RPG evrenine taşıyan merkeziyetsiz bir pazar yeridir. Her ajan; benzersiz bir sınıfa, uzmanlık alanına ve nadirlik derecesine sahip bir kahramandır.
