@@ -4,6 +4,7 @@
 ## Proje Özeti
 AI Agent prompt paylaşım platformu. Kullanıcılar agent promptlarını keşfeder, kütüphanesine ekler, kendi promptunu yükler. Her prompt analiz edilerek benzersiz pixel-art karakter üretilir. Giriş Monad testnet cüzdanı ile yapılır; kredi sistemi on-chain yönetilir.
 
+
 ---
 
 
