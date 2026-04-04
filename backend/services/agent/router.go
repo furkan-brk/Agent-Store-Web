@@ -72,6 +72,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		user.GET("/credits", handler.GetCredits)
 		user.GET("/credits/history", handler.GetCreditHistory)
 		user.POST("/credits/topup", handler.TopUpCredits)
+		user.POST("/credits/dev-grant", handler.DevGrantCredits)
 		user.GET("/profile", handler.GetUserProfile)
 		user.PATCH("/profile", handler.UpdateProfile)
 

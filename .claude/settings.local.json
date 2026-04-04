@@ -84,7 +84,18 @@
       "Bash(taskkill:*)",
       "Bash(cmd.exe //c \"taskkill /F /PID 19180\")",
       "Bash(flutter run:*)",
-      "Bash(cmd.exe //c \"taskkill /F /PID 18824\")"
+      "Bash(cmd.exe //c \"taskkill /F /PID 18824\")",
+      "Bash(docker-compose up:*)",
+      "Read(//home/alp/.docker/**)",
+      "Read(//usr/lib/docker/**)",
+      "Read(//usr/libexec/docker/**)",
+      "Bash(sudo apt-get:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(PGPASSWORD=agent_pass psql:*)",
+      "Bash(apt list:*)",
+      "Read(//tmp/add_credits/**)",
+      "Bash(go mod:*)",
+      "Bash(go run:*)"
     ]
   }
 }
