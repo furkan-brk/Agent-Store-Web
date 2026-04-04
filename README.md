@@ -148,12 +148,10 @@ Bu proje bir hackathon kapsamında geliştirilmiştir.
 
 ## 👥 Takım
 
-| İsim | Rol | GitHub |
-|------|-----|--------|
-| Furkan | - | [@furkan-brk](https://github.com/furkan-brk) |
-| Hale Sezin | Frontend & Blockchain | [@seziyy](https://github.com/seziyy) |
-| Alp | - | - |
-| Doğu | - | - |
+| Furkan  | [@furkan-brk](https://github.com/furkan-brk) |
+| Hale Sezin  | [@seziyy](https://github.com/seziyy) |
+| Alp | [ AlpDurak ] (https://github.com/AlpDurak) |
+| Doğu | [ Doğu Kervan] https://github.com/dogujen |
 
 ---
 
