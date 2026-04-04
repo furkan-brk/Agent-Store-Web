@@ -82,21 +82,24 @@ class FilterPanel extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: AppTheme.primary.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  '${_priceLabel(currentMin)} — ${_priceLabel(currentMax)}',
-                  style: const TextStyle(
-                    color: AppTheme.gold,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+              Flexible(
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '${_priceLabel(currentMin)} — ${_priceLabel(currentMax)}',
+                    style: const TextStyle(
+                      color: AppTheme.gold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),

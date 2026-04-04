@@ -381,126 +381,132 @@ class _Sidebar extends StatelessWidget {
         child: FocusTraversalGroup(
           child: Column(
             children: [
-            const SizedBox(height: 24),
-            // ── Branding ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary,
-                      borderRadius: BorderRadius.circular(8),
+              const SizedBox(height: 24),
+              // ── Branding ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.auto_awesome, color: colorScheme.onPrimary, size: 18),
                     ),
-                    child: Icon(Icons.auto_awesome, color: colorScheme.onPrimary, size: 18),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'AgentStore',
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      letterSpacing: -0.3,
+                    const SizedBox(width: 10),
+                    Text(
+                      'AgentStore',
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        letterSpacing: -0.3,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 28),
+              const SizedBox(height: 28),
 
-            // ── Primary ──
-            _SectionLabel(label: 'EXPLORE', colorScheme: colorScheme),
-            _NavItem(
-                icon: Icons.storefront_outlined,
-                label: 'Store',
-                path: '/',
-                loc: loc,
-                tooltip: 'Alt+S',
-                isDrawer: isDrawer),
-            _NavItem(
-                icon: Icons.bookmarks_outlined,
-                label: 'Library',
-                path: '/library',
-                loc: loc,
-                tooltip: 'Alt+L',
-                isDrawer: isDrawer),
-            _NavItem(
-                icon: Icons.add_circle_outline,
-                label: 'Create Agent',
-                path: '/create',
-                loc: loc,
-                tooltip: 'Alt+C',
-                isDrawer: isDrawer),
+              // ── Navigation items (scrollable) ──
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    // ── Primary ──
+                    _SectionLabel(label: 'EXPLORE', colorScheme: colorScheme),
+                    _NavItem(
+                        icon: Icons.storefront_outlined,
+                        label: 'Store',
+                        path: '/',
+                        loc: loc,
+                        tooltip: 'Alt+S',
+                        isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.bookmarks_outlined,
+                        label: 'Library',
+                        path: '/library',
+                        loc: loc,
+                        tooltip: 'Alt+L',
+                        isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.add_circle_outline,
+                        label: 'Create Agent',
+                        path: '/create',
+                        loc: loc,
+                        tooltip: 'Alt+C',
+                        isDrawer: isDrawer),
 
-            const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-            // ── Community ──
-            _SectionLabel(label: 'COMMUNITY', colorScheme: colorScheme),
-            _NavItem(
-                icon: Icons.groups_outlined,
-                label: 'Guilds',
-                path: '/guild',
-                loc: loc,
-                tooltip: 'Alt+G',
-                isDrawer: isDrawer),
-            _NavItem(
-                icon: Icons.auto_awesome_outlined,
-                label: 'Guild Master',
-                path: '/guild-master',
-                loc: loc,
-                tooltip: 'AI Team Builder',
-                isDrawer: isDrawer),
-            _NavItem(
-                icon: Icons.emoji_events_outlined,
-                label: 'Leaderboard',
-                path: '/leaderboard',
-                loc: loc,
-                isDrawer: isDrawer),
+                    // ── Community ──
+                    _SectionLabel(label: 'COMMUNITY', colorScheme: colorScheme),
+                    _NavItem(
+                        icon: Icons.groups_outlined,
+                        label: 'Guilds',
+                        path: '/guild',
+                        loc: loc,
+                        tooltip: 'Alt+G',
+                        isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.auto_awesome_outlined,
+                        label: 'Guild Master',
+                        path: '/guild-master',
+                        loc: loc,
+                        tooltip: 'AI Team Builder',
+                        isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.emoji_events_outlined,
+                        label: 'Leaderboard',
+                        path: '/leaderboard',
+                        loc: loc,
+                        isDrawer: isDrawer),
 
-            const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-            // ── Missions ──
-            _SectionLabel(label: 'MISSIONS', colorScheme: colorScheme),
-            _NavItem(icon: Icons.flag_outlined, label: 'Missions', path: '/missions', loc: loc, isDrawer: isDrawer),
-            _NavItem(
-                icon: Icons.account_tree_outlined,
-                label: 'Legend',
-                path: '/legend',
-                loc: loc,
-                tooltip: 'Alt+W',
-                isDrawer: isDrawer),
+                    // ── Missions ──
+                    _SectionLabel(label: 'MISSIONS', colorScheme: colorScheme),
+                    _NavItem(icon: Icons.flag_outlined, label: 'Missions', path: '/missions', loc: loc, isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.account_tree_outlined,
+                        label: 'Legend',
+                        path: '/legend',
+                        loc: loc,
+                        tooltip: 'Alt+W',
+                        isDrawer: isDrawer),
 
-            const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-            // ── Account ──
-            _SectionLabel(label: 'ACCOUNT', colorScheme: colorScheme),
-            _NavItem(
-                icon: Icons.analytics_outlined, label: 'Dashboard', path: '/creator', loc: loc, isDrawer: isDrawer),
-            _NavItem(icon: Icons.settings_outlined, label: 'Settings', path: '/settings', loc: loc, isDrawer: isDrawer),
-            _NavItem(
-                icon: Icons.account_balance_wallet_outlined,
-                label: 'Wallet',
-                path: '/wallet',
-                loc: loc,
-                isDrawer: isDrawer),
+                    // ── Account ──
+                    _SectionLabel(label: 'ACCOUNT', colorScheme: colorScheme),
+                    _NavItem(
+                        icon: Icons.analytics_outlined, label: 'Dashboard', path: '/creator', loc: loc, isDrawer: isDrawer),
+                    _NavItem(icon: Icons.settings_outlined, label: 'Settings', path: '/settings', loc: loc, isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'Wallet',
+                        path: '/wallet',
+                        loc: loc,
+                        isDrawer: isDrawer),
+                  ],
+                ),
+              ),
 
-            const Spacer(),
+              // ── Notification bell (desktop only — mobile has it in AppBar) ──
+              if (!isDrawer) ...[
+                Divider(color: colorScheme.outline, height: 1, indent: 20, endIndent: 20),
+                const SizedBox(height: 8),
+              ],
 
-            // ── Notification bell (desktop only — mobile has it in AppBar) ──
-            if (!isDrawer) ...[
-              Divider(color: colorScheme.outline, height: 1, indent: 20, endIndent: 20),
-              const SizedBox(height: 8),
-            ],
-
-            // ── User info + notification ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _UserFooter(isDrawer: isDrawer),
-            ),
-            const SizedBox(height: 12),
+              // ── User info + notification ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: _UserFooter(isDrawer: isDrawer),
+              ),
+              const SizedBox(height: 12),
             ],
           ),
         ),
