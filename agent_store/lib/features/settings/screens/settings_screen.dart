@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../app/theme.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -242,19 +243,7 @@ class SettingsScreen extends StatelessWidget {
     AuthController.to.disconnect();
 
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(children: [
-          Icon(Icons.check_circle_outline, color: AppTheme.textH, size: 16),
-          SizedBox(width: 8),
-          Text('All local data cleared'),
-        ]),
-        backgroundColor: AppTheme.card2,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppSnackBar.success(context, 'All local data cleared');
   }
 }
 

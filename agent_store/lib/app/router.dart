@@ -21,6 +21,7 @@ import '../features/missions/screens/missions_screen.dart';
 import '../features/legend/screens/legend_screen.dart';
 import '../controllers/auth_controller.dart';
 import '../shared/services/app_telemetry_service.dart';
+import 'theme.dart';
 
 // Intent classes for keyboard shortcuts
 class _GoStoreIntent extends Intent {
@@ -235,7 +236,10 @@ class _WideLayout extends StatelessWidget {
     return Scaffold(
       body: Row(
         children: [
-          const _Sidebar(),
+          const SizedBox(
+            width: AppSizing.navSidebar,
+            child: _Sidebar(),
+          ),
           // Thin vertical divider between sidebar and content
           Container(
             width: 1,
@@ -375,7 +379,7 @@ class _Sidebar extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      width: isDrawer ? null : 220,
+      width: isDrawer ? null : AppSizing.navSidebar,
       color: theme.scaffoldBackgroundColor,
       child: SafeArea(
         child: FocusTraversalGroup(

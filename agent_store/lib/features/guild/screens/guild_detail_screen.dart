@@ -137,7 +137,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
     final isFull = guild.memberCount >= 4;
 
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final bodyPad = isMobile ? 12.0 : (screenWidth < 900 ? 16.0 : 24.0);
 
     return SingleChildScrollView(
@@ -554,7 +554,7 @@ class _GuildStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFull = guild.memberCount >= 4;
     final slotColor = isFull ? AppTheme.primary : const Color(0xFF5A8A48);
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
     return Container(
       padding: EdgeInsets.all(isMobile ? 10 : 16),
       decoration: BoxDecoration(

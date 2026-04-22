@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/library_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
@@ -162,7 +163,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         ? '${wallet.substring(0, 6)}...${wallet.substring(wallet.length - 4)}'
         : wallet;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final hPad = isMobile ? 14.0 : 24.0;
 
     return Obx(() => Container(
@@ -265,7 +266,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _buildLoadingSkeleton() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final hPad = isMobile ? 12.0 : 20.0;
     return CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -299,14 +300,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   /// Responsive grid delegate based on available width.
   SliverGridDelegate _responsiveGridDelegate(double width) {
-    if (width < 500) {
-      return const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.68,
-      );
-    } else if (width < 900) {
+    if (AppBreakpoints.isMobile(width)) {
       return const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 240,
         crossAxisSpacing: 12,
@@ -362,7 +356,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         final filtered = _applyFilters(baseList);
         final categories = _uniqueCategories(_ctrl.saved);
         final screenWidth = MediaQuery.of(context).size.width;
-        final isMobile = screenWidth < 600;
+        final isMobile = AppBreakpoints.isMobile(screenWidth);
         final hPad = isMobile ? 12.0 : 20.0;
 
         if (_ctrl.saved.isEmpty && _searchQuery.isEmpty) {
@@ -466,7 +460,7 @@ class _LibraryScreenState extends State<LibraryScreen>
       });
 
   Widget _buildEmptySavedState() {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
     return Center(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 40),
@@ -515,7 +509,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _buildSearchAndSort(List<String> categories) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final hPad = isMobile ? 12.0 : 20.0;
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 0),
@@ -656,18 +650,9 @@ class _LibraryScreenState extends State<LibraryScreen>
       if (mounted) {
         if (ok) {
           _ctrl.load();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('"${agent.title}" removed from library'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          AppSnackBar.info(context, '"${agent.title}" removed from library');
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to remove agent. Try again.'),
-            ),
-          );
+          AppSnackBar.error(context, 'Failed to remove agent. Try again.');
         }
       }
     }
@@ -675,7 +660,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _buildCollectionsSection() {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final hPad = isMobile ? 12.0 : 20.0;
     return Obx(() => Container(
         padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 0),
@@ -869,7 +854,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           credits: _ctrl.credits.value,
         );
         final screenWidth = MediaQuery.of(context).size.width;
-        final isMobile = screenWidth < 600;
+        final isMobile = AppBreakpoints.isMobile(screenWidth);
         final hPad = isMobile ? 12.0 : 20.0;
         final gridDelegate = _responsiveGridDelegate(screenWidth);
         final wallet = WalletService.instance.connectedWallet;

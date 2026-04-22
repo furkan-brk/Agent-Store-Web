@@ -170,3 +170,34 @@ class AppTheme {
     ),
   );
 }
+
+class AppSpacing {
+  static const xs   = 4.0;
+  static const sm   = 8.0;
+  static const md   = 12.0;
+  static const lg   = 16.0;
+  static const xl   = 24.0;
+  static const xxl  = 32.0;
+  static const xxxl = 48.0;
+
+  static double screenH(double width) =>
+      width < AppBreakpoints.mobile ? lg : xl;
+}
+
+class AppSizing {
+  static const navSidebar    = 220.0;
+  static const catSidebar    = 200.0;
+  static const filterSidebar = 260.0;
+  static const cardRadius    = 14.0;
+  static const inputRadius   = 10.0;
+  static const minTapTarget  = 44.0;
+}
+
+class AppBreakpoints {
+  static const mobile = 600.0;
+  static const tablet = 1024.0;
+
+  static bool isMobile(double w)  => w < mobile;
+  static bool isTablet(double w)  => w >= mobile && w < tablet;
+  static bool isDesktop(double w) => w >= tablet;
+}

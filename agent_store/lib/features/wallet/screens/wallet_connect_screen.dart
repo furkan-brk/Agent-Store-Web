@@ -14,7 +14,7 @@ class WalletConnectScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ctrl = AuthController.to;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final containerWidth = screenWidth < 520 ? double.infinity : 480.0;
     final padding = isMobile ? 20.0 : 36.0;
     final horizontalMargin = isMobile ? 16.0 : 0.0;

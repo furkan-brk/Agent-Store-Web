@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/mission_service.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
@@ -134,12 +135,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     await MissionService.instance.deleteMission(mission.id);
     if (mounted) {
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Mission "#${mission.slug}" deleted'),
-        backgroundColor: AppTheme.card2,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
+      AppSnackBar.info(context, 'Mission "#${mission.slug}" deleted');
     }
   }
 
@@ -150,12 +146,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     );
     if (mounted) {
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Mission duplicated'),
-        backgroundColor: AppTheme.card2,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ));
+      AppSnackBar.success(context, 'Mission duplicated');
     }
   }
 
@@ -176,12 +167,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
           await MissionService.instance.addMission(title: title, prompt: prompt);
           if (mounted) {
             setState(() {});
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Mission created. Use with #slug in chats.'),
-              backgroundColor: AppTheme.card2,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ));
+            AppSnackBar.success(context, 'Mission created. Use with #slug in chats.');
           }
         },
       ),
@@ -210,12 +196,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
           );
           if (mounted) {
             setState(() {});
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Mission updated'),
-              backgroundColor: AppTheme.card2,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ));
+            AppSnackBar.success(context, 'Mission updated');
           }
         },
       ),
@@ -225,7 +206,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final isTablet = screenWidth >= 600 && screenWidth <= 900;
     final bodyPad = isMobile ? 12.0 : (isTablet ? 16.0 : 24.0);
     final missions = MissionService.instance.missions;
@@ -582,7 +563,7 @@ class _MissionCardState extends State<_MissionCard> {
   Widget build(BuildContext context) {
     final m = widget.mission;
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

@@ -11,6 +11,7 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/mission_service.dart';
@@ -114,9 +115,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
     if (!_requireAuth()) return;
     await _ctrl.toggleLibrary();
     if (mounted && !_ctrl.inLibrary.value) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Removed from library'), duration: Duration(seconds: 2)),
-      );
+      AppSnackBar.info(context, 'Removed from library');
     }
   }
 
@@ -128,9 +127,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       if (forked != null) {
         context.go('/agent/${forked.id}');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not fork agent. Try again.')),
-        );
+        AppSnackBar.error(context, 'Could not fork agent. Try again.');
       }
     }
   }
@@ -213,40 +210,20 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       );
       if (txHash == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.warning_amber_rounded, color: AppTheme.gold, size: 16),
-              SizedBox(width: 8),
-              Text('Transaction cancelled or failed. No funds were sent.'),
-            ]),
-          ));
+          AppSnackBar.info(context, 'Transaction cancelled or failed. No funds were sent.');
         }
         return;
       }
       final ok = await _ctrl.purchaseAgent(txHash, agent.price);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(
-              ok ? Icons.check_circle : Icons.error_outline,
-              color: ok ? AppTheme.success : AppTheme.primary,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(ok ? 'Agent purchased successfully!' : 'Purchase failed. Try again.'),
-          ]),
-        ));
+        if (ok) {
+          AppSnackBar.success(context, 'Agent purchased successfully!');
+        } else {
+          AppSnackBar.error(context, 'Purchase failed. Try again.');
+        }
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline, color: AppTheme.primary, size: 16),
-            const SizedBox(width: 8),
-            Flexible(child: Text('Purchase error: $e')),
-          ]),
-        ));
-      }
+      if (mounted) AppSnackBar.error(context, 'Purchase error: $e');
     }
   }
 
@@ -256,16 +233,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
     final url = '${web.window.location.origin}/agent/${agent.id}';
     final text = '${agent.title} — ${agent.characterType.displayName} on AgentStore\n$url';
     web.window.navigator.clipboard.writeText(text).toDart.then((_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle, color: AppTheme.success, size: 16),
-            SizedBox(width: 8),
-            Text('Link copied to clipboard!'),
-          ]),
-          duration: Duration(seconds: 2),
-        ));
-      }
+      if (mounted) AppSnackBar.success(context, 'Link copied to clipboard!');
     }).catchError((_) {});
   }
 
@@ -290,8 +258,8 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       }
 
       final hasAccess = _ctrl.hasAccess;
-      final screenWidth = MediaQuery.of(context).size.width;
-      final isMobile = screenWidth < 768;
+      final screenWidth = MediaQuery.sizeOf(context).width;
+      final isMobile = AppBreakpoints.isMobile(screenWidth);
 
       return CallbackShortcuts(
         bindings: <ShortcutActivator, VoidCallback>{
@@ -312,8 +280,10 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
   // ── Breadcrumb ─────────────────────────────────────────────────────────────
 
+  static const _kMedium = 900.0;
+
   Widget _buildBreadcrumb(AgentModel a, {bool isMobile = false}) {
-    final hPad = isMobile ? 16.0 : (MediaQuery.of(context).size.width < 900 ? 16.0 : 24.0);
+    final hPad = isMobile ? AppSpacing.lg : (MediaQuery.sizeOf(context).width < _kMedium ? AppSpacing.lg : AppSpacing.xl);
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, isMobile ? 8 : 14, hPad, 0),
       child: Row(children: [
@@ -1381,7 +1351,7 @@ class _DetailLoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 768;
+    final isMobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
     return Scaffold(
       backgroundColor: AppTheme.bg,
       body: ShimmerScope(
@@ -2172,13 +2142,7 @@ class _CopyButtonState extends State<_CopyButton> {
     await Clipboard.setData(ClipboardData(text: widget.text));
     if (!mounted) return;
     setState(() => _copied = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Command copied to clipboard!'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.success(context, 'Command copied to clipboard!');
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) setState(() => _copied = false);
   }

@@ -7,6 +7,8 @@ import '../../../controllers/store_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/widgets/wallet_guard.dart';
+import '../../../shared/utils/app_snack_bar.dart';
+import '../../../shared/utils/category_icon.dart';
 import '../widgets/agent_card.dart';
 import '../widgets/category_chips.dart';
 import '../widgets/category_sidebar.dart';
@@ -63,18 +65,11 @@ class _StoreScreenState extends State<StoreScreen> {
     if (!WalletGuard.checkWithSnackBar(context, actionLabel: 'save agents')) return;
     final ok = await ApiService.instance.addToLibrary(agent.id);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Row(children: [
-          Icon(
-            ok ? Icons.bookmark_added_rounded : Icons.bookmark_outlined,
-            color: ok ? AppTheme.olive : AppTheme.gold,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Text(ok ? 'Saved to library' : 'Already in library')),
-        ]),
-        duration: const Duration(seconds: 2),
-      ));
+      if (ok) {
+        AppSnackBar.success(context, 'Saved to library');
+      } else {
+        AppSnackBar.info(context, 'Already in library');
+      }
     }
   }
 
@@ -282,8 +277,8 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   Widget _buildCategoryChips() {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-    final hPad = isMobile ? 16.0 : 24.0;
+    final w = MediaQuery.sizeOf(context).width;
+    final hPad = AppSpacing.screenH(w);
     return Obx(() => Padding(
       padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 8),
       child: CategoryChips(
@@ -299,26 +294,15 @@ class _StoreScreenState extends State<StoreScreen> {
     ));
   }
 
-  // Responsive grid delegate based on available width.
   SliverGridDelegate _responsiveGridDelegate(double width) {
-    if (width < 400) {
-      // Small phones: 2 columns, tight spacing
-      return const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+    if (AppBreakpoints.isMobile(width)) {
+      return const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 220,
         crossAxisSpacing: 10,
         mainAxisSpacing: 10,
         childAspectRatio: 0.68,
       );
-    } else if (width < 768) {
-      // Large phones / small tablets: 2-3 columns
-      return const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 220,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.70,
-      );
     }
-    // Tablet / Desktop: default behavior
     return const SliverGridDelegateWithMaxCrossAxisExtent(
       maxCrossAxisExtent: 300,
       crossAxisSpacing: 16,
@@ -327,13 +311,10 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  // Returns a sliver based on current controller state.
   Widget _buildContentSliver() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
-    final gridPadding = isMobile
-        ? const EdgeInsets.fromLTRB(12, 0, 12, 12)
-        : const EdgeInsets.fromLTRB(24, 0, 24, 24);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final hPad = AppSpacing.screenH(screenWidth);
+    final gridPadding = EdgeInsets.fromLTRB(hPad, 0, hPad, hPad);
 
     // Skeleton: loading AND no stale data to show
     if (_ctrl.isLoading.value && _ctrl.agents.isEmpty) {
@@ -366,9 +347,9 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   Widget _buildHeader() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
-    final hPad = isMobile ? 16.0 : 24.0;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
+    final hPad = AppSpacing.screenH(screenWidth);
     final titleSize = isMobile ? 20.0 : 24.0;
 
     return Padding(
@@ -439,9 +420,9 @@ class _StoreScreenState extends State<StoreScreen> {
         ]);
       }),
       // Filter panel
-      Obx(() => AnimatedSwitcher(
+      Obx(() => ClipRect(child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
-        transitionBuilder: (child, a) => SizeTransition(sizeFactor: a, child: FadeTransition(opacity: a, child: child)),
+        transitionBuilder: (child, a) => SizeTransition(sizeFactor: a, axisAlignment: -1.0, child: FadeTransition(opacity: a, child: child)),
         child: _ctrl.showFilter.value
           ? Padding(key: const ValueKey('fp'), padding: const EdgeInsets.only(top: 14), child: FilterPanel(
               minPrice: 0, maxPrice: 10,
@@ -452,7 +433,7 @@ class _StoreScreenState extends State<StoreScreen> {
               onReset: _ctrl.resetFilters,
             ))
           : const SizedBox.shrink(key: ValueKey('fh')),
-      )),
+      ))),
       // Recent searches
       Obx(() => _ctrl.recentSearches.isNotEmpty && _ctrl.search.value.isEmpty ? Padding(
         padding: const EdgeInsets.only(top: 14),
@@ -550,7 +531,9 @@ class _StoreScreenState extends State<StoreScreen> {
     ),
   ));
 
-  Widget _buildFilterButton() => Obx(() => Stack(clipBehavior: Clip.none, children: [
+  Widget _buildFilterButton() => Obx(() => Padding(
+    padding: const EdgeInsets.only(top: 4, right: 4),
+    child: Stack(clipBehavior: Clip.none, children: [
     _HoverContainer(
       isActive: _ctrl.showFilter.value,
       onTap: () => _ctrl.showFilter.toggle(),
@@ -575,11 +558,13 @@ class _StoreScreenState extends State<StoreScreen> {
           style: const TextStyle(color: Color(0xFF1E1A14), fontSize: 9, fontWeight: FontWeight.bold),
         )),
       )),
-  ]));
+  ])));
+
 
   Widget _buildSectionHeader() {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-    final hPad = isMobile ? 16.0 : 24.0;
+    final w = MediaQuery.sizeOf(context).width;
+    final isMobile = AppBreakpoints.isMobile(w);
+    final hPad = AppSpacing.screenH(w);
     return Padding(
     padding: EdgeInsets.fromLTRB(hPad, isMobile ? 16 : 24, hPad, 4),
     child: Column(children: [
@@ -592,7 +577,7 @@ class _StoreScreenState extends State<StoreScreen> {
           text = 'Results for "${_ctrl.search.value}"';
           subtitle = '${_ctrl.agents.length} agent${_ctrl.agents.length != 1 ? 's' : ''} found';
         } else if (_ctrl.category.value.isNotEmpty) {
-          icon = _getCategoryIcon(_ctrl.category.value);
+          icon = categoryIcon(_ctrl.category.value);
           text = '${_ctrl.category.value[0].toUpperCase()}${_ctrl.category.value.substring(1)} Agents';
           subtitle = '${_ctrl.agents.length} in this category';
         } else {
@@ -633,17 +618,6 @@ class _StoreScreenState extends State<StoreScreen> {
   );
   }
 
-  IconData _getCategoryIcon(String category) => switch (category.toLowerCase()) {
-    'backend'  => Icons.code_rounded,
-    'frontend' => Icons.brush_rounded,
-    'data'     => Icons.bar_chart_rounded,
-    'security' => Icons.shield_rounded,
-    'creative' => Icons.auto_awesome_rounded,
-    'business' => Icons.trending_up_rounded,
-    'research' => Icons.science_rounded,
-    'planning' => Icons.map_rounded,
-    _          => Icons.folder_open_rounded,
-  };
 
   Widget _buildErrorView() => Center(child: Padding(
     padding: const EdgeInsets.all(32),
@@ -784,10 +758,9 @@ class _StoreScreenState extends State<StoreScreen> {
     ));
   }
 
-  /// End-of-list indicator for long scrollable grids
   Widget _buildEndOfList() {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-    final hPad = isMobile ? 12.0 : 24.0;
+    final w = MediaQuery.sizeOf(context).width;
+    final hPad = AppSpacing.screenH(w);
     return Padding(
     padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 32),
     child: Obx(() => Column(children: [
@@ -819,8 +792,8 @@ class _StoreScreenState extends State<StoreScreen> {
   static const _kPopularTags = ['AI', 'coding', 'writing', 'analysis', 'planning', 'security', 'research', 'marketing', 'automation', 'data'];
 
   Widget _buildDiscovery() {
-    final isMobile = MediaQuery.of(context).size.width < 768;
-    final hPad = isMobile ? 16.0 : 24.0;
+    final w = MediaQuery.sizeOf(context).width;
+    final hPad = AppSpacing.screenH(w);
     return Padding(
     padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

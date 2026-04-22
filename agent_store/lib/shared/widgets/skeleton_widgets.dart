@@ -137,19 +137,24 @@ class AgentCardSkeleton extends StatelessWidget {
         border: Border.all(color: AppTheme.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Banner (pixel art area) ──
-        Container(
-          height: 118,
-          decoration: const BoxDecoration(
-            color: AppTheme.bg,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(13),
-              topRight: Radius.circular(13),
-            ),
-          ),
-          child: const Center(
-            child: ShimmerBox(width: 72, height: 72, radius: 36, color: AppTheme.card2),
-          ),
+        // ── Banner (pixel art area) — matches AgentCard responsive height ──
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final bannerH = (constraints.maxWidth * 0.52).clamp(130.0, 180.0);
+            return Container(
+              height: bannerH,
+              decoration: const BoxDecoration(
+                color: AppTheme.bg,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(13),
+                  topRight: Radius.circular(13),
+                ),
+              ),
+              child: const Center(
+                child: ShimmerBox(width: 72, height: 72, radius: 36, color: AppTheme.card2),
+              ),
+            );
+          },
         ),
         // ── Card body ──
         Padding(

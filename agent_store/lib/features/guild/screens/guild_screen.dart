@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/guild_controller.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/services/api_service.dart';
@@ -46,7 +47,7 @@ class _GuildScreenState extends State<GuildScreen> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 600;
+    final isMobile = AppBreakpoints.isMobile(screenWidth);
     final isTablet = screenWidth >= 600 && screenWidth <= 900;
     final bodyPad = isMobile ? 12.0 : (isTablet ? 16.0 : 24.0);
     return Obx(() {
@@ -240,13 +241,8 @@ class _GuildScreenState extends State<GuildScreen> {
 
   void _onCreateGuild(BuildContext context) {
     if (!ApiService.instance.isAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Connect your wallet to create a guild'),
-        backgroundColor: AppTheme.card2,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        action: SnackBarAction(label: 'Connect', textColor: AppTheme.gold, onPressed: () => context.go('/wallet')),
-      ));
+      AppSnackBar.info(context, 'Connect your wallet to create a guild',
+          action: SnackBarAction(label: 'Connect', textColor: AppTheme.gold, onPressed: () => context.go('/wallet')));
       return;
     }
     context.go('/guild/create');

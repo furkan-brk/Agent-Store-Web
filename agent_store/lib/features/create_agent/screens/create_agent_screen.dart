@@ -17,6 +17,8 @@ class CreateAgentScreen extends StatefulWidget {
 }
 
 class _CreateAgentScreenState extends State<CreateAgentScreen> {
+  static const _kMedium = 900.0;
+
   late final CreateAgentController _ctrl;
   final _form = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
@@ -214,8 +216,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       child: Center(
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: screenWidth < 900 ? 16 : 24,
-            vertical: screenWidth < 900 ? 24 : 32,
+            horizontal: screenWidth < _kMedium ? 16 : 24,
+            vertical: screenWidth < _kMedium ? 24 : 32,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -545,8 +547,8 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
 
   Widget _buildFormPanel({bool isMobile = false}) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final hPad = isMobile ? 16.0 : (screenWidth < 900 ? 24.0 : 48.0);
-    final vPad = isMobile ? 24.0 : (screenWidth < 900 ? 28.0 : 40.0);
+    final hPad = isMobile ? 16.0 : (screenWidth < _kMedium ? 24.0 : 48.0);
+    final vPad = isMobile ? 24.0 : (screenWidth < _kMedium ? 28.0 : 40.0);
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(
         horizontal: hPad,

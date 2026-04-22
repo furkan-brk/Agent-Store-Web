@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:web/web.dart' as web;
 
 import '../../../app/theme.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
@@ -40,16 +41,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     try {
       await web.window.navigator.clipboard.writeText(url).toDart;
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.check_circle, color: AppTheme.success, size: 16),
-            SizedBox(width: 8),
-            Text('Profile link copied to clipboard!'),
-          ]),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      AppSnackBar.success(context, 'Profile link copied to clipboard!');
     } catch (_) {}
   }
 
