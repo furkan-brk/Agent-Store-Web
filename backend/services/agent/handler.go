@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -653,11 +654,51 @@ func (h *Handler) TopUpCredits(c *gin.Context) {
 	}
 	wallet := c.GetString("wallet")
 	if err := h.agentSvc.TopUpCredits(wallet, body.TxHash, body.AmountMon); err != nil {
+		log.Printf("[TopUpCredits] verification failed for wallet=%s amount=%.4f: %v", wallet, body.AmountMon, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	credits, _ := h.agentSvc.GetUserCredits(wallet)
 	c.JSON(http.StatusOK, gin.H{"message": "credits added", "new_balance": credits})
+}
+
+// DevGrantCredits handles POST /api/v1/user/credits/dev-grant
+// Only available in non-production environments (no RAILWAY_ENVIRONMENT set).
+// Grants credits without on-chain verification for local testing.
+func (h *Handler) DevGrantCredits(c *gin.Context) {
+	if os.Getenv("RAILWAY_ENVIRONMENT") != "" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "not available in production"})
+		return
+	}
+	var body struct {
+		Amount int64 `json:"amount" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if body.Amount <= 0 || body.Amount > 10000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "amount must be between 1 and 10000"})
+		return
+	}
+	wallet := c.GetString("wallet")
+	// Directly add credits to the user
+	if err := database.DB.Model(&models.User{}).
+		Where("wallet_address = ?", wallet).
+		UpdateColumn("credits", gorm.Expr("credits + ?", body.Amount)).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to grant credits"})
+		return
+	}
+	// Record the transaction
+	tx := models.CreditTransaction{
+		Wallet: wallet,
+		Type:   "dev_grant",
+		Amount: body.Amount,
+	}
+	database.DB.Create(&tx)
+	credits, _ := h.agentSvc.GetUserCredits(wallet)
+	log.Printf("[DevGrant] granted %d credits to %s (new balance: %d)", body.Amount, wallet, credits)
+	c.JSON(http.StatusOK, gin.H{"message": "credits granted", "new_balance": credits})
 }
 
 // SetAgentPrice handles PUT /api/v1/agents/:id/price

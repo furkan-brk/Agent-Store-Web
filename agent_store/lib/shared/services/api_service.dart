@@ -702,8 +702,26 @@ class ApiService {
         body: jsonEncode({'tx_hash': txHash, 'amount_mon': amountMon}),
       );
       if (r.statusCode == 200) return jsonDecode(r.body) as Map<String, dynamic>;
-      debugPrint('topUpCredits: HTTP ${r.statusCode} — ${r.body}');
-    } catch (e) { debugPrint('topUpCredits: $e'); }
+      final err = jsonDecode(r.body) as Map<String, dynamic>?;
+      final msg = err?['error'] as String? ?? 'Top-up failed (HTTP ${r.statusCode})';
+      debugPrint('topUpCredits: HTTP ${r.statusCode} — $msg');
+      throw Exception(msg);
+    } catch (e) {
+      debugPrint('topUpCredits: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> devGrantCredits(int amount) async {
+    try {
+      final r = await http.post(
+        Uri.parse('${ApiConstants.apiV1}/user/credits/dev-grant'),
+        headers: _headers,
+        body: jsonEncode({'amount': amount}),
+      );
+      if (r.statusCode == 200) return jsonDecode(r.body) as Map<String, dynamic>;
+      debugPrint('devGrantCredits: HTTP ${r.statusCode} — ${r.body}');
+    } catch (e) { debugPrint('devGrantCredits: $e'); }
     return null;
   }
 

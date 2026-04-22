@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/mission_service.dart';
@@ -149,10 +150,25 @@ class AuthController extends GetxController {
       if (result != null) {
         credits.value = result['new_balance'] as int? ?? credits.value;
         Get.snackbar('Credits Added', '${(amountMon * 100).toInt()} credits added!',
-            snackPosition: SnackPosition.BOTTOM);
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade800,
+            colorText: Colors.white);
+      } else {
+        Get.snackbar('Top-up Failed', 'Transaction sent but server rejected it. Check transaction hash.',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.red.shade800,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 5));
       }
-    } catch (_) {}
-    isBuyingCredits.value = false;
+    } catch (e) {
+      Get.snackbar('Top-up Error', e.toString(),
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade800,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 5));
+    } finally {
+      isBuyingCredits.value = false;
+    }
   }
 
   Future<bool> updateProfile(String newUsername, String newBio) async {
