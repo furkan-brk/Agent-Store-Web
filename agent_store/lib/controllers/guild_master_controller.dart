@@ -27,6 +27,7 @@ class GuildMasterController extends GetxController {
   final isLibraryLoading = false.obs;
   final libraryAgents = <AgentModel>[].obs;
   final error = RxnString();
+  String lastProblem = '';
 
   @override
   void onInit() {
@@ -57,6 +58,7 @@ class GuildMasterController extends GetxController {
 
   Future<void> findTeam(String problem) async {
     if (problem.trim().isEmpty) return;
+    lastProblem = problem;
     phase.value = GuildMasterPhase.loading;
     error.value = null;
 
@@ -99,6 +101,7 @@ class GuildMasterController extends GetxController {
   }
 
   void reset() {
+    lastProblem = '';
     phase.value = GuildMasterPhase.input;
     suggestion.value = null;
     teamAgents.clear();
