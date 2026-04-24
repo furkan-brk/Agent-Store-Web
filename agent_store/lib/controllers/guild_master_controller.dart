@@ -22,6 +22,11 @@ class GuildChatMessage {
   /// each other), as opposed to a direct agent reply to the user.
   final bool isCrossAgent;
 
+  /// True when this row is a lightweight marker in the "All" feed indicating
+  /// the user sent a private DM on an individual agent tab. The real content
+  /// lives only in that agent's thread; the All thread only sees this hint.
+  final bool isPrivateMarker;
+
   final DateTime timestamp;
 
   GuildChatMessage({
@@ -33,6 +38,7 @@ class GuildChatMessage {
     this.characterType,
     this.role,
     this.isCrossAgent = false,
+    this.isPrivateMarker = false,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
 }
@@ -54,6 +60,10 @@ class GuildMasterController extends GetxController {
 
   // Which agent IDs are selected for the next broadcast
   final selectedAgentIds = <int>[].obs;
+
+  // Optional "team leader" — when set, broadcasts are prefixed with a
+  // coordination instruction so the named agent acts as the spokesperson.
+  final leaderAgentId = RxnInt();
 
   // Library agents — loaded on demand for @-mention autocomplete
   final libraryAgents = <AgentModel>[].obs;
@@ -198,6 +208,37 @@ class GuildMasterController extends GetxController {
     }
   }
 
+  /// Appends new agents to the current team, creating empty threads and
+  /// auto-selecting them. Existing members (matched by id) are skipped.
+  void addAgentsToTeam(List<Map<String, dynamic>> agents) {
+    final existing = teamAgents
+        .map((a) => (a['id'] as num).toInt())
+        .toSet();
+    var added = 0;
+    for (final a in agents) {
+      final id = (a['id'] as num?)?.toInt();
+      if (id == null || existing.contains(id)) continue;
+      teamAgents.add(a);
+      agentThreads[id] = RxList<GuildChatMessage>([]);
+      if (!selectedAgentIds.contains(id)) selectedAgentIds.add(id);
+      existing.add(id);
+      added++;
+    }
+    if (added > 0) {
+      // Nudge reactive listeners watching the list.
+      teamAgents.refresh();
+    }
+  }
+
+  /// Sets or clears the team leader. Passing the currently-selected id clears.
+  void setLeader(int? id) {
+    if (id == null || leaderAgentId.value == id) {
+      leaderAgentId.value = null;
+    } else {
+      leaderAgentId.value = id;
+    }
+  }
+
   void switchToTab(int? agentId) => activeTabId.value = agentId;
 
   // ── Broadcast send ──────────────────────────────────────────────────────────
@@ -209,28 +250,63 @@ class GuildMasterController extends GetxController {
     if (trimmed.isEmpty) return;
 
     // Expand #mission tags before sending
-    final message = await MissionService.instance.expandMissionTags(trimmed);
-    if (message.isEmpty) return;
+    final expandedMessage =
+        await MissionService.instance.expandMissionTags(trimmed);
+    if (expandedMessage.isEmpty) return;
 
-    // 1. Add user message to every selected agent's thread + all feed.
-    //    Display the raw text (with #mission-slug visible); send the expanded
-    //    version to the backend below.
+    // Determine routing: if an individual agent tab is active, this is a
+    // private DM to that single agent. Otherwise, broadcast to all selected.
+    final dmTargetId = activeTabId.value;
+    final isPrivate = dmTargetId != null && selectedAgentIds.contains(dmTargetId);
+    final recipients = isPrivate ? <int>[dmTargetId] : selectedAgentIds.toList();
+
+    // Apply Team Leader coordination prefix when set (broadcast only).
+    String message = expandedMessage;
+    if (!isPrivate && leaderAgentId.value != null) {
+      final leader = teamAgents.firstWhereOrNull(
+        (a) => (a['id'] as num?)?.toInt() == leaderAgentId.value,
+      );
+      final leaderName = leader?['title'] as String? ?? 'Team Leader';
+      message =
+          '[Team Leader: $leaderName] Please coordinate: $expandedMessage';
+    }
+
+    // 1. Add user message to recipient threads.
+    //    Display the raw text (with #mission-slug visible); send the
+    //    prefixed/expanded version to the backend below.
     final userMsg = GuildChatMessage(
       id: _nextId(),
       isUser: true,
       text: trimmed,
     );
-    for (final id in selectedAgentIds) {
+    for (final id in recipients) {
       agentThreads[id]?.add(userMsg);
     }
-    allMessages.add(userMsg);
+
+    if (isPrivate) {
+      // Surface a lock marker in the combined "All" feed so the user knows
+      // a private conversation just happened, without leaking the content.
+      final targetAgent = teamAgents.firstWhereOrNull(
+        (a) => (a['id'] as num?)?.toInt() == dmTargetId,
+      );
+      allMessages.add(GuildChatMessage(
+        id: _nextId(),
+        isUser: true,
+        text: targetAgent?['title'] as String? ?? 'Agent',
+        agentId: dmTargetId,
+        agentTitle: targetAgent?['title'] as String?,
+        isPrivateMarker: true,
+      ));
+    } else {
+      allMessages.add(userMsg);
+    }
 
     isChatLoading.value = true;
 
-    // 2. Call backend — one call returns responses from all selected agents
+    // 2. Call backend — one call returns responses from all recipients
     final responses = await ApiService.instance.teamChat(
       message,
-      selectedAgentIds.toList(),
+      recipients,
     );
 
     final agentReplies = <GuildChatMessage>[];
@@ -256,17 +332,19 @@ class GuildMasterController extends GetxController {
           role: r['role'] as String?,
         );
 
-        // Route to the specific agent's thread + all feed
+        // Always route to the agent's own thread. Only surface in the "All"
+        // feed for broadcasts; private DMs stay within the individual tab.
         agentThreads[agentId]?.add(replyMsg);
-        allMessages.add(replyMsg);
+        if (!isPrivate) allMessages.add(replyMsg);
         agentReplies.add(replyMsg);
       }
     }
 
     isChatLoading.value = false;
 
-    // 3. Trigger one round of cross-agent interaction when ≥2 agents replied
-    if (agentReplies.length >= 2) {
+    // 3. Trigger one round of cross-agent interaction when ≥2 agents replied.
+    //    Skipped for private DMs (only a single recipient).
+    if (!isPrivate && agentReplies.length >= 2) {
       isCrossLoading.value = true;
       await _crossAgentRound(message, agentReplies);
       isCrossLoading.value = false;
@@ -333,6 +411,7 @@ class GuildMasterController extends GetxController {
     teamAgents.clear();
     agentThreads.clear();
     selectedAgentIds.clear();
+    leaderAgentId.value = null;
     allMessages.clear();
     activeTabId.value = null;
     error.value = null;
@@ -346,19 +425,3 @@ class GuildMasterController extends GetxController {
       '${DateTime.now().microsecondsSinceEpoch}-${++_msgCounter}';
 }
 
-// Keep the old typedef so existing code that imports GuildMasterMsg still works
-class _Msg {
-  final bool isUser;
-  final String? userText;
-  final List<Map<String, dynamic>>? teamResponses;
-  const _Msg.user(String text)
-      : isUser = true,
-        userText = text,
-        teamResponses = null;
-  const _Msg.team(List<Map<String, dynamic>> r)
-      : isUser = false,
-        teamResponses = r,
-        userText = null;
-}
-
-typedef GuildMasterMsg = _Msg;

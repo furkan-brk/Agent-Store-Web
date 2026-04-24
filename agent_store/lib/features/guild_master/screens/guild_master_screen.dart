@@ -2,9 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/guild_master_controller.dart';
 import '../../../features/character/character_types.dart';
+import '../../../shared/models/agent_model.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../widgets/mention_composer.dart';
 
@@ -35,6 +37,22 @@ IconData _charTypeIcon(CharacterType t) => switch (t) {
       CharacterType.scholar => Icons.school,
       CharacterType.merchant => Icons.trending_up,
     };
+
+/// Small icon-only back button that returns the user to the guilds list.
+class _BackToGuildsButton extends StatelessWidget {
+  const _BackToGuildsButton();
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: 'Back to Guilds',
+        child: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppTheme.textB, size: 20),
+          splashRadius: 20,
+          onPressed: () => context.go('/guild'),
+        ),
+      );
+}
 
 // ── Screen root ───────────────────────────────────────────────────────────────
 
@@ -76,12 +94,21 @@ class GuildMasterScreen extends StatelessWidget {
 
   Widget _buildInput(BuildContext context, GuildMasterController ctrl) {
     final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.xxl),
-          child: Column(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+          child: Row(children: const [_BackToGuildsButton()]),
+        ),
+        Expanded(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xxl),
+                child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -175,39 +202,54 @@ class GuildMasterScreen extends StatelessWidget {
                 }
                 return const SizedBox.shrink();
               }),
-            ],
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
   // ── Loading phase ────────────────────────────────────────────────────────────
 
   Widget _buildLoading() {
-    return const Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 48,
-            height: 48,
-            child: CircularProgressIndicator(
-                color: AppTheme.primary,
-                strokeWidth: 3,
-                backgroundColor: Color(0x4D3D3020)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+          child: Row(children: const [_BackToGuildsButton()]),
+        ),
+        const Expanded(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                      color: AppTheme.primary,
+                      strokeWidth: 3,
+                      backgroundColor: Color(0x4D3D3020)),
+                ),
+                SizedBox(height: AppSpacing.xl),
+                Text('Analyzing your challenge…',
+                    style: TextStyle(
+                        color: AppTheme.textB,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500)),
+                SizedBox(height: AppSpacing.sm),
+                Text('Selecting the best agents for your team',
+                    style: TextStyle(color: AppTheme.textM, fontSize: 12)),
+              ],
+            ),
           ),
-          SizedBox(height: AppSpacing.xl),
-          Text('Analyzing your challenge…',
-              style: TextStyle(
-                  color: AppTheme.textB,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500)),
-          SizedBox(height: AppSpacing.sm),
-          Text('Selecting the best agents for your team',
-              style: TextStyle(color: AppTheme.textM, fontSize: 12)),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -252,11 +294,14 @@ class _LeftPanel extends StatelessWidget {
         // Header
         Padding(
           padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.md),
+              AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
           child: Obx(() => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Top row: back + eyebrow label + select shortcut
                   Row(children: [
+                    const _BackToGuildsButton(),
+                    const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
@@ -267,31 +312,59 @@ class _LeftPanel extends StatelessWidget {
                           color: AppTheme.primary, size: 14),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    const Text('YOUR TEAM',
-                        style: TextStyle(
-                            color: AppTheme.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5)),
+                    const Expanded(
+                      child: Text('YOUR TEAM',
+                          style: TextStyle(
+                              color: AppTheme.primary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5)),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.group_add_rounded, size: 14),
+                      label: const Text('Select',
+                          style: TextStyle(fontSize: 11)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primary,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () => _showAgentPickerDialog(context, ctrl),
+                    ),
                   ]),
                   const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    ctrl.suggestion.value?['suggested_name'] as String? ??
-                        'Custom Squad',
-                    style: const TextStyle(
-                        color: AppTheme.textH,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    ctrl.suggestion.value?['reasoning'] as String? ?? '',
-                    style: const TextStyle(
-                        color: AppTheme.textB, fontSize: 12, height: 1.4),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ctrl.suggestion.value?['suggested_name']
+                                  as String? ??
+                              'Custom Squad',
+                          style: const TextStyle(
+                              color: AppTheme.textH,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          ctrl.suggestion.value?['reasoning'] as String? ??
+                              '',
+                          style: const TextStyle(
+                              color: AppTheme.textB,
+                              fontSize: 12,
+                              height: 1.4),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               )),
@@ -379,6 +452,57 @@ class _AgentCheckTile extends StatefulWidget {
 class _AgentCheckTileState extends State<_AgentCheckTile> {
   bool _hovered = false;
 
+  void _showLeaderMenu(BuildContext context) {
+    final RenderBox box = context.findRenderObject() as RenderBox;
+    final offset = box.localToGlobal(Offset.zero);
+    final isLeader = widget.ctrl.leaderAgentId.value == widget.agentId;
+    showMenu<String>(
+      context: context,
+      color: AppTheme.card2,
+      position: RelativeRect.fromLTRB(
+          offset.dx, offset.dy + box.size.height, offset.dx + box.size.width, 0),
+      items: [
+        PopupMenuItem(
+          value: 'leader',
+          child: Row(children: [
+            Icon(
+              isLeader ? Icons.star_border_rounded : Icons.star_rounded,
+              size: 14,
+              color: AppTheme.gold,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isLeader ? 'Remove Leader' : 'Set as Leader',
+              style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+            ),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'toggle',
+          child: Row(children: [
+            Icon(
+              widget.ctrl.selectedAgentIds.contains(widget.agentId)
+                  ? Icons.toggle_off_rounded
+                  : Icons.toggle_on_rounded,
+              size: 14,
+              color: AppTheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              widget.ctrl.selectedAgentIds.contains(widget.agentId)
+                  ? 'Deactivate'
+                  : 'Activate',
+              style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+            ),
+          ]),
+        ),
+      ],
+    ).then((val) {
+      if (val == 'leader') widget.ctrl.setLeader(widget.agentId);
+      if (val == 'toggle') widget.ctrl.toggleAgentSelection(widget.agentId);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final charType =
@@ -386,10 +510,9 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
     final color = charType.primaryColor;
 
     return Obx(() {
-      final selected =
-          widget.ctrl.selectedAgentIds.contains(widget.agentId);
-      final isActiveTab =
-          widget.ctrl.activeTabId.value == widget.agentId;
+      final selected = widget.ctrl.selectedAgentIds.contains(widget.agentId);
+      final isActiveTab = widget.ctrl.activeTabId.value == widget.agentId;
+      final isLeader = widget.ctrl.leaderAgentId.value == widget.agentId;
 
       return MouseRegion(
         cursor: SystemMouseCursors.click,
@@ -397,11 +520,11 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           onTap: () => widget.ctrl.switchToTab(widget.agentId),
+          onLongPress: () => _showLeaderMenu(context),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 140),
             margin: const EdgeInsets.only(bottom: 6),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: isActiveTab
                   ? color.withValues(alpha: 0.10)
@@ -410,43 +533,85 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
                       : AppTheme.card,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isActiveTab
-                    ? color.withValues(alpha: 0.6)
+                color: selected
+                    ? color.withValues(alpha: isActiveTab ? 0.6 : 0.35)
                     : _hovered
                         ? AppTheme.border2
                         : AppTheme.border,
-                width: isActiveTab ? 1.5 : 1,
+                width: selected ? 1.5 : 1,
               ),
             ),
             child: Row(children: [
-              // Checkbox
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: Checkbox(
-                  value: selected,
-                  onChanged: (_) =>
-                      widget.ctrl.toggleAgentSelection(widget.agentId),
-                  activeColor: color,
-                  side: BorderSide(
-                      color: AppTheme.border2.withValues(alpha: 0.7)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4)),
-                  visualDensity: VisualDensity.compact,
+              // Active / inactive dot indicator (replaces Checkbox)
+              GestureDetector(
+                onTap: () => widget.ctrl.toggleAgentSelection(widget.agentId),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected
+                        ? color.withValues(alpha: 0.18)
+                        : AppTheme.surface,
+                    border: Border.all(
+                      color: selected
+                          ? color
+                          : AppTheme.border2.withValues(alpha: 0.5),
+                      width: selected ? 2 : 1,
+                    ),
+                  ),
+                  child: selected
+                      ? Center(
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color,
+                              boxShadow: [
+                                BoxShadow(
+                                    color: color.withValues(alpha: 0.6),
+                                    blurRadius: 4),
+                              ],
+                            ),
+                          ),
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(width: 8),
-              // Character icon
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: color.withValues(alpha: 0.4)),
-                ),
-                child: Icon(_charTypeIcon(charType), color: color, size: 18),
+              // Character icon with optional leader star
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: color.withValues(alpha: 0.4)),
+                    ),
+                    child: Icon(_charTypeIcon(charType), color: color, size: 18),
+                  ),
+                  if (isLeader)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppTheme.gold,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.surface, width: 1.5),
+                        ),
+                        child: const Icon(Icons.star_rounded,
+                            size: 8, color: Color(0xFF1E1A14)),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 10),
               // Name + role
@@ -464,10 +629,15 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      charType.displayName,
+                      isLeader
+                          ? '★ Team Leader'
+                          : charType.displayName,
                       style: TextStyle(
-                          color: color.withValues(alpha: 0.8),
-                          fontSize: 10),
+                          color: isLeader
+                              ? AppTheme.gold
+                              : color.withValues(alpha: 0.8),
+                          fontSize: 10,
+                          fontWeight: isLeader ? FontWeight.w600 : FontWeight.normal),
                     ),
                   ],
                 ),
@@ -723,6 +893,7 @@ class _MessageListState extends State<_MessageList> {
 
           final msg = thread[i];
           if (msg.isUser) return _UserBubble(text: msg.text, timestamp: msg.timestamp);
+          if (msg.isPrivateMarker) return _PrivateMarkerRow(agentName: msg.text);
           return _AgentResponseCard(message: msg);
         },
       );
@@ -965,6 +1136,167 @@ class _ProblemPromptComposerState extends State<_ProblemPromptComposer> {
       ],
     );
   }
+}
+
+// ── Agent picker dialog ───────────────────────────────────────────────────────
+
+void _showAgentPickerDialog(BuildContext context, GuildMasterController ctrl) {
+  showDialog<void>(
+    context: context,
+    builder: (_) => _AgentPickerDialog(ctrl: ctrl),
+  );
+}
+
+class _AgentPickerDialog extends StatefulWidget {
+  final GuildMasterController ctrl;
+  const _AgentPickerDialog({required this.ctrl});
+
+  @override
+  State<_AgentPickerDialog> createState() => _AgentPickerDialogState();
+}
+
+class _AgentPickerDialogState extends State<_AgentPickerDialog> {
+  final Set<int> _picked = {};
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final all = widget.ctrl.libraryAgents;
+    final existing = widget.ctrl.teamAgents
+        .map((a) => (a['id'] as num).toInt())
+        .toSet();
+    final filtered = all
+        .where((a) =>
+            !existing.contains(a.id) &&
+            (a.title.toLowerCase().contains(_query.toLowerCase()) ||
+                _query.isEmpty))
+        .toList();
+
+    return AlertDialog(
+      backgroundColor: AppTheme.card,
+      insetPadding: const EdgeInsets.all(32),
+      title: const Text('Add Agents',
+          style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.bold)),
+      content: SizedBox(
+        width: 400,
+        height: 420,
+        child: Column(children: [
+          TextField(
+            style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Search agents…',
+              hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 12),
+              filled: true,
+              fillColor: AppTheme.surface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textM, size: 16),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppTheme.border)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: AppTheme.border)),
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: filtered.isEmpty
+                ? const Center(
+                    child: Text('No agents available',
+                        style: TextStyle(color: AppTheme.textM, fontSize: 13)))
+                : ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final agent = filtered[i];
+                      final isPicked = _picked.contains(agent.id);
+                      final charType = agent.characterType;
+                      final color = charType.primaryColor;
+                      return ListTile(
+                        dense: true,
+                        leading: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(_charTypeIcon(charType), color: color, size: 16),
+                        ),
+                        title: Text(agent.title,
+                            style: const TextStyle(color: AppTheme.textH, fontSize: 13)),
+                        subtitle: Text(charType.displayName,
+                            style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
+                        trailing: isPicked
+                            ? Icon(Icons.check_circle_rounded, color: color, size: 18)
+                            : Icon(Icons.add_circle_outline_rounded,
+                                color: AppTheme.textM, size: 18),
+                        onTap: () => setState(() {
+                          if (isPicked) {
+                            _picked.remove(agent.id);
+                          } else {
+                            _picked.add(agent.id);
+                          }
+                        }),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.primary,
+            foregroundColor: AppTheme.textH,
+          ),
+          onPressed: _picked.isEmpty
+              ? null
+              : () {
+                  final toAdd = widget.ctrl.libraryAgents
+                      .where((a) => _picked.contains(a.id))
+                      .map((a) => {
+                            'id': a.id,
+                            'title': a.title,
+                            'character_type': a.characterType.name,
+                          })
+                      .toList();
+                  widget.ctrl.addAgentsToTeam(toAdd);
+                  Navigator.pop(context);
+                },
+          child: Text('Add ${_picked.isEmpty ? '' : '(${_picked.length}) '}Agents'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Private DM marker row ─────────────────────────────────────────────────────
+
+class _PrivateMarkerRow extends StatelessWidget {
+  final String agentName;
+  const _PrivateMarkerRow({required this.agentName});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.lock_outline_rounded, size: 11, color: AppTheme.textM),
+            const SizedBox(width: 6),
+            Text(
+              'Private → $agentName',
+              style: const TextStyle(
+                  color: AppTheme.textM, fontSize: 11, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+      );
 }
 
 // ── Chat bubbles ──────────────────────────────────────────────────────────────

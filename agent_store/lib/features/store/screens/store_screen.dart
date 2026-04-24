@@ -141,13 +141,13 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   /// Desktop 3-column layout (>1024px):
-  /// Left: StoreCategorySidebar (200px) | Center: header + grid | Right: StoreFilterSidebar (260px)
+  /// Left: StoreCategorySidebar (200px) | Center: header + grid | Right: StoreFilterSidebar (180px)
   Widget _buildDesktopLayout() {
     return Row(
       children: [
         // Left: category sidebar
         const StoreCategorySidebar(),
-        // Center: main content (no inline chips, filter panel, or trending row)
+        // Center: main content
         Expanded(
           child: Stack(
             children: [
@@ -157,7 +157,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 child: CustomScrollView(cacheExtent: 1200, slivers: [
                   // Header with search bar only (filter button hidden on desktop)
                   SliverToBoxAdapter(child: _buildDesktopHeader()),
-                  // Discovery section (no category chips or trending row — those are in sidebars)
+                  // Discovery section
                   Obx(() => (_ctrl.search.value.isEmpty && _ctrl.category.value.isEmpty && !_ctrl.isLoading.value)
                     ? SliverToBoxAdapter(child: _buildDiscovery())
                     : const SliverToBoxAdapter(child: SizedBox.shrink())),
@@ -185,7 +185,7 @@ class _StoreScreenState extends State<StoreScreen> {
             ],
           ),
         ),
-        // Right: filter + trending sidebar
+        // Right: sort sidebar
         const StoreFilterSidebar(),
       ],
     );

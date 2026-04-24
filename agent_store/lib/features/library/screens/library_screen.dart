@@ -1400,33 +1400,33 @@ class _CollectionDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<AgentCollection>>(
-      future: CollectionService.instance.collectionsForAgent(agentId),
-      builder: (context, snapshot) {
-        final cols = snapshot.data ?? [];
-        if (cols.isEmpty) return const SizedBox.shrink();
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: cols
-              .take(3)
-              .map((c) => Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(left: 3),
-                    decoration: BoxDecoration(
-                      color: _hexToColor(c.color),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                            color: _hexToColor(c.color).withValues(alpha: 0.6),
-                            blurRadius: 4),
-                      ],
-                    ),
-                  ))
-              .toList(),
-        );
-      },
-    );
+    final ctrl = Get.find<LibraryController>();
+    return Obx(() {
+      final cols = ctrl.collections
+          .where((c) => c.agentIds.contains(agentId))
+          .take(3)
+          .toList();
+      if (cols.isEmpty) return const SizedBox.shrink();
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: cols
+            .map((c) => Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(left: 3),
+                  decoration: BoxDecoration(
+                    color: _hexToColor(c.color),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                          color: _hexToColor(c.color).withValues(alpha: 0.6),
+                          blurRadius: 4),
+                    ],
+                  ),
+                ))
+            .toList(),
+      );
+    });
   }
 }
 

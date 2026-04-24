@@ -12,6 +12,7 @@ import '../../../shared/models/guild_model.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/mission_service.dart' show MissionService, SyncStatus;
+import '../../../shared/widgets/monaco_editor_widget.dart';
 import '../models/workflow_models.dart';
 import '../../../core/utils/input_mode.dart';
 import '../services/claude_export_service.dart';
@@ -426,8 +427,17 @@ class _LegendScreenState extends State<LegendScreen>
               fromId: idMap[e.fromId] ?? e.fromId,
               toId: idMap[e.toId] ?? e.toId,
             )).toList();
-            _pushHistory();
+            // Clear execution/results refs BEFORE setState so that any
+            // intermediate build sees consistent state (the results panel
+            // depends on _lastExecution / _showResultsPanel — if these are
+            // still truthy while _nodes already points to fresh nodes, the
+            // panel's per-node lookup explodes on stale node IDs).
+            _lastExecution = null;
+            _showResultsPanel = false;
             setState(() {
+              // Snapshot must be captured atomically alongside the mutation
+              // to avoid a torn state where _nodes/_edges diverge.
+              _pushHistory();
               _workflowName = workflow.name;
               _currentWorkflowId = workflow.id;
               _nodes = newNodes;
@@ -440,8 +450,6 @@ class _LegendScreenState extends State<LegendScreen>
               _dragCurrentOffset = Offset.zero;
               _canvasOffset = Offset.zero;
               _zoom = 1.0;
-              _lastExecution = null;
-              _showResultsPanel = false;
             });
             _showNotice('Template loaded: ${tpl.name}', background: AppTheme.success);
           });
@@ -1121,6 +1129,11 @@ class _LegendScreenState extends State<LegendScreen>
               'Workflow failed: ${result.errorMessage ?? "Unknown error"}',
               background: AppTheme.error);
         }
+        // Surface the final output in a dedicated Monaco-backed dialog.
+        // The inline side panel (_buildResultsPanel) also remains available.
+        if (mounted) {
+          _showExecutionResultDialog(result);
+        }
       } else {
         setState(() => _executing = false);
         _showNotice('Execution failed. Check your credits and try again.',
@@ -1131,6 +1144,13 @@ class _LegendScreenState extends State<LegendScreen>
       setState(() => _executing = false);
       _showNotice('Execution error: $e', background: AppTheme.error);
     }
+  }
+
+  void _showExecutionResultDialog(WorkflowExecution exec) {
+    showDialog<void>(
+      context: context,
+      builder: (_) => _ExecutionOutputDialog(execution: exec),
+    );
   }
 
   // ── Execution history ─────────────────────────────────────────────────────
@@ -1470,8 +1490,12 @@ class _LegendScreenState extends State<LegendScreen>
       }
 
       _confirmReplaceCanvas(() {
-        _pushHistory();
+        // See _showTemplatesDialog() for rationale on ordering: clear
+        // execution refs first, then capture history & mutate atomically.
+        _lastExecution = null;
+        _showResultsPanel = false;
         setState(() {
+          _pushHistory();
           _nodes
             ..clear()
             ..addAll(wf.nodes);
@@ -1482,7 +1506,10 @@ class _LegendScreenState extends State<LegendScreen>
           _currentWorkflowId = wf.id;
           _selectedNodeId = null;
           _selectedEdgeId = null;
-          _lastExecution = null;
+          // Also clear any in-flight drag reference so the EdgePainter does
+          // not try to dereference a node from the pre-replace canvas.
+          _dragFromPort = null;
+          _dragCurrentOffset = Offset.zero;
         });
         _showNotice('Workflow imported: ${wf.name}', background: AppTheme.success);
       });
@@ -1836,8 +1863,13 @@ class _LegendScreenState extends State<LegendScreen>
               label: 'Split',
               accent: true,
               onTap: () {
-                final guildNode = _nodes.firstWhere(
-                    (n) => n.id == _selectedNodeId);
+                // Defensive: _selectedNodeId can be stale (e.g. after a
+                // template Replace) — use nullable firstWhere to avoid a
+                // StateError when no matching node exists.
+                final guildNode = _nodes.cast<WorkflowNode?>().firstWhere(
+                    (n) => n?.id == _selectedNodeId,
+                    orElse: () => null);
+                if (guildNode == null) return;
                 _splitGuildNode(guildNode);
               },
             ),
@@ -4802,4 +4834,103 @@ class _CanvasSnapshot {
         edges = e
             .map((x) => WorkflowEdge(id: x.id, fromId: x.fromId, toId: x.toId))
             .toList();
+}
+
+// ── Execution Output Dialog (Monaco read-only viewer) ────────────────────────
+
+class _ExecutionOutputDialog extends StatelessWidget {
+  final WorkflowExecution execution;
+  const _ExecutionOutputDialog({required this.execution});
+
+  @override
+  Widget build(BuildContext context) {
+    final exec = execution;
+    final output = exec.finalOutput.isNotEmpty
+        ? exec.finalOutput
+        : (exec.errorMessage ?? '');
+
+    return Dialog(
+      backgroundColor: AppTheme.card,
+      insetPadding: const EdgeInsets.all(32),
+      child: SizedBox(
+        width: 800,
+        height: 560,
+        child: Column(
+          children: [
+            // Header
+            Container(
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: AppTheme.border)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    exec.isCompleted
+                        ? Icons.check_circle_rounded
+                        : Icons.error_outline_rounded,
+                    size: 16,
+                    color:
+                        exec.isCompleted ? AppTheme.success : AppTheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    exec.isCompleted ? 'Execution Output' : 'Execution Failed',
+                    style: const TextStyle(
+                      color: AppTheme.textH,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    '${exec.creditsUsed} credits',
+                    style: const TextStyle(color: AppTheme.gold, fontSize: 11),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.content_copy_rounded, size: 15),
+                    color: AppTheme.textM,
+                    tooltip: 'Copy output',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: output));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Copied to clipboard'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    color: AppTheme.textM,
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
+            ),
+            // Monaco editor showing final output (read-only).
+            // 560 dialog - 48 header = 512 for the editor body.
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) => MonacoEditorWidget(
+                  height: constraints.maxHeight,
+                  readOnly: true,
+                  initialValue: output,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
