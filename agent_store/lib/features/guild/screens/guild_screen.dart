@@ -267,7 +267,7 @@ class _GuildCardState extends State<_GuildCard> {
     final guild = widget.guild;
     final rarityColor = _rarityColor(guild.rarity);
     final statusLabel = guild.memberCount >= 4 ? 'Full' : 'Recruiting';
-    final statusColor = guild.memberCount >= 4 ? AppTheme.primary : const Color(0xFF5A8A48);
+    final statusColor = guild.memberCount >= 4 ? AppTheme.primary : AppTheme.success;
     final categoryLabel = _categoryLabel(guild);
 
     return MouseRegion(

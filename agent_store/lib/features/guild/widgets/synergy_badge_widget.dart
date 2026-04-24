@@ -46,14 +46,16 @@ class _SynergyChip extends StatefulWidget {
 class _SynergyChipState extends State<_SynergyChip> {
   bool _hovered = false;
 
-  /// Color-code by synergy tier: legendary = gold, force = olive, others = primary
+  /// Color-code by synergy tier: legendary & force = gold, elemental = primary crimson,
+  /// others fall back to primary. Everything is drawn from the warm theme palette
+  /// (no olive/teal/lime) to keep the guild UI on-brand.
   Color get _chipColor {
     if (widget.synergy.name.contains('Legendary')) return AppTheme.gold;
-    if (widget.synergy.name.contains('Force'))     return AppTheme.olive;
+    if (widget.synergy.name.contains('Force'))     return AppTheme.gold;
     if (widget.synergy.name.contains('Sorcerer') ||
         widget.synergy.name.contains('Tank') ||
         widget.synergy.name.contains('Think')) {
-      return const Color(0xFF5F8A6A); // teal-green — distinct from olive
+      return AppTheme.primary;
     }
     return AppTheme.primary;
   }
@@ -82,7 +84,7 @@ class _SynergyChipState extends State<_SynergyChip> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: c.withValues(alpha: _hovered ? 0.20 : 0.12),
+            color: c.withValues(alpha: _hovered ? 0.22 : 0.14),
             border: Border.all(color: c.withValues(alpha: _hovered ? 0.7 : 0.4)),
             borderRadius: BorderRadius.circular(20),
           ),
@@ -163,18 +165,19 @@ class _BonusRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
             decoration: BoxDecoration(
-              color: AppTheme.olive.withValues(alpha: 0.15),
+              color: AppTheme.gold.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.add, size: 10, color: AppTheme.olive),
+                const Icon(Icons.add, size: 10, color: AppTheme.gold),
                 const SizedBox(width: 2),
                 Text(
                   '$value',
                   style: const TextStyle(
-                    color: AppTheme.olive,
+                    color: AppTheme.gold,
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),

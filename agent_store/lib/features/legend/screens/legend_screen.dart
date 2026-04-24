@@ -181,6 +181,13 @@ class _LegendScreenState extends State<LegendScreen>
     setState(() {
       _nodes = snap.nodes;
       _edges = snap.edges;
+      // Reset transient interaction state — stale selection / drag references
+      // to nodes that no longer exist in the restored snapshot would cause
+      // null-reference crashes in the canvas / edge painter.
+      _selectedNodeId = null;
+      _selectedEdgeId = null;
+      _dragFromPort = null;
+      _dragCurrentOffset = Offset.zero;
     });
   }
 
@@ -191,6 +198,11 @@ class _LegendScreenState extends State<LegendScreen>
     setState(() {
       _nodes = snap.nodes;
       _edges = snap.edges;
+      // Reset transient interaction state (see _undo() for rationale).
+      _selectedNodeId = null;
+      _selectedEdgeId = null;
+      _dragFromPort = null;
+      _dragCurrentOffset = Offset.zero;
     });
   }
 
@@ -422,6 +434,10 @@ class _LegendScreenState extends State<LegendScreen>
               _edges = newEdges;
               _selectedNodeId = null;
               _selectedEdgeId = null;
+              // Clear any in-flight drag so the EdgePainter does not try to
+              // dereference a node from the pre-replace canvas.
+              _dragFromPort = null;
+              _dragCurrentOffset = Offset.zero;
               _canvasOffset = Offset.zero;
               _zoom = 1.0;
               _lastExecution = null;
@@ -3848,6 +3864,9 @@ class _EdgePainter extends CustomPainter {
       final from = _nodeById(edge.fromId);
       final to = _nodeById(edge.toId);
       if (from == null || to == null) continue;
+      // Defensive: skip edges whose endpoints have non-finite positions
+      // (can happen mid-transition when a template replace is applied).
+      if (!_hasFiniteOffset(from) || !_hasFiniteOffset(to)) continue;
 
       final src = _outputPort(from);
       final dst = _inputPort(to);
@@ -3899,7 +3918,11 @@ class _EdgePainter extends CustomPainter {
       final parsed = _parsePortId(dragFromPort!);
       if (parsed != null) {
         final sourceNode = _nodeById(parsed.nodeId);
-        if (sourceNode != null) {
+        // Guard against a source node that vanished (e.g. after a template
+        // replace) or has a non-finite offset mid-transition.
+        if (sourceNode != null &&
+            _hasFiniteOffset(sourceNode) &&
+            dragOffset.isFinite) {
           final src = parsed.side == 'output'
               ? _outputPort(sourceNode)
               : _inputPort(sourceNode);
@@ -4002,6 +4025,8 @@ class _EdgePainter extends CustomPainter {
     }
     return null;
   }
+
+  bool _hasFiniteOffset(WorkflowNode n) => n.x.isFinite && n.y.isFinite;
 
   @override
   bool shouldRepaint(_EdgePainter old) =>

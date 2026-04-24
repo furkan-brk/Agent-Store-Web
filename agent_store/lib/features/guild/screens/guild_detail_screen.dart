@@ -51,7 +51,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
           if (ctrl.detail.value != null) ...[
             _AppBarAction(
               icon: Icons.auto_awesome,
-              color: const Color(0xFF8B5CF6),
+              color: AppTheme.gold,
               tooltip: 'Open in Guild Master',
               onPressed: () => _openInGuildMaster(ctrl, context),
             ),
@@ -226,7 +226,7 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
                   width: double.infinity,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
-                      backgroundColor: isFull ? AppTheme.card2 : const Color(0xFF5A8A48),
+                      backgroundColor: isFull ? AppTheme.card2 : AppTheme.success,
                       foregroundColor: isFull ? AppTheme.textM : AppTheme.textH,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -489,7 +489,7 @@ class _GuildDetailCtrl extends GetxController {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(ok ? 'Joined guild successfully!' : 'Failed to join guild. Guild may be full.'),
-        backgroundColor: ok ? const Color(0xFF5A8A48) : AppTheme.primary,
+        backgroundColor: ok ? AppTheme.success : AppTheme.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
@@ -553,7 +553,7 @@ class _GuildStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isFull = guild.memberCount >= 4;
-    final slotColor = isFull ? AppTheme.primary : const Color(0xFF5A8A48);
+    final slotColor = isFull ? AppTheme.primary : AppTheme.success;
     final isMobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
     return Container(
       padding: EdgeInsets.all(isMobile ? 10 : 16),
@@ -669,27 +669,27 @@ class _GuildMasterCTAState extends State<_GuildMasterCTA> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFF6366F1).withValues(alpha: _hovered ? 0.2 : 0.1),
-                const Color(0xFF8B5CF6).withValues(alpha: _hovered ? 0.15 : 0.06),
+                AppTheme.primary.withValues(alpha: _hovered ? 0.22 : 0.14),
+                AppTheme.gold.withValues(alpha: _hovered ? 0.16 : 0.10),
               ],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: _hovered ? 0.6 : 0.35)),
+            border: Border.all(color: AppTheme.primary.withValues(alpha: _hovered ? 0.6 : 0.4)),
             boxShadow: _hovered
-                ? [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.15), blurRadius: 12)]
+                ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.18), blurRadius: 12)]
                 : null,
           ),
           child: Row(children: [
             Container(
               width: 44, height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withValues(alpha: 0.2),
+                color: AppTheme.primary.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(10),
-                boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.25), blurRadius: 12)],
+                boxShadow: [BoxShadow(color: AppTheme.gold.withValues(alpha: 0.25), blurRadius: 12)],
               ),
-              child: const Icon(Icons.auto_awesome, color: Color(0xFF8B5CF6), size: 22),
+              child: const Icon(Icons.auto_awesome, color: AppTheme.gold, size: 22),
             ),
             const SizedBox(width: 14),
             const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -701,7 +701,7 @@ class _GuildMasterCTAState extends State<_GuildMasterCTA> {
             AnimatedSlide(
               duration: const Duration(milliseconds: 200),
               offset: Offset(_hovered ? 0.15 : 0, 0),
-              child: const Icon(Icons.arrow_forward_ios_rounded, color: Color(0xFF6366F1), size: 14),
+              child: const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.gold, size: 14),
             ),
           ]),
         ),
@@ -774,11 +774,17 @@ class _MemberRowState extends State<_MemberRow> {
             ),
             const SizedBox(height: 3),
             Row(children: [
-              Icon(_roleIconData, size: 14, color: typeColor),
+              // Role icon/text use a warm muted gold so they stay on-theme
+              // regardless of the member's character type (forest-green Bard,
+              // olive Artisan, etc. were rendering as "lime" on dark bg).
+              Icon(_roleIconData, size: 14, color: AppTheme.gold.withValues(alpha: 0.85)),
               const SizedBox(width: 4),
               Text(
                 '${widget.member.role} · ${agent.characterType.displayName}',
-                style: TextStyle(color: typeColor, fontSize: 10),
+                style: TextStyle(
+                  color: AppTheme.gold.withValues(alpha: 0.85),
+                  fontSize: 10,
+                ),
               ),
             ]),
             const SizedBox(height: 4),
