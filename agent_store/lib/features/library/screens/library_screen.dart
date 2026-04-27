@@ -32,10 +32,11 @@ class _LibraryScreenState extends State<LibraryScreen>
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
-  // Local filter/sort state for saved tab
-  String _searchQuery = '';
-  String _sortBy = 'newest'; // newest | oldest | rarity | category
-  String _filterCategory = ''; // empty = all
+  // Filter/sort state lives on LibraryController so it can round-trip through
+  // the URL (v3.7-7.1). Read-only proxies keep existing call sites working.
+  String get _searchQuery => _ctrl.searchQuery.value;
+  String get _sortBy => _ctrl.sortBy.value;
+  String get _filterCategory => _ctrl.filterCategory.value;
   bool _hasError = false;
 
   @override
@@ -67,14 +68,14 @@ class _LibraryScreenState extends State<LibraryScreen>
   void _onSearchChanged(String val) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() => _searchQuery = val.toLowerCase().trim());
+      if (mounted) _ctrl.setSearchQuery(val);
     });
   }
 
   void _clearSearch() {
     _debounce?.cancel();
     _searchCtrl.clear();
-    setState(() => _searchQuery = '');
+    _ctrl.setSearchQuery('');
   }
 
   /// Apply local search + category filter + sort to a list of agents.
@@ -417,10 +418,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                         TextButton(
                           onPressed: () {
                             _clearSearch();
-                            setState(() {
-                              _filterCategory = '';
-                              _sortBy = 'newest';
-                            });
+                            _ctrl.setFilterCategory('');
+                            _ctrl.setSortBy('newest');
                           },
                           child: const Text('Clear all filters'),
                         ),
@@ -592,7 +591,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         child: Text('Category')),
                   ],
                   onChanged: (v) {
-                    if (v != null) setState(() => _sortBy = v);
+                    if (v != null) _ctrl.setSortBy(v);
                   },
                 ),
               ),
@@ -615,8 +614,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     return _FilterChip(
                       label: 'All',
                       isSelected: isSelected,
-                      onTap: () =>
-                          setState(() => _filterCategory = ''),
+                      onTap: () => _ctrl.setFilterCategory(''),
                     );
                   }
                   final cat = categories[i - 1];
@@ -625,8 +623,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     label: cat[0].toUpperCase() +
                         cat.substring(1),
                     isSelected: isSelected,
-                    onTap: () => setState(
-                        () => _filterCategory = isSelected ? '' : cat),
+                    onTap: () => _ctrl.setFilterCategory(isSelected ? '' : cat),
                   );
                 },
               ),
@@ -1324,7 +1321,58 @@ class _LibraryAgentCardState extends State<_LibraryAgentCard> {
                 left: 8,
                 child: _RemoveButton(onTap: widget.onRemove),
               ),
+            // Edit button on hover (only for the creator)
+            if (_hovered && widget.isOwned)
+              Positioned(
+                bottom: 8,
+                left: 8,
+                child: _EditButton(
+                  onTap: () => context.go('/agent/${widget.agent.id}/edit'),
+                ),
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hover-revealed edit pencil. Same shape language as _RemoveButton but in gold.
+class _EditButton extends StatefulWidget {
+  final VoidCallback onTap;
+  const _EditButton({required this.onTap});
+
+  @override
+  State<_EditButton> createState() => _EditButtonState();
+}
+
+class _EditButtonState extends State<_EditButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Tooltip(
+        message: 'Edit Card',
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: _hovered ? AppTheme.gold : AppTheme.surface.withValues(alpha: 0.9),
+              shape: BoxShape.circle,
+              border: Border.all(color: _hovered ? AppTheme.gold : AppTheme.border2),
+            ),
+            child: Icon(
+              Icons.edit_outlined,
+              size: 14,
+              color: _hovered ? AppTheme.bg : AppTheme.gold,
+            ),
+          ),
         ),
       ),
     );

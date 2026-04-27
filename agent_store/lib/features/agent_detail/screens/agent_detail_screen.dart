@@ -753,6 +753,13 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         color: _ctrl.inLibrary.value ? AppTheme.primary : AppTheme.textM,
         onPressed: _toggleLibrary,
       )),
+      if (_ctrl.isOwnAgent)
+        _HoverIconButton(
+          icon: Icons.edit_outlined,
+          tooltip: 'Edit Card',
+          color: AppTheme.gold,
+          onPressed: () => context.go('/agent/${a.id}/edit'),
+        ),
     ];
 
     if (isMobile) {

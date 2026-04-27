@@ -216,29 +216,69 @@ func (s *AgentService) GetAgent(id uint) (*models.Agent, error) {
 	return &agent, err
 }
 
-// deductCredits atomically deducts amount credits from wallet and records a CreditTransaction.
+// deductCredits atomically deducts amount credits from wallet and records both
+// a legacy CreditTransaction (compat) and a CreditLedgerEntry (v3.7+).
+//
+// txType maps to ledger action_type (e.g. "create_agent", "fork", "topup").
+// nodeRef is set for legend node executions ("workflow:node" format) and nil otherwise.
+// breakdown is an optional structured cost detail (e.g. {"model":"sonnet","tokens":1234}).
 func (s *AgentService) deductCredits(wallet string, amount int64, txType string, agentID *uint) error {
+	return s.appendLedger(wallet, -amount, txType, agentID, nil, nil)
+}
+
+// appendLedger is the unified credit mutation primitive. delta is signed
+// (negative=spend, positive=topup/grant). Writes both the legacy
+// CreditTransaction row and the structured CreditLedgerEntry inside one
+// transaction so the two histories never drift.
+func (s *AgentService) appendLedger(wallet string, delta int64, actionType string, agentID *uint, nodeRef *string, breakdown map[string]any) error {
 	return database.DB.Transaction(func(dbTx *gorm.DB) error {
 		var user models.User
 		if err := dbTx.Set("gorm:query_option", "FOR UPDATE").
 			Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
 			return fmt.Errorf("user not found: %w", err)
 		}
-		if user.Credits < amount {
-			return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, amount)
+		newBalance := user.Credits + delta
+		if newBalance < 0 {
+			return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, -delta)
 		}
 		if err := dbTx.Model(&models.User{}).Where("wallet_address = ?", wallet).
-			UpdateColumn("credits", gorm.Expr("credits - ?", amount)).Error; err != nil {
-			return fmt.Errorf("failed to deduct credits: %w", err)
+			UpdateColumn("credits", gorm.Expr("credits + ?", delta)).Error; err != nil {
+			return fmt.Errorf("failed to apply credit delta: %w", err)
 		}
+		legacyAmount := delta
 		creditTx := models.CreditTransaction{
 			Wallet:  wallet,
-			Type:    txType,
-			Amount:  -amount,
+			Type:    actionType,
+			Amount:  legacyAmount,
 			AgentID: agentID,
 		}
-		return dbTx.Create(&creditTx).Error
+		if err := dbTx.Create(&creditTx).Error; err != nil {
+			return fmt.Errorf("failed to write credit transaction: %w", err)
+		}
+		breakdownStr := ""
+		if breakdown != nil {
+			b, err := json.Marshal(breakdown)
+			if err != nil {
+				return fmt.Errorf("failed to marshal cost breakdown: %w", err)
+			}
+			breakdownStr = string(b)
+		}
+		entry := models.CreditLedgerEntry{
+			UserWallet:    wallet,
+			Delta:         delta,
+			BalanceAfter:  newBalance,
+			ActionType:    actionType,
+			NodeRef:       nodeRef,
+			CostBreakdown: breakdownStr,
+		}
+		return dbTx.Create(&entry).Error
 	})
+}
+
+// AppendLedger is the public ledger primitive used by other services (Workspace,
+// AI Pipeline) via the in-process service handle. delta is signed.
+func (s *AgentService) AppendLedger(userWallet string, delta int64, actionType string, nodeRef *string, breakdown map[string]any) error {
+	return s.appendLedger(userWallet, delta, actionType, nil, nodeRef, breakdown)
 }
 
 // CreateAgent creates a new agent with concurrent AI analysis, profile generation,
@@ -610,7 +650,8 @@ func (s *AgentService) GenerateTrialToken(agentID uint, wallet, provider, messag
 	return token, nil
 }
 
-// GetCreditHistory returns the last 50 credit transactions for a wallet.
+// GetCreditHistory returns the last 50 credit transactions for a wallet (legacy
+// endpoint — preserved so existing frontend keeps working).
 func (s *AgentService) GetCreditHistory(wallet string) ([]models.CreditTransaction, error) {
 	var txs []models.CreditTransaction
 	if err := database.DB.
@@ -629,6 +670,32 @@ func (s *AgentService) GetCreditHistory(wallet string) ([]models.CreditTransacti
 		}
 	}
 	return txs, nil
+}
+
+// GetCreditLedger returns paginated CreditLedgerEntry rows for a wallet, newest first.
+func (s *AgentService) GetCreditLedger(wallet string, page, limit int) ([]models.CreditLedgerEntry, int64, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	var entries []models.CreditLedgerEntry
+	var total int64
+	q := database.DB.Model(&models.CreditLedgerEntry{}).Where("user_wallet = ?", wallet)
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	offset := (page - 1) * limit
+	if err := q.Order("created_at DESC, id DESC").
+		Offset(offset).Limit(limit).
+		Find(&entries).Error; err != nil {
+		return nil, 0, err
+	}
+	return entries, total, nil
 }
 
 // GetLeaderboard returns top 10 creators ranked by total saves.
@@ -695,8 +762,44 @@ func (s *AgentService) IsPurchased(buyerWallet string, agentID uint) bool {
 	return database.DB.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&p).Error == nil
 }
 
-// UpdateAgent allows a creator to update title, description, and tags.
-func (s *AgentService) UpdateAgent(agentID uint, wallet string, title, description *string, tags []string) (*models.Agent, error) {
+// UpdateAgentRequest is the whitelist of fields a creator may patch on their agent.
+// Pointer fields are nil when not present in the request body.
+//
+// Note: `stats` is intentionally excluded — those values come out of the
+// analysis pipeline at creation/regeneration time and must not be hand-tuned.
+// Same rationale as `character_type` and `rarity`.
+type UpdateAgentRequest struct {
+	Title              *string  `json:"title"`
+	Description        *string  `json:"description"`
+	Prompt             *string  `json:"prompt"`
+	Category           *string  `json:"category"`
+	Subclass           *string  `json:"subclass"`
+	Tags               []string `json:"tags"`
+	Price              *float64 `json:"price"`
+	CardVersion        *string  `json:"card_version"`
+	ServiceDescription *string  `json:"service_description"`
+	ProfileMood        *string  `json:"profile_mood"`
+	ProfileRolePurpose *string  `json:"profile_role_purpose"`
+	Traits             []string `json:"traits"`
+}
+
+// RevisionMismatchError signals that an If-Match precondition failed. The
+// handler converts this to a 409 Conflict with the current row in the body.
+type RevisionMismatchError struct {
+	Current *models.Agent
+}
+
+func (e *RevisionMismatchError) Error() string {
+	return "revision mismatch"
+}
+
+// UpdateAgent allows a creator to update a wide whitelist of fields on their own agent.
+// Column-level fields are written via GORM Updates(); fields living inside character_data
+// (stats, traits, profile.mood, profile.role_purpose) are merged into the JSON blob.
+//
+// If ifMatchRev is non-nil and differs from the row's current RevisionID, this returns
+// a *RevisionMismatchError carrying the current row so the handler can answer 409.
+func (s *AgentService) UpdateAgent(agentID uint, wallet string, req *UpdateAgentRequest, ifMatchRev *uint64) (*models.Agent, error) {
 	var agent models.Agent
 	if err := database.DB.First(&agent, agentID).Error; err != nil {
 		return nil, fmt.Errorf("agent not found")
@@ -704,16 +807,72 @@ func (s *AgentService) UpdateAgent(agentID uint, wallet string, title, descripti
 	if agent.CreatorWallet != wallet {
 		return nil, fmt.Errorf("unauthorized: you can only edit your own agents")
 	}
+	if ifMatchRev != nil && *ifMatchRev != agent.RevisionID {
+		current := agent
+		return nil, &RevisionMismatchError{Current: &current}
+	}
 
 	updates := map[string]any{}
-	if title != nil && *title != "" {
-		updates["title"] = *title
+	if req.Title != nil && *req.Title != "" {
+		updates["title"] = *req.Title
 	}
-	if description != nil && *description != "" {
-		updates["description"] = *description
+	if req.Description != nil && *req.Description != "" {
+		updates["description"] = *req.Description
 	}
-	if tags != nil {
-		updates["tags"] = pq.StringArray(tags)
+	if req.Prompt != nil && *req.Prompt != "" {
+		updates["prompt"] = *req.Prompt
+	}
+	if req.Category != nil {
+		updates["category"] = *req.Category
+	}
+	if req.Subclass != nil {
+		updates["subclass"] = *req.Subclass
+	}
+	if req.Tags != nil {
+		updates["tags"] = pq.StringArray(req.Tags)
+	}
+	if req.Price != nil {
+		updates["price"] = *req.Price
+	}
+	if req.CardVersion != nil {
+		updates["card_version"] = *req.CardVersion
+	}
+	if req.ServiceDescription != nil {
+		updates["service_description"] = *req.ServiceDescription
+	}
+
+	// Merge traits / profile into character_data JSON blob. (Stats are
+	// owned by the analysis pipeline and never accepted from the editor.)
+	needsJSONMerge := req.Traits != nil || req.ProfileMood != nil || req.ProfileRolePurpose != nil
+	if needsJSONMerge {
+		charData := map[string]any{}
+		if agent.CharacterData != "" {
+			if err := json.Unmarshal([]byte(agent.CharacterData), &charData); err != nil {
+				log.Printf("[UpdateAgent] character_data unmarshal failed (will reset): %v", err)
+				charData = map[string]any{}
+			}
+		}
+		if req.Traits != nil {
+			charData["traits"] = req.Traits
+		}
+		if req.ProfileMood != nil || req.ProfileRolePurpose != nil {
+			profile, _ := charData["profile"].(map[string]any)
+			if profile == nil {
+				profile = map[string]any{}
+			}
+			if req.ProfileMood != nil {
+				profile["mood"] = *req.ProfileMood
+			}
+			if req.ProfileRolePurpose != nil {
+				profile["role_purpose"] = *req.ProfileRolePurpose
+			}
+			charData["profile"] = profile
+		}
+		blob, err := json.Marshal(charData)
+		if err != nil {
+			return nil, fmt.Errorf("character_data marshal failed: %w", err)
+		}
+		updates["character_data"] = string(blob)
 	}
 
 	if len(updates) == 0 {
@@ -851,7 +1010,9 @@ func (s *AgentService) GetUserRating(agentID uint, wallet string) int {
 	return r.Rating
 }
 
-// TopUpCredits grants credits after verifying MON payment on-chain.
+// TopUpCredits grants credits after verifying MON payment on-chain. Writes
+// both the legacy CreditTransaction (with tx_hash for replay protection) and
+// a CreditLedgerEntry (action_type=topup, breakdown carries amount_mon + tx_hash).
 func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) error {
 	credits := int64(amountMon * 100)
 	if credits < 10 {
@@ -862,23 +1023,47 @@ func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) er
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
+	// Ensure the user row exists so the ledger primitive can find it.
 	var user models.User
 	if database.DB.Where("wallet_address = ?", wallet).First(&user).Error != nil {
-		database.DB.Create(&models.User{WalletAddress: wallet, Credits: credits})
-	} else {
-		database.DB.Model(&models.User{}).
-			Where("wallet_address = ?", wallet).
-			UpdateColumn("credits", gorm.Expr("credits + ?", credits))
+		if err := database.DB.Create(&models.User{WalletAddress: wallet, Credits: 0}).Error; err != nil {
+			return fmt.Errorf("create user: %w", err)
+		}
 	}
-	txHashPtr := &txHash
-	tx := models.CreditTransaction{
-		Wallet: wallet,
-		Type:   "topup",
-		Amount: credits,
-		TxHash: txHashPtr,
-	}
-	database.DB.Create(&tx)
-	return nil
+
+	return database.DB.Transaction(func(dbTx *gorm.DB) error {
+		var u models.User
+		if err := dbTx.Set("gorm:query_option", "FOR UPDATE").
+			Where("wallet_address = ?", wallet).First(&u).Error; err != nil {
+			return fmt.Errorf("user not found: %w", err)
+		}
+		if err := dbTx.Model(&models.User{}).Where("wallet_address = ?", wallet).
+			UpdateColumn("credits", gorm.Expr("credits + ?", credits)).Error; err != nil {
+			return fmt.Errorf("failed to add credits: %w", err)
+		}
+		txHashPtr := &txHash
+		creditTx := models.CreditTransaction{
+			Wallet: wallet,
+			Type:   "topup",
+			Amount: credits,
+			TxHash: txHashPtr,
+		}
+		if err := dbTx.Create(&creditTx).Error; err != nil {
+			return fmt.Errorf("write credit transaction: %w", err)
+		}
+		breakdown, _ := json.Marshal(map[string]any{
+			"amount_mon": amountMon,
+			"tx_hash":    txHash,
+		})
+		entry := models.CreditLedgerEntry{
+			UserWallet:    wallet,
+			Delta:         credits,
+			BalanceAfter:  u.Credits + credits,
+			ActionType:    "topup",
+			CostBreakdown: string(breakdown),
+		}
+		return dbTx.Create(&entry).Error
+	})
 }
 
 // UpdateProfile updates username and bio.

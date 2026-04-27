@@ -1,164 +1,149 @@
-<div align="center">
+# Agent Store
 
-<img src="https://img.shields.io/badge/EVM-Solidity_0.8-purple?style=for-the-badge&logo=ethereum" />
-<img src="https://img.shields.io/badge/Backend-Go_1.22-blue?style=for-the-badge&logo=go" />
-<img src="https://img.shields.io/badge/Frontend-Flutter_Web-teal?style=for-the-badge&logo=flutter" />
-<img src="https://img.shields.io/badge/Chain-Monad_Testnet-gold?style=for-the-badge" />
+Agent Store, AI agent prompt'larını keşfetme, üretme, kütüphaneye ekleme ve
+workflow içinde çalıştırma deneyimini oyunlaştıran full-stack bir platformdur.
 
-# ⚔️ Agent Store
-### *Yapay Zeka, RPG ile Buluşuyor*
-**Kodlama Maceralarınız İçin Nihai Lonca**
+Frontend Flutter Web, backend Go mikroservisleri, veri katmanı PostgreSQL +
+Redis, on-chain tarafı ise Monad Testnet üzerinde Solidity kontratları ile
+çalışır.
 
-> Promptlar artık sadece metin değil. Onlar yetenekleri, sınıfları ve karakterleri olan birer Kahraman.
+## İçerik
 
-</div>
+- [Öne Çıkan Özellikler](#öne-çıkan-özellikler)
+- [Mimari Özeti](#mimari-özeti)
+- [Hızlı Başlangıç](#hızlı-başlangıç)
+- [Geliştirme Modları](#geliştirme-modları)
+- [API Özeti](#api-özeti)
+- [Test ve Kalite](#test-ve-kalite)
+- [Dokümantasyon Haritası](#dokümantasyon-haritası)
 
----
+## Öne Çıkan Özellikler
 
-## 🧙 Proje Nedir?
+- Prompt bazlı agent marketplace (listeleme, filtreleme, kategori, trending)
+- Wallet tabanlı auth akışı (nonce + signature + JWT)
+- Agent kart sistemi (type, rarity, trait, stat, görsel üretim)
+- Library ve kredi akışları
+- Guild + Guild Master yardımcı akışları
+- Mission ve Legend workflow editörü/çalıştırıcısı
+- Agent Card Editor (canlı önizleme, autosave, undo/redo, export)
 
-**Agent Store**, AI prompt ajanlarını bir RPG evrenine taşıyan merkeziyetsiz bir pazar yeridir. Her ajan; benzersiz bir sınıfa, uzmanlık alanına ve nadirlik derecesine sahip bir kahramandır.
+## Mimari Özeti
 
-Geleneksel prompt paylaşım platformlarının aksine, Agent Store:
-
-- Ajanları **Wizard, Strategist, Oracle** gibi rollere göre sınıflandırır
-- Her ajana **DEF, POW, CTRL** gibi RPG istatistikleri atar
-- **Epic ve Legendary** seviyelerde ajan nadirliği sunar
-- Ajanları **blockchain üzerinde** ticarete açar (10.00 MON)
-- **WebContainer** entegrasyonu ile ajanları doğrudan tarayıcıda çalıştırır
-
----
-
-## ✨ Temel Özellikler
-
-### ⚔️ İş Akışınızı Oyunlaştırın
-Promptlar artık karakter kartlarına dönüşüyor. Kod yazan bir Archmage, strateji kuran bir Strategist veya vizyon üreten bir Oracle — her ajan kendi hikayesiyle gelir.
-
-### 🧠 Derin Karakterizasyon
-İstatistikler ve hikaye, LLM'in tam olarak nasıl davranacağını belirler. Sadece kod yazmaz, karakterine uygun kararlar alır.
-
-### 🛒 Kendi Yapay Zeka Takımınızı Kurun
-Yüzlerce uzman ajan arasından seçim yapın. İhtiyacınıza göre filtreleyin:
-`#coding` `#planning` `#security`
-
-### ⚡ Sadece Konuşmaz, Çalıştırır
-Tarayıcı içi **WebContainer** entegrasyonu. Ajanlar, Node.js ortamını doğrudan tarayıcınızda kurar, kodu yazar ve test eder.
-
-### 💰 Değer Odaklı Ekosistem
-En iyi prompt mühendislerinin yarattığı Epic ve Legendary ajanlara erişmek için tek fiyat. Satın al · Kullan · Çatallandır.
-
----
-
-## 🏗️ Mimari
-
-```
-Agent Store
-├── agent_store/          # Flutter Web frontend
-│   ├── lib/
-│   │   ├── features/     # Store, wallet, agent detail
-│   │   └── app/          # Router, theme
-│   └── web/
-├── backend/              # Go 1.22 REST API & mikroservisler
-│   └── cmd/gateway/      # API Gateway
-├── contracts/            # Solidity 0.8.24 akıllı kontratlar
-│   ├── scripts/          # Hardhat deployment
-│   └── test/             # 13/13 test passed ✅
-└── docker-compose.yml    # Full stack orchestration
+```text
+Frontend (Flutter Web)
+	|
+	v
+Gateway (Go, :8080)
+	|-- authsvc (:8081)
+	|-- agentsvc (:8082)
+	|-- aipipelinesvc (:8083)
+	|-- guildsvc (:8084)
+	|-- workspacesvc (:8085)
+	|
+	+-- postgres (:5432 container, :5433 host)
+	+-- redis (:6379)
 ```
 
----
-
-## 🛠️ Tech Stack
-
-| Katman | Teknoloji |
-|--------|-----------|
-| Frontend | Flutter Web · Dart |
-| Backend | Go 1.22 · REST API · Mikroservisler |
-| Blockchain | Solidity 0.8.24 · EVM · Monad Testnet |
-| Deployment | Hardhat · JavaScript |
-| Veritabanı | PostgreSQL · GORM |
-| DevOps | Docker · Docker Compose · Shell/Bash |
-
----
-
-## 🔐 Güvenlik
-
-- `ReentrancyGuard` — yeniden giriş saldırılarına karşı korumalı
-- `Access Control` — rol tabanlı erişim yönetimi
-- `CORS Middleware` — whitelist konfigürasyonu aktif
-- `.env` — `.gitignore` ile korumalı, asla commit'e girmez
-
----
-
-## 🚀 Kurulum
+## Hızlı Başlangıç
 
 ### Gereksinimler
+
+- Docker + Docker Compose
 - Go 1.22+
 - Flutter 3.x
 - Node.js 18+
-- Docker & Docker Compose
-- PostgreSQL
 
-### Hızlı Başlangıç
+### 1) Repo ve ortam değişkenleri
 
 ```bash
-# Repo'yu klonla
 git clone https://github.com/furkan-brk/Agent-Store-Web.git
 cd Agent-Store-Web
-
-# Ortam değişkenlerini ayarla
 cp .env.example .env
-
-# Bağımlılıkları yükle
-cd agent_store && flutter pub get
-cd ../backend && go mod download
-cd ../contracts && npm install
-
-# Kontratları deploy et (local)
-npx hardhat node
-npx hardhat run scripts/deploy.js --network localhost
-
-# Full stack başlat
-docker compose up --build
-
-# Flutter Web
-cd agent_store && flutter run -d chrome
 ```
 
----
+En azından aşağıdaki alanları doldurun:
 
-## 🧪 Testler
+- `JWT_SECRET`
+- `CLAUDE_API_KEY` (AI özellikleri için)
+- `CREDITS_CONTRACT_ADDRESS` (on-chain kredi akışları için)
+
+### 2) Full stack'i Docker ile kaldır
 
 ```bash
-# Solidity kontrat testleri
-cd contracts && npx hardhat test
-# 13/13 passed ✅
-
-# Go unit testleri
-cd backend && go test ./...
+docker compose up -d --build
 ```
 
----
+Kontrol URL'leri:
 
-## 🏆 Hackathon
+- Frontend: `http://localhost`
+- API Gateway health: `http://localhost:8080/health`
+- Full health: `http://localhost:8080/health/full`
 
-Bu proje bir hackathon kapsamında geliştirilmiştir.
+### 3) Flutter hot reload (opsiyonel, hybrid)
 
----
+```bash
+docker compose up -d postgres redis gateway authsvc agentsvc aipipelinesvc guildsvc workspacesvc
+docker compose stop frontend
 
-## 👥 Takım
+cd agent_store
+flutter run -d chrome
+```
 
-| Furkan  | [@furkan-brk](https://github.com/furkan-brk) |
-| Hale Sezin  | [@seziyy](https://github.com/seziyy) |
-| Alp | [ AlpDurak ] (https://github.com/AlpDurak) |
-| Doğu | [ Doğu Kervan] https://github.com/dogujen |
+## Geliştirme Modları
 
----
+- Tam Docker (prod-benzeri): CI/CD davranışını en iyi yansıtan mod
+- Hybrid (backend Docker + Flutter hot reload): günlük geliştirme için en hızlı mod
 
-<div align="center">
+Detaylı adımlar için: [DEVELOPMENT.md](DEVELOPMENT.md)
 
-*"İş akışınızı oyunlaştırın. Ajanlarınızı seçin. Büyüyü çalıştırın."*
+## API Özeti
 
-**Agent Store** · Built with Flutter · Go · Solidity
+Tüm frontend çağrıları gateway üzerinden gider: `http://localhost:8080/api/v1/...`
 
-</div>
+Ana route grupları:
+
+- `/api/v1/auth/*` (nonce, verify)
+- `/api/v1/agents/*` (listeleme, detay, üretim, chat, fork, purchase, rating)
+- `/api/v1/user/*` (library, credits, profile, missions, legend)
+- `/api/v1/guilds/*` ve `/api/v1/guild-master/*`
+- `/api/v1/leaderboard`, `/api/v1/users/:wallet`, `/api/v1/images/*`
+
+Detaylı endpoint tablosu için: [GUIDE.md](GUIDE.md)
+
+## Test ve Kalite
+
+### Backend
+
+```bash
+cd backend
+go vet ./...
+go test ./... -race -coverprofile=coverage.out -covermode=atomic
+```
+
+### Frontend
+
+```bash
+cd agent_store
+flutter pub get
+flutter analyze --no-fatal-infos
+flutter test --reporter expanded
+```
+
+### Smart Contracts
+
+```bash
+cd contracts
+npm install
+npm run compile
+npm run test
+```
+
+## Dokümantasyon Haritası
+
+- [GUIDE.md](GUIDE.md): Detaylı mimari, servis ve API rehberi
+- [DEVELOPMENT.md](DEVELOPMENT.md): Lokal geliştirme akışları ve debug
+- [CLAUDE.md](CLAUDE.md): Sprint geçmişi, feature notları, takım çalışma kaydı
+
+## Lisans
+
+MIT - bkz. [LICENSE](LICENSE)

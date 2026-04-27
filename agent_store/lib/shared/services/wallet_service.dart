@@ -22,6 +22,12 @@ external JSPromise<JSAny?> _nativeSwitchToMonad();
 @JS('agentStoreWallet.sendTransaction')
 external JSPromise<JSString> _nativeSendTransaction(JSString toAddress, JSString amountWei);
 
+@JS('agentStoreWallet.getChainId')
+external JSPromise<JSString> _nativeGetChainId();
+
+@JS('agentStoreWallet.onChainChanged')
+external void _nativeOnChainChanged(JSFunction callback);
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const _kWalletKey = 'wallet_address';
@@ -157,5 +163,30 @@ class WalletService {
 
   Future<void> _jsSwitchToMonad() async {
     await _nativeSwitchToMonad().toDart;
+  }
+
+  /// Reads MetaMask's current chain ID payload (hex like '0x279F' or
+  /// decimal like '10143'). Empty string when MetaMask is unavailable.
+  /// Used by NetworkGuard.readCurrentChainId.
+  Future<String> readChainId() async {
+    if (!kIsWeb) return '';
+    try {
+      final result = await _nativeGetChainId().toDart;
+      return result.toDart;
+    } catch (e) {
+      debugPrint('readChainId: $e');
+      return '';
+    }
+  }
+
+  /// Subscribes [onChange] to MetaMask's chainChanged event. Idempotent —
+  /// repeated calls replace any previous handler. Used by NetworkGuard
+  /// to maintain a live banner state.
+  void subscribeChainChanged(void Function(String rawChainId) onChange) {
+    if (!kIsWeb) return;
+    final cb = ((JSString id) {
+      onChange(id.toDart);
+    }).toJS;
+    _nativeOnChainChanged(cb);
   }
 }

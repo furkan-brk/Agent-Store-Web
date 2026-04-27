@@ -1753,21 +1753,29 @@ class _LegendScreenState extends State<LegendScreen>
               ),
             ),
             const SizedBox(width: 6),
-            GestureDetector(
-              onTap: _showRenameDialog,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '· $_workflowName',
-                    style: TextStyle(
-                      color: AppTheme.textM.withValues(alpha: 0.8),
-                      fontSize: 12,
+            Flexible(
+              fit: FlexFit.loose,
+              child: GestureDetector(
+                onTap: _showRenameDialog,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '· $_workflowName',
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppTheme.textM.withValues(alpha: 0.8),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.edit, size: 12, color: AppTheme.textM),
-                ],
+                    const SizedBox(width: 4),
+                    const Icon(Icons.edit, size: 12, color: AppTheme.textM),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 8),
@@ -1811,7 +1819,14 @@ class _LegendScreenState extends State<LegendScreen>
               ),
             ),
           ],
-          const Spacer(),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              physics: const ClampingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
           _ToolbarButton(
             icon: Icons.add_box_outlined,
             label: 'New',
@@ -1966,6 +1981,10 @@ class _LegendScreenState extends State<LegendScreen>
                 ),
               );
             },
+          ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -3372,6 +3391,9 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
                                               children: [
                                                 Text(
                                                   '${nr.nodeLabel} (${nr.nodeType})',
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   style: const TextStyle(
                                                       color: AppTheme.textH,
                                                       fontSize: 11,
@@ -3381,6 +3403,9 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
                                                 if (hasErr)
                                                   Text(
                                                     nr.error!,
+                                                    maxLines: 3,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                     style: const TextStyle(
                                                         color: AppTheme.error,
                                                         fontSize: 10),

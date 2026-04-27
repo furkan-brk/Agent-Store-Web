@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type UserMission struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement" json:"-"`
@@ -10,8 +14,20 @@ type UserMission struct {
 	Slug       string    `gorm:"column:slug;not null;index" json:"slug"`
 	Prompt     string    `gorm:"column:prompt;type:text;not null" json:"prompt"`
 	UseCount   int64     `gorm:"column:use_count;default:0" json:"use_count"`
+	// RevisionID supports optimistic concurrency control via If-Match header.
+	// Bumped on every successful update by the BeforeUpdate hook.
+	RevisionID uint64    `gorm:"column:revision_id;not null;default:1" json:"revision_id"`
 	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+}
+
+// BeforeUpdate increments the revision id on every update so optimistic-locking
+// PATCH callers can detect concurrent writes. Uses Statement.SetColumn so the
+// bump is applied for both struct-based and map-based GORM updates.
+func (m *UserMission) BeforeUpdate(tx *gorm.DB) error {
+	m.RevisionID++
+	tx.Statement.SetColumn("revision_id", m.RevisionID)
+	return nil
 }
 
 type UserLegendWorkflow struct {

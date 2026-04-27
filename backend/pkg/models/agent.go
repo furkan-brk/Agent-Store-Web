@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/lib/pq"
+	"gorm.io/gorm"
 )
 
 type CharacterRarity string
@@ -37,8 +38,21 @@ type Agent struct {
 	ServiceDescription string          `gorm:"column:service_description;type:text" json:"service_description"`
 	CardVersion        string          `gorm:"column:card_version;default:'1.0'" json:"card_version"`
 	LastImageRegen     *time.Time      `gorm:"column:last_image_regen" json:"last_image_regen,omitempty"`
+	// RevisionID powers optimistic concurrency control. PATCH endpoints accept an
+	// If-Match header carrying the client's last-seen value; mismatches return 409.
+	// Bumped on every successful update via the BeforeUpdate hook.
+	RevisionID uint64 `gorm:"column:revision_id;not null;default:1" json:"revision_id"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+// BeforeUpdate increments the revision id on every update so optimistic-locking
+// PATCH callers can detect concurrent writes. Uses Statement.SetColumn so the
+// bump is applied for both struct-based and map-based GORM updates.
+func (a *Agent) BeforeUpdate(tx *gorm.DB) error {
+	a.RevisionID++
+	tx.Statement.SetColumn("revision_id", a.RevisionID)
+	return nil
 }
 
 // TrialUse records that a user has consumed their one-time trial for an agent.

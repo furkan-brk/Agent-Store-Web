@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:get/get.dart';
+import '../app/router.dart';
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/local_kv_store.dart';
+import '../shared/state/query_state.dart';
 
-class StoreController extends GetxController {
+class StoreController extends GetxController with QueryStatePersistence {
   // ── State ─────────────────────────────────────────────────────────────────
   final agents = <AgentModel>[].obs;
   final total = 0.obs;
@@ -38,6 +40,62 @@ class StoreController extends GetxController {
 
   static const _kRecentSearchesKey = 'recent_searches';
 
+  // ── Query state persistence ──────────────────────────────────────────────
+  // Sync filter/search/sort to URL query params so deep-links and back/forward
+  // navigation restore the user's view. Foundation primitive (v3.7-FND).
+  @override
+  Map<String, QueryFieldSpec> get queryFields => {
+        'q': QueryFieldSpecs.string(
+          read: () => search.value,
+          write: (v) => search.value = v,
+        ),
+        'cat': QueryFieldSpecs.string(
+          read: () => category.value,
+          write: (v) => category.value = v,
+        ),
+        'sort': QueryFieldSpecs.string(
+          read: () => sort.value,
+          write: (v) => sort.value = v,
+          defaultValue: 'newest',
+        ),
+        'tags': QueryFieldSpecs.stringList(
+          read: () => filterTags.toList(),
+          write: (v) => filterTags.value = v,
+        ),
+        // Price range as comma-separated min,max so it travels as one key.
+        'price': QueryFieldSpec<List<double>>(
+          read: () => [minPrice.value, maxPrice.value],
+          write: (v) {
+            if (v.length == 2) {
+              minPrice.value = v[0];
+              maxPrice.value = v[1];
+            }
+          },
+          encode: (v) {
+            if (v.length != 2) return '';
+            // Default range is 0..10 — omit from URL when unchanged.
+            if (v[0] == 0 && v[1] == 10) return '';
+            return '${v[0]},${v[1]}';
+          },
+          decode: (s) {
+            if (s.isEmpty) return const [0, 10];
+            final parts = s.split(',');
+            if (parts.length != 2) return const [0, 10];
+            final lo = double.tryParse(parts[0]) ?? 0;
+            final hi = double.tryParse(parts[1]) ?? 10;
+            return [lo, hi];
+          },
+          defaultValue: const [0, 10],
+        ),
+      };
+
+  @override
+  String currentUriString() =>
+      AppRouter.router.routerDelegate.currentConfiguration.uri.toString();
+
+  @override
+  void pushUri(String uri) => AppRouter.router.replace(uri);
+
   @override
   void onInit() {
     super.onInit();
@@ -45,6 +103,20 @@ class StoreController extends GetxController {
     loadCategories();
     loadTrending();
     load();
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // Hydrate from URL once the router has settled. If the user landed on
+    // /?q=research&cat=wizard&sort=popular this restores all of them and
+    // re-runs load() with the restored filters.
+    final uri = Uri.parse(currentUriString());
+    hydrateFromQuery(uri.queryParameters);
+    if (uri.queryParameters.isNotEmpty) {
+      // hydrate mutated filters silently — pull the matching list now.
+      load();
+    }
   }
 
   Future<void> loadCategories() async {
@@ -104,6 +176,7 @@ class StoreController extends GetxController {
     _debounce = Timer(const Duration(milliseconds: 400), () {
       search.value = val;
       _saveRecentSearch(val);
+      persistToQuery();
       load();
     });
   }
@@ -113,23 +186,27 @@ class StoreController extends GetxController {
     _debounce?.cancel();
     search.value = val;
     _saveRecentSearch(val);
+    persistToQuery();
     load();
   }
 
   void clearSearch() {
     _debounce?.cancel();
     search.value = '';
+    persistToQuery();
     load();
   }
 
   void setCategory(String cat) {
     search.value = '';
     category.value = cat;
+    persistToQuery();
     load();
   }
 
   void setSort(String s) {
     sort.value = s;
+    persistToQuery();
     load();
   }
 
@@ -138,6 +215,7 @@ class StoreController extends GetxController {
   void setPriceRange(double min, double max) {
     minPrice.value = min;
     maxPrice.value = max;
+    persistToQuery();
     load();
   }
 
@@ -147,6 +225,7 @@ class StoreController extends GetxController {
     } else {
       filterTags.add(tag);
     }
+    persistToQuery();
     load();
   }
 
@@ -154,6 +233,7 @@ class StoreController extends GetxController {
     minPrice.value = 0;
     maxPrice.value = 10;
     filterTags.clear();
+    persistToQuery();
     load();
   }
 

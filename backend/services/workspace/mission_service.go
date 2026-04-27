@@ -78,8 +78,22 @@ func (s *MissionService) ListUserMissions(wallet string) ([]models.UserMission, 
 	return missions, err
 }
 
+// MissionRevisionMismatchError signals an If-Match precondition failure on a mission.
+// The handler converts this to 409 Conflict with the current row in the body.
+type MissionRevisionMismatchError struct {
+	Current *models.UserMission
+}
+
+func (e *MissionRevisionMismatchError) Error() string {
+	return "revision mismatch"
+}
+
 // SaveUserMission creates or updates a mission after validation.
-func (s *MissionService) SaveUserMission(wallet string, input SaveMissionInput) (*models.UserMission, error) {
+//
+// If ifMatchRev is non-nil and the row already exists, it must equal the row's
+// current RevisionID — otherwise a *MissionRevisionMismatchError is returned.
+// On create (no existing row), If-Match is ignored.
+func (s *MissionService) SaveUserMission(wallet string, input SaveMissionInput, ifMatchRev *uint64) (*models.UserMission, error) {
 	if err := validateMissionInput(input); err != nil {
 		return nil, err
 	}
@@ -87,6 +101,7 @@ func (s *MissionService) SaveUserMission(wallet string, input SaveMissionInput) 
 	wallet = strings.ToLower(wallet)
 	mission := &models.UserMission{}
 	err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(mission).Error
+	existed := err == nil
 	if err != nil {
 		mission = &models.UserMission{
 			UserWallet: wallet,
@@ -94,6 +109,12 @@ func (s *MissionService) SaveUserMission(wallet string, input SaveMissionInput) 
 			CreatedAt:  input.CreatedAt,
 		}
 	}
+
+	if existed && ifMatchRev != nil && *ifMatchRev != mission.RevisionID {
+		current := *mission
+		return nil, &MissionRevisionMismatchError{Current: &current}
+	}
+
 	if mission.CreatedAt.IsZero() {
 		mission.CreatedAt = time.Now()
 	}

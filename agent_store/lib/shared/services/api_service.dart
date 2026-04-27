@@ -646,17 +646,42 @@ class ApiService {
     } catch (e) { debugPrint('setAgentPrice: $e'); return false; }
   }
 
-  /// Update agent metadata (title, description, tags).
+  /// Update agent metadata. All fields are optional — only the non-null ones
+  /// are sent to the backend, which performs a whitelist patch.
+  ///
+  /// `traits`, `profileMood`, and `profileRolePurpose` are merged into the
+  /// agent's `character_data` JSON blob server-side. Stats are deliberately
+  /// not patchable here — they're owned by the analysis pipeline.
   Future<Map<String, dynamic>?> updateAgent(int agentId, {
     String? title,
     String? description,
+    String? prompt,
+    String? category,
+    String? subclass,
     List<String>? tags,
+    double? price,
+    String? cardVersion,
+    String? serviceDescription,
+    String? profileMood,
+    String? profileRolePurpose,
+    List<String>? traits,
   }) async {
     try {
       final body = <String, dynamic>{};
       if (title != null) body['title'] = title;
       if (description != null) body['description'] = description;
+      if (prompt != null) body['prompt'] = prompt;
+      if (category != null) body['category'] = category;
+      if (subclass != null) body['subclass'] = subclass;
       if (tags != null) body['tags'] = tags;
+      if (price != null) body['price'] = price;
+      if (cardVersion != null) body['card_version'] = cardVersion;
+      if (serviceDescription != null) body['service_description'] = serviceDescription;
+      if (profileMood != null) body['profile_mood'] = profileMood;
+      if (profileRolePurpose != null) body['profile_role_purpose'] = profileRolePurpose;
+      if (traits != null) body['traits'] = traits;
+
+      if (body.isEmpty) return null; // nothing to do — don't waste a round-trip
 
       final res = await http.put(
         Uri.parse('${ApiConstants.agents}/$agentId'),

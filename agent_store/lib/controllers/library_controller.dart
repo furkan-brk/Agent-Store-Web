@@ -1,10 +1,12 @@
 import 'package:get/get.dart';
+import '../app/router.dart';
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/wallet_service.dart';
 import '../shared/services/collection_service.dart';
+import '../shared/state/query_state.dart';
 
-class LibraryController extends GetxController {
+class LibraryController extends GetxController with QueryStatePersistence {
   final saved = <AgentModel>[].obs;
   final created = <AgentModel>[].obs;
   final credits = 0.obs;
@@ -12,6 +14,15 @@ class LibraryController extends GetxController {
   final collections = <AgentCollection>[].obs;
   final selectedCollectionId = RxnString();
   final tabIndex = 0.obs;
+
+  // ── URL-persisted view state (v3.7-7.1) ─────────────────────────────────
+  /// Lower-cased search query. Updated by the screen on debounced keystrokes
+  /// and by hydrate-from-URL on cold load.
+  final searchQuery = ''.obs;
+  /// 'newest' | 'oldest' | 'rarity' | 'category'
+  final sortBy = 'newest'.obs;
+  /// Empty string = all categories.
+  final filterCategory = ''.obs;
 
   int get totalSaves => created.fold(0, (s, a) => s + a.saveCount);
   int get totalUses => created.fold(0, (s, a) => s + a.useCount);
@@ -23,6 +34,60 @@ class LibraryController extends GetxController {
     return saved.where((a) => col.agentIds.contains(a.id)).toList();
   }
 
+  // ── Query state persistence ──────────────────────────────────────────────
+  @override
+  Map<String, QueryFieldSpec> get queryFields => {
+        'q': QueryFieldSpecs.string(
+          read: () => searchQuery.value,
+          write: (v) => searchQuery.value = v,
+        ),
+        'sort': QueryFieldSpecs.string(
+          read: () => sortBy.value,
+          write: (v) => sortBy.value = v,
+          defaultValue: 'newest',
+        ),
+        'cat': QueryFieldSpecs.string(
+          read: () => filterCategory.value,
+          write: (v) => filterCategory.value = v,
+        ),
+        'tab': QueryFieldSpecs.int_(
+          read: () => tabIndex.value,
+          write: (v) => tabIndex.value = v,
+        ),
+        'col': QueryFieldSpecs.string(
+          read: () => selectedCollectionId.value ?? '',
+          write: (v) => selectedCollectionId.value = v.isEmpty ? null : v,
+        ),
+      };
+
+  @override
+  String currentUriString() =>
+      AppRouter.router.routerDelegate.currentConfiguration.uri.toString();
+
+  @override
+  void pushUri(String uri) => AppRouter.router.replace(uri);
+
+  // Setters that route through persistToQuery so the URL stays in sync.
+  void setSearchQuery(String q) {
+    searchQuery.value = q.toLowerCase().trim();
+    persistToQuery();
+  }
+
+  void setSortBy(String s) {
+    sortBy.value = s;
+    persistToQuery();
+  }
+
+  void setFilterCategory(String c) {
+    filterCategory.value = c;
+    persistToQuery();
+  }
+
+  void setTabIndex(int i) {
+    tabIndex.value = i;
+    persistToQuery();
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -32,6 +97,13 @@ class LibraryController extends GetxController {
     } else {
       isLoading.value = false;
     }
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    final uri = Uri.parse(currentUriString());
+    hydrateFromQuery(uri.queryParameters);
   }
 
   Future<void> load() async {
@@ -67,6 +139,7 @@ class LibraryController extends GetxController {
 
   void toggleCollection(String id) {
     selectedCollectionId.value = selectedCollectionId.value == id ? null : id;
+    persistToQuery();
   }
 
   void updateAgentPrice(int agentId, double newPrice) {

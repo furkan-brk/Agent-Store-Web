@@ -43,6 +43,30 @@ type verifyReq struct {
 	Signature string `json:"signature" binding:"required"`
 }
 
+type abandonReq struct {
+	Wallet string `json:"wallet" binding:"required"`
+}
+
+// AbandonSignature invalidates the wallet's stored nonce so a leaked
+// in-flight value can't be replayed. Frontend calls this when the user
+// dismisses the MetaMask popup. Always returns 200 — never reveals
+// whether the wallet exists.
+func (h *Handler) AbandonSignature(c *gin.Context) {
+	var req abandonReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !walletRegex.MatchString(req.Wallet) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid wallet address format"})
+		return
+	}
+	if err := h.authSvc.Abandon(req.Wallet); err != nil {
+		log.Printf("[AuthHandler.AbandonSignature] error: %v", err)
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 // VerifySignature validates the Ethereum signature and returns a JWT on success.
 func (h *Handler) VerifySignature(c *gin.Context) {
 	var req verifyReq

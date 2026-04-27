@@ -9,6 +9,7 @@ import 'controllers/startup_preload_controller.dart';
 import 'shared/services/api_service.dart';
 import 'shared/services/app_telemetry_service.dart';
 import 'shared/services/mission_service.dart';
+import 'shared/services/network_guard.dart';
 import 'shared/services/wallet_service.dart';
 import 'features/legend/services/legend_service.dart';
 
@@ -29,6 +30,9 @@ void main() async {
   // By this point both services have their persisted state restored,
   // so AuthController.onInit() can read isAuthenticated + isConnected.
   Get.put(AuthController(), permanent: true);
+  // NetworkGuard watches MetaMask chainChanged events and exposes
+  // onCorrectNetwork / currentChainId to the AppShell banner.
+  Get.put(NetworkGuard(), permanent: true);
   // Warm up frequently used page controllers in background.
   Get.put(StartupPreloadController(), permanent: true).start();
   runApp(const AgentStoreApp());

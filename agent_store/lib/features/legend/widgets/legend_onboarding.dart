@@ -116,13 +116,18 @@ class _LegendOnboardingState extends State<LegendOnboarding> {
                 const SizedBox(height: 20),
                 Text(
                   step.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(color: AppTheme.textH, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
                 Text(
                   step.desc,
-                  style: const TextStyle(color: AppTheme.textM, fontSize: 14, height: 1.5),
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppTheme.textM, fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 28),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [

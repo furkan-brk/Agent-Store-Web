@@ -18,20 +18,31 @@ func IsReady() bool {
 	return DB != nil
 }
 
-// ConnectWithRetry retries DB connection indefinitely until successful.
-// Called in a goroutine so the HTTP server can start (and pass healthcheck) immediately.
-// Does NOT run migrations — each service calls its own Migrate() after connection.
-func ConnectWithRetry(dsn string) {
+// SetForTest swaps the global DB to a test instance. Tests use this to inject
+// an in-memory sqlite connection from internal/testutil.
+func SetForTest(db *gorm.DB) {
+	DB = db
+}
+
+// ConnectWithDialector opens a connection using a caller-provided dialector.
+// Production code passes postgres.Open(dsn); tests pass sqlite.Open(":memory:").
+func ConnectWithDialector(d gorm.Dialector) (*gorm.DB, error) {
 	logLevel := logger.Info
 	if os.Getenv("RAILWAY_ENVIRONMENT") == "production" || os.Getenv("GO_ENV") == "production" {
 		logLevel = logger.Warn
 	}
+	return gorm.Open(d, &gorm.Config{
+		Logger: logger.Default.LogMode(logLevel),
+	})
+}
 
+// ConnectWithRetry retries a postgres connection indefinitely until successful.
+// Called in a goroutine so the HTTP server can start (and pass healthcheck) immediately.
+// Does NOT run migrations — each service calls its own Migrate() after connection.
+func ConnectWithRetry(dsn string) {
 	maxAttempts := 30 // give up after ~2.5 minutes
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger: logger.Default.LogMode(logLevel),
-		})
+		db, err := ConnectWithDialector(postgres.Open(dsn))
 		if err == nil {
 			DB = db
 			log.Println("Database connected")

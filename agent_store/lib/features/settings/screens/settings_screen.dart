@@ -26,8 +26,8 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 28),
 
-          // ── Account ────────────────────────────────────────────────────
-          const _SectionHeader(icon: Icons.person_outline, title: 'ACCOUNT'),
+          // ── Profile ────────────────────────────────────────────────────
+          const _SectionHeader(icon: Icons.person_outline, title: 'PROFILE'),
           const SizedBox(height: 8),
           _SettingsCard(children: [
             Obx(() => _InfoTile(
@@ -161,6 +161,41 @@ class SettingsScreen extends StatelessWidget {
           const _SectionHeader(icon: Icons.notifications_outlined, title: 'NOTIFICATIONS'),
           const SizedBox(height: 8),
           const _NotificationToggles(),
+
+          const SizedBox(height: 24),
+
+          // ── Privacy ───────────────────────────────────────────────────
+          // Sprint v3.7-14.1 stub: profile visibility skeleton. Full
+          // permission matrix lands in v3.11-14.2.
+          const _SectionHeader(icon: Icons.lock_outline, title: 'PRIVACY'),
+          const SizedBox(height: 8),
+          const _SettingsCard(children: [
+            _ToggleTile(
+              icon: Icons.visibility_outlined,
+              title: 'Public Profile',
+              subtitle: 'Coming soon — others can find you by username',
+              value: true,
+              onChanged: null,
+            ),
+          ]),
+
+          const SizedBox(height: 24),
+
+          // ── Developer ─────────────────────────────────────────────────
+          // Sprint v3.7-14.1 stub: developer surface placeholder. API
+          // tokens + dev mode toggles land in v3.11.
+          const _SectionHeader(icon: Icons.code_rounded, title: 'DEVELOPER'),
+          const SizedBox(height: 8),
+          const _SettingsCard(children: [
+            _InfoTile(
+              icon: Icons.api_rounded,
+              title: 'API Tokens',
+              trailing: Text(
+                'Coming soon',
+                style: TextStyle(color: AppTheme.textM, fontSize: 13),
+              ),
+            ),
+          ]),
 
           const SizedBox(height: 24),
 

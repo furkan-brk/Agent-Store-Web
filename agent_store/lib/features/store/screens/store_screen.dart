@@ -13,7 +13,6 @@ import '../widgets/agent_card.dart';
 import '../widgets/category_chips.dart';
 import '../widgets/category_sidebar.dart';
 import '../widgets/filter_panel.dart';
-import '../widgets/filter_sidebar.dart';
 import '../widgets/trending_row.dart';
 import '../../../shared/widgets/onboarding_modal.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
@@ -141,7 +140,7 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   /// Desktop 3-column layout (>1024px):
-  /// Left: StoreCategorySidebar (200px) | Center: header + grid | Right: StoreFilterSidebar (180px)
+  /// Left: StoreCategorySidebar (200px) | Center: header + grid
   Widget _buildDesktopLayout() {
     return Row(
       children: [
@@ -185,8 +184,6 @@ class _StoreScreenState extends State<StoreScreen> {
             ],
           ),
         ),
-        // Right: sort sidebar
-        const StoreFilterSidebar(),
       ],
     );
   }
@@ -197,7 +194,7 @@ class _StoreScreenState extends State<StoreScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Title row with accent decoration
+        // Title row with accent decoration + sort dropdown
         Row(children: [
           Container(
             width: 4, height: 28,
@@ -222,6 +219,7 @@ class _StoreScreenState extends State<StoreScreen> {
               ),
             ),
           ),
+          _buildSortDropdown(),
         ]),
         const SizedBox(height: 8),
         Obx(() => Padding(

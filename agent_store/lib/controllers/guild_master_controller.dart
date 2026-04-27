@@ -135,13 +135,15 @@ class GuildMasterController extends GetxController {
       final storeRes =
           results[1] as ({List<AgentModel> agents, int total});
 
-      // Merge by id — library version wins (has up-to-date owned flag etc.)
+      // Merge by id — library wins. Tag the source so the @-mention dropdown
+      // can split into "My Library" vs "Store" sections (the backend
+      // /user/library endpoint does not set `owned: true` on the agent JSON).
       final byId = <int, AgentModel>{};
       for (final a in storeRes.agents) {
-        byId[a.id] = a;
+        byId[a.id] = a.copyWith(owned: false);
       }
       for (final a in library) {
-        byId[a.id] = a;
+        byId[a.id] = a.copyWith(owned: true);
       }
       libraryAgents.value = byId.values.toList();
     } finally {

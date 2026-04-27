@@ -1,9 +1,11 @@
 package workspace
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,8 +39,25 @@ func (h *Handler) SaveMission(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	mission, err := h.missionSvc.SaveUserMission(c.GetString("wallet"), input)
+
+	// If-Match optimistic concurrency on update path. Absent → opt-out.
+	var ifMatchRev *uint64
+	if raw := strings.Trim(c.GetHeader("If-Match"), `" `); raw != "" {
+		v, perr := strconv.ParseUint(raw, 10, 64)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid If-Match header (must be uint64)"})
+			return
+		}
+		ifMatchRev = &v
+	}
+
+	mission, err := h.missionSvc.SaveUserMission(c.GetString("wallet"), input, ifMatchRev)
 	if err != nil {
+		var revErr *MissionRevisionMismatchError
+		if errors.As(err, &revErr) {
+			c.JSON(http.StatusConflict, revErr.Current)
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

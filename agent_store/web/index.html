@@ -151,6 +151,39 @@
       },
 
       /**
+       * Reads the wallet's currently active chain ID. Returns the raw
+       * MetaMask payload — Flutter parses both hex ('0x279F') and decimal
+       * ('10143') forms via NetworkGuard.parseChainId.
+       * Returns empty string if MetaMask is unavailable.
+       */
+      getChainId: async function () {
+        if (!window.ethereum) return '';
+        try {
+          const id = await window.ethereum.request({ method: 'eth_chainId' });
+          return typeof id === 'string' ? id : '';
+        } catch (e) {
+          console.warn('getChainId failed:', e);
+          return '';
+        }
+      },
+
+      /**
+       * Subscribes to MetaMask's chainChanged event. Calls [callback]
+       * with the raw chain ID string each time the user switches networks.
+       * Idempotent — re-binding replaces any previous handler.
+       */
+      onChainChanged: function (callback) {
+        if (!window.ethereum) return;
+        if (this._chainChangedHandler) {
+          window.ethereum.removeListener('chainChanged', this._chainChangedHandler);
+        }
+        this._chainChangedHandler = function (chainId) {
+          try { callback(chainId); } catch (e) { console.warn('chainChanged cb', e); }
+        };
+        window.ethereum.on('chainChanged', this._chainChangedHandler);
+      },
+
+      /**
        * Sends MON tokens to a recipient address (agent purchase).
        * @param {string} toAddress   — recipient wallet (agent creator)
        * @param {string} amountWei   — amount in wei as hex string (e.g. "0xDE0B6B3A7640000" for 1 MON)

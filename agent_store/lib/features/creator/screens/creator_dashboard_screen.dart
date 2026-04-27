@@ -1080,8 +1080,14 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
                             const SizedBox(width: 4),
                             _ActionIcon(
                               icon: Icons.edit_rounded,
-                              tooltip: 'Edit Agent',
+                              tooltip: 'Quick Edit (title/desc/tags)',
                               onTap: () => _showEditDialog(context, agent),
+                            ),
+                            const SizedBox(width: 4),
+                            _ActionIcon(
+                              icon: Icons.style_outlined,
+                              tooltip: 'Manage Card (full editor)',
+                              onTap: () => context.go('/agent/${agent.id}/edit'),
                             ),
                             const SizedBox(width: 4),
                             _ActionIcon(

@@ -55,7 +55,13 @@ func (s *AuthService) GetNonce(wallet string) (string, error) {
 }
 
 // VerifySignature validates an Ethereum personal_sign signature against the
-// stored nonce and rotates the nonce on success to prevent replay attacks.
+// stored nonce and rotates the nonce on every outcome to prevent replay
+// attacks and stale-nonce reuse across browser tabs (v3.7-8.2).
+//
+// On any failure path (mismatched nonce, malformed signature, recovery
+// error, or recovered address mismatch), the stored nonce is invalidated
+// — replaced with a fresh one — so a leaked or partial signature can't be
+// retried. The caller (frontend) must request a new nonce before retrying.
 func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, error) {
 	wallet = strings.ToLower(wallet)
 	var user models.User
@@ -65,6 +71,10 @@ func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, er
 	log.Printf("[AUTH] verify wallet=%s nonce_db=%s nonce_req=%s", wallet, user.Nonce, nonce)
 	if user.Nonce != nonce {
 		log.Printf("[AUTH] FAIL nonce mismatch: db=%q req=%q", user.Nonce, nonce)
+		// Invalidate the stored nonce too — a mismatch likely means the
+		// caller sees a stale value, and we don't want either side to
+		// keep believing the old one is valid.
+		s.invalidateNonce(&user)
 		return false, errors.New("nonce mismatch")
 	}
 	// Construct the same human-readable message the frontend signs.
@@ -74,6 +84,7 @@ func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, er
 	sigBytes, err := hex.DecodeString(strings.TrimPrefix(signature, "0x"))
 	if err != nil || len(sigBytes) != 65 {
 		log.Printf("[AUTH] FAIL invalid signature: len=%d err=%v", len(sigBytes), err)
+		s.invalidateNonce(&user)
 		return false, errors.New("invalid signature")
 	}
 	if sigBytes[64] >= 27 {
@@ -82,6 +93,7 @@ func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, er
 	pubKey, err := crypto.SigToPub(hash.Bytes(), sigBytes)
 	if err != nil {
 		log.Printf("[AUTH] FAIL SigToPub err=%v", err)
+		s.invalidateNonce(&user)
 		return false, err
 	}
 	recovered := crypto.PubkeyToAddress(*pubKey)
@@ -89,13 +101,37 @@ func (s *AuthService) VerifySignature(wallet, nonce, signature string) (bool, er
 	match := strings.EqualFold(recovered.Hex(), expected.Hex())
 	log.Printf("[AUTH] recovered=%s expected=%s match=%v msg_len=%d", recovered.Hex(), expected.Hex(), match, len(signable))
 
-	// Rotate nonce after successful verification to prevent replay attacks.
-	if match {
-		newNonce, _ := generateNonce()
-		database.DB.Model(&user).Update("nonce", newNonce)
-	}
+	// Rotate nonce on both success AND failure so the prior nonce can never
+	// be re-used. Frontend must call /auth/nonce again to retry.
+	s.invalidateNonce(&user)
 
 	return match, nil
+}
+
+// Abandon invalidates the stored nonce for [wallet] without verifying any
+// signature. Frontend calls this when the user dismisses the MetaMask
+// signature popup, so a subsequent retry can't accidentally replay a
+// leaked or sniffed in-flight nonce. No-op if the wallet doesn't exist
+// (we don't want to leak existence via this endpoint).
+func (s *AuthService) Abandon(wallet string) error {
+	wallet = strings.ToLower(wallet)
+	var user models.User
+	if err := database.DB.Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
+		// Silently succeed for unknown wallets — see comment above.
+		return nil
+	}
+	s.invalidateNonce(&user)
+	return nil
+}
+
+// invalidateNonce rotates the stored nonce on the user row. Returns the
+// new nonce (not used by callers today, but useful for future debug
+// logging or test assertions).
+func (s *AuthService) invalidateNonce(user *models.User) string {
+	newNonce, _ := generateNonce()
+	database.DB.Model(user).Update("nonce", newNonce)
+	user.Nonce = newNonce
+	return newNonce
 }
 
 // GenerateJWT issues a signed JWT containing the wallet address claim.

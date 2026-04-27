@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -414,11 +415,7 @@ func (h *Handler) UpdateAgent(c *gin.Context) {
 	}
 	wallet := c.GetString("wallet")
 
-	var req struct {
-		Title       *string  `json:"title"`
-		Description *string  `json:"description"`
-		Tags        []string `json:"tags"`
-	}
+	var req UpdateAgentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
@@ -429,6 +426,38 @@ func (h *Handler) UpdateAgent(c *gin.Context) {
 	}
 	if req.Description != nil && (len(*req.Description) < 10 || len(*req.Description) > 500) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "description must be 10-500 characters"})
+		return
+	}
+	if req.Prompt != nil && (len(*req.Prompt) < 20 || len(*req.Prompt) > 8000) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "prompt must be 20-8000 characters"})
+		return
+	}
+	if req.Category != nil && len(*req.Category) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "category must be at most 64 characters"})
+		return
+	}
+	if req.Subclass != nil && len(*req.Subclass) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "subclass must be at most 64 characters"})
+		return
+	}
+	if req.ServiceDescription != nil && len(*req.ServiceDescription) > 200 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "service description must be at most 200 characters"})
+		return
+	}
+	if req.ProfileMood != nil && len(*req.ProfileMood) > 200 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "profile mood must be at most 200 characters"})
+		return
+	}
+	if req.ProfileRolePurpose != nil && len(*req.ProfileRolePurpose) > 400 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "profile role/purpose must be at most 400 characters"})
+		return
+	}
+	if req.CardVersion != nil && *req.CardVersion != "1.0" && *req.CardVersion != "2.0" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "card_version must be '1.0' or '2.0'"})
+		return
+	}
+	if req.Price != nil && (*req.Price < 0 || *req.Price > 1000) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "price must be between 0 and 1000"})
 		return
 	}
 	if req.Tags != nil {
@@ -443,9 +472,38 @@ func (h *Handler) UpdateAgent(c *gin.Context) {
 			}
 		}
 	}
+	if req.Traits != nil {
+		if len(req.Traits) > 12 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "maximum 12 traits allowed"})
+			return
+		}
+		for _, t := range req.Traits {
+			if len(t) > 40 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "each trait must be at most 40 characters"})
+				return
+			}
+		}
+	}
 
-	agent, err := h.agentSvc.UpdateAgent(uint(id), wallet, req.Title, req.Description, req.Tags)
+	// If-Match optimistic concurrency: when present, must equal the row's current
+	// RevisionID. Absent → opt-out, behaves like before.
+	var ifMatchRev *uint64
+	if raw := strings.Trim(c.GetHeader("If-Match"), `" `); raw != "" {
+		v, perr := strconv.ParseUint(raw, 10, 64)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid If-Match header (must be uint64)"})
+			return
+		}
+		ifMatchRev = &v
+	}
+
+	agent, err := h.agentSvc.UpdateAgent(uint(id), wallet, &req, ifMatchRev)
 	if err != nil {
+		var revErr *RevisionMismatchError
+		if errors.As(err, &revErr) {
+			c.JSON(http.StatusConflict, revErr.Current)
+			return
+		}
 		if strings.Contains(err.Error(), "unauthorized") {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		} else if strings.Contains(err.Error(), "not found") {
@@ -527,15 +585,39 @@ func (h *Handler) GetPublicProfile(c *gin.Context) {
 }
 
 // GetCreditHistory handles GET /api/v1/user/credits/history
+//
+// Supports pagination via ?page=&limit= against the new credit_ledger_entries
+// table. The legacy "transactions" field is preserved for backward compat;
+// new clients should consume "entries" + "total"/"page"/"limit".
 func (h *Handler) GetCreditHistory(c *gin.Context) {
-	txs, err := h.agentSvc.GetCreditHistory(c.GetString("wallet"))
+	wallet := c.GetString("wallet")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+
+	entries, total, err := h.agentSvc.GetCreditLedger(wallet, page, limit)
 	if err != nil {
-		log.Printf("[AgentHandler.GetCreditHistory] error: %v", err)
+		log.Printf("[AgentHandler.GetCreditHistory] ledger: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	credits, _ := h.agentSvc.GetUserCredits(c.GetString("wallet"))
-	c.JSON(http.StatusOK, gin.H{"transactions": txs, "balance": credits})
+
+	// Legacy compatibility: return the last 50 CreditTransactions for clients
+	// that haven't migrated to the ledger format yet.
+	txs, lerr := h.agentSvc.GetCreditHistory(wallet)
+	if lerr != nil {
+		log.Printf("[AgentHandler.GetCreditHistory] legacy: %v", lerr)
+		txs = nil
+	}
+
+	credits, _ := h.agentSvc.GetUserCredits(wallet)
+	c.JSON(http.StatusOK, gin.H{
+		"entries":      entries,
+		"total":        total,
+		"page":         page,
+		"limit":        limit,
+		"transactions": txs,
+		"balance":      credits,
+	})
 }
 
 // GetLeaderboard handles GET /api/v1/leaderboard
@@ -682,20 +764,22 @@ func (h *Handler) DevGrantCredits(c *gin.Context) {
 		return
 	}
 	wallet := c.GetString("wallet")
-	// Directly add credits to the user
-	if err := database.DB.Model(&models.User{}).
-		Where("wallet_address = ?", wallet).
-		UpdateColumn("credits", gorm.Expr("credits + ?", body.Amount)).Error; err != nil {
+
+	// Ensure the user row exists so AppendLedger can find it.
+	var user models.User
+	if err := database.DB.Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
+		if err := database.DB.Create(&models.User{WalletAddress: wallet, Credits: 0}).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
+			return
+		}
+	}
+
+	if err := h.agentSvc.AppendLedger(wallet, body.Amount, "dev_grant", nil, nil); err != nil {
+		log.Printf("[DevGrant] AppendLedger failed: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to grant credits"})
 		return
 	}
-	// Record the transaction
-	tx := models.CreditTransaction{
-		Wallet: wallet,
-		Type:   "dev_grant",
-		Amount: body.Amount,
-	}
-	database.DB.Create(&tx)
+
 	credits, _ := h.agentSvc.GetUserCredits(wallet)
 	log.Printf("[DevGrant] granted %d credits to %s (new balance: %d)", body.Amount, wallet, credits)
 	c.JSON(http.StatusOK, gin.H{"message": "credits granted", "new_balance": credits})

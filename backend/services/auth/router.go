@@ -25,6 +25,7 @@ func SetupRouter(authSvc *AuthService) *gin.Engine {
 		auth.Use(authRL.Middleware())
 		auth.GET("/nonce/:wallet", handler.GetNonce)
 		auth.POST("/verify", handler.VerifySignature)
+		auth.POST("/abandon", handler.AbandonSignature)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

@@ -265,6 +265,11 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                         label: 'Claude Team Config',
                         subtitle: 'config.json',
                         actionIcon: Icons.download_rounded,
+                        onPreview: () {
+                          final content = ClaudeExportService.generateTeamConfig(
+                              widget.workflow, _agents);
+                          _showPreviewDialog(context, '$slug-team-config.json', content);
+                        },
                         onTap: () {
                           final content =
                               ClaudeExportService.generateTeamConfig(
@@ -280,6 +285,19 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                         label: 'Claude Agents',
                         subtitle: '*.md files',
                         actionIcon: Icons.download_rounded,
+                        onPreview: _agents.isNotEmpty
+                            ? () {
+                                final first = _agents.firstWhere(
+                                  (a) => a.prompt.isNotEmpty,
+                                  orElse: () => _agents.first,
+                                );
+                                final content = ClaudeExportService.generateAgentMd(first);
+                                final agentSlug = first.title
+                                    .toLowerCase()
+                                    .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+                                _showPreviewDialog(context, '$agentSlug.md', content);
+                              }
+                            : null,
                         onTap: () {
                           for (final agent in _agents) {
                             if (agent.prompt.isEmpty) continue;
@@ -290,7 +308,6 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                                 .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
                             _downloadFile(md, '$agentSlug.md');
                           }
-                          // Also export virtual agents from metadata
                           for (final node in widget.workflow.nodes) {
                             if (node.type == WorkflowNodeType.agent &&
                                 node.refId == null &&
@@ -312,6 +329,11 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                         label: 'CLAUDE.md',
                         subtitle: 'CLAUDE.md',
                         actionIcon: Icons.download_rounded,
+                        onPreview: () {
+                          final content = ClaudeExportService.generateClaudeMd(
+                              widget.workflow, _agents);
+                          _showPreviewDialog(context, 'CLAUDE.md', content);
+                        },
                         onTap: () {
                           final content =
                               ClaudeExportService.generateClaudeMd(
@@ -326,6 +348,11 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                         label: 'Cursor Rules',
                         subtitle: '.cursorrules',
                         actionIcon: Icons.download_rounded,
+                        onPreview: () {
+                          final content = ClaudeExportService.generateCursorRules(
+                              widget.workflow, _agents);
+                          _showPreviewDialog(context, '.cursorrules', content);
+                        },
                         onTap: () {
                           final content =
                               ClaudeExportService.generateCursorRules(
@@ -340,6 +367,8 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                         label: 'Workflow JSON',
                         subtitle: 'workflow.json',
                         actionIcon: Icons.download_rounded,
+                        onPreview: () => _showPreviewDialog(
+                            context, '$slug-workflow.json', widget.workflowJson),
                         onTap: () {
                           _downloadFile(
                               widget.workflowJson, '$slug-workflow.json',
@@ -354,6 +383,11 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                           label: 'Export Context',
                           subtitle: 'context.md',
                           actionIcon: Icons.download_rounded,
+                          onPreview: () {
+                            final content = ClaudeExportService.generateClaudeContext(
+                                widget.lastExecution!, _agents);
+                            _showPreviewDialog(context, '$slug-context.md', content);
+                          },
                           onTap: () {
                             final content =
                                 ClaudeExportService.generateClaudeContext(
@@ -507,6 +541,64 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+// -- Monaco preview dialog (read-only) --
+void _showPreviewDialog(BuildContext context, String filename, String content) {
+  final uniqueId = DateTime.now().millisecondsSinceEpoch;
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => Dialog(
+      backgroundColor: AppTheme.card,
+      insetPadding: const EdgeInsets.all(24),
+      child: SizedBox(
+        width: 720,
+        height: 540,
+        child: Column(children: [
+          Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppTheme.border)),
+            ),
+            child: Row(children: [
+              const Icon(Icons.description_rounded, size: 15, color: AppTheme.textM),
+              const SizedBox(width: 8),
+              Text(filename,
+                  style: const TextStyle(
+                      color: AppTheme.textH, fontSize: 13, fontWeight: FontWeight.w500)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.content_copy_rounded, size: 14),
+                color: AppTheme.textM,
+                tooltip: 'Copy',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: content));
+                  Navigator.pop(ctx);
+                },
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, size: 16),
+                color: AppTheme.textM,
+                onPressed: () => Navigator.pop(ctx),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ]),
+          ),
+          Expanded(
+            child: MonacoEditorWidget(
+              key: ValueKey('preview_$uniqueId'),
+              readOnly: true,
+              initialValue: content,
+            ),
+          ),
+        ]),
+      ),
+    ),
+  );
+}
+
 // -- Full-width export row with color indicator, icon, label+subtitle, action icon --
 class _ExportRow extends StatefulWidget {
   final IconData icon;
@@ -515,6 +607,7 @@ class _ExportRow extends StatefulWidget {
   final String subtitle;
   final IconData actionIcon;
   final VoidCallback onTap;
+  final VoidCallback? onPreview;
 
   const _ExportRow({
     required this.icon,
@@ -523,6 +616,7 @@ class _ExportRow extends StatefulWidget {
     required this.subtitle,
     required this.actionIcon,
     required this.onTap,
+    this.onPreview,
   });
 
   @override
@@ -588,6 +682,23 @@ class _ExportRowState extends State<_ExportRow> {
                       ],
                     ),
                   ),
+                  // Preview icon (when available)
+                  if (widget.onPreview != null)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: widget.onPreview,
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: Icon(Icons.preview_rounded,
+                              size: 15,
+                              color: _hovered
+                                  ? widget.color.withValues(alpha: 0.7)
+                                  : AppTheme.textM.withValues(alpha: 0.4)),
+                        ),
+                      ),
+                    ),
                   // Action icon on the right
                   Icon(
                     widget.actionIcon,

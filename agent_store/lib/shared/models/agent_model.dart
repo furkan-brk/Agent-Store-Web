@@ -116,6 +116,63 @@ class AgentModel {
         owned: owned ?? this.owned,
       );
 
+  /// Full JSON export (matches the backend `Agent` model shape, with
+  /// `character_data` flattened back into a nested map). Used for the
+  /// "Export JSON" feature in the card editor.
+  Map<String, dynamic> toJson() {
+    final characterData = <String, dynamic>{
+      'stats': stats,
+      'traits': traits,
+      if (subclass.name.isNotEmpty) 'subclass': subclass.name,
+      if (profileMood != null || profileRolePurpose != null)
+        'profile': <String, dynamic>{
+          if (profileMood != null) 'mood': profileMood,
+          if (profileRolePurpose != null) 'role_purpose': profileRolePurpose,
+        },
+    };
+    return <String, dynamic>{
+      'id': id,
+      'title': title,
+      'description': description,
+      'prompt': prompt,
+      'category': category,
+      'creator_wallet': creatorWallet,
+      'character_type': characterType.name,
+      'subclass': subclass.name,
+      'rarity': rarity.name,
+      'character_data': characterData,
+      'tags': tags,
+      'use_count': useCount,
+      'save_count': saveCount,
+      'price': price,
+      'created_at': createdAt.toIso8601String(),
+      if (generatedImage != null) 'generated_image': generatedImage,
+      if (imageUrl != null) 'image_url': imageUrl,
+      'card_version': cardVersion,
+      'prompt_score': promptScore,
+      if (serviceDescription != null) 'service_description': serviceDescription,
+    };
+  }
+
+  /// Patch payload for `PUT /api/v1/agents/:id`. Only includes fields the
+  /// editor is allowed to mutate. `characterType`, `rarity`, `stats`, `id`,
+  /// wallet, timestamps, and counters are intentionally excluded — stats
+  /// are owned by the analysis pipeline, not the user.
+  Map<String, dynamic> toUpdatePayload() => <String, dynamic>{
+        'title': title,
+        'description': description,
+        'prompt': prompt,
+        'category': category,
+        'subclass': subclass.name,
+        'tags': tags,
+        'price': price,
+        'card_version': cardVersion,
+        if (serviceDescription != null) 'service_description': serviceDescription,
+        if (profileMood != null) 'profile_mood': profileMood,
+        if (profileRolePurpose != null) 'profile_role_purpose': profileRolePurpose,
+        'traits': traits,
+      };
+
   factory AgentModel.fromJson(Map<String, dynamic> json) {
     final rawData = json['character_data'];
     Map<String, dynamic> charData;

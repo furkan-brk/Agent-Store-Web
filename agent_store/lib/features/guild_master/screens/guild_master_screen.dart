@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/guild_master_controller.dart';
 import '../../../features/character/character_types.dart';
-import '../../../shared/models/agent_model.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../widgets/mention_composer.dart';
 
@@ -46,8 +45,7 @@ class _BackToGuildsButton extends StatelessWidget {
   Widget build(BuildContext context) => Tooltip(
         message: 'Back to Guilds',
         child: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppTheme.textB, size: 20),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.textB, size: 20),
           splashRadius: 20,
           onPressed: () => context.go('/guild'),
         ),
@@ -60,8 +58,7 @@ class GuildMasterScreen extends StatelessWidget {
   final List<Map<String, dynamic>>? initialAgents;
   final String? initialGuildName;
 
-  const GuildMasterScreen(
-      {super.key, this.initialAgents, this.initialGuildName});
+  const GuildMasterScreen({super.key, this.initialAgents, this.initialGuildName});
 
   @override
   Widget build(BuildContext context) {
@@ -97,10 +94,9 @@ class GuildMasterScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
-          child: Row(children: const [_BackToGuildsButton()]),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+          child: Row(children: [_BackToGuildsButton()]),
         ),
         Expanded(
           child: Center(
@@ -109,99 +105,80 @@ class GuildMasterScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xxl),
                 child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppTheme.primary,
-                        AppTheme.primary.withValues(alpha: 0.6)
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppTheme.primary, AppTheme.primary.withValues(alpha: 0.6)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.border2, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primary.withValues(alpha: 0.35),
+                              blurRadius: 24,
+                              spreadRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.auto_awesome, color: AppTheme.textH, size: 32),
+                      ),
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.border2, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primary.withValues(alpha: 0.35),
-                        blurRadius: 24,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(Icons.auto_awesome,
-                      color: AppTheme.textH, size: 32),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              const Text('Guild Master',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: AppTheme.textH,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              const Text('AI-Powered Team Builder',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textB, fontSize: 14)),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Describe your project or challenge and Guild Master will assemble the ideal team of AI agents to tackle it together.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: AppTheme.textM.withValues(alpha: 0.85),
-                    fontSize: 12,
-                    height: 1.5),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              const Text('Try one of these:',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.textM, fontSize: 11)),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                alignment: WrapAlignment.center,
-                children: _kExamplePrompts
-                    .map((ex) => ActionChip(
-                          label: Text(ex,
-                              style: const TextStyle(
-                                  color: AppTheme.textB, fontSize: 10)),
-                          backgroundColor: AppTheme.card,
-                          side: const BorderSide(color: AppTheme.border),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.sm,
-                              vertical: 0),
-                          onPressed: () => ctrl.setExampleHint(ex),
-                        ))
-                    .toList(),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              _ProblemPromptComposer(ctrl: ctrl),
-              Obx(() {
-                if (ctrl.error.value != null) {
-                  return Padding(
-                    padding:
-                        const EdgeInsets.only(top: AppSpacing.md),
-                    child: Row(children: [
-                      Icon(Icons.error_outline, size: 14, color: cs.error),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(ctrl.error.value!,
-                            style:
-                                TextStyle(color: cs.error, fontSize: 13)),
-                      ),
-                    ]),
-                  );
-                }
-                return const SizedBox.shrink();
-              }),
+                    const SizedBox(height: AppSpacing.xl),
+                    const Text('Guild Master',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppTheme.textH, fontSize: 28, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    const Text('AI-Powered Team Builder',
+                        textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textB, fontSize: 14)),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Describe your project or challenge and Guild Master will assemble the ideal team of AI agents to tackle it together.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textM.withValues(alpha: 0.85), fontSize: 12, height: 1.5),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    const Text('Try one of these:',
+                        textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      alignment: WrapAlignment.center,
+                      children: _kExamplePrompts
+                          .map((ex) => ActionChip(
+                                label: Text(ex, style: const TextStyle(color: AppTheme.textB, fontSize: 10)),
+                                backgroundColor: AppTheme.card,
+                                side: const BorderSide(color: AppTheme.border),
+                                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 0),
+                                onPressed: () => ctrl.setExampleHint(ex),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    _ProblemPromptComposer(ctrl: ctrl),
+                    Obx(() {
+                      if (ctrl.error.value != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.md),
+                          child: Row(children: [
+                            Icon(Icons.error_outline, size: 14, color: cs.error),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(ctrl.error.value!, style: TextStyle(color: cs.error, fontSize: 13)),
+                            ),
+                          ]),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    }),
                   ],
                 ),
               ),
@@ -215,15 +192,14 @@ class GuildMasterScreen extends StatelessWidget {
   // ── Loading phase ────────────────────────────────────────────────────────────
 
   Widget _buildLoading() {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
-          child: Row(children: const [_BackToGuildsButton()]),
+          padding: EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+          child: Row(children: [_BackToGuildsButton()]),
         ),
-        const Expanded(
+        Expanded(
           child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -232,19 +208,13 @@ class GuildMasterScreen extends StatelessWidget {
                   width: 48,
                   height: 48,
                   child: CircularProgressIndicator(
-                      color: AppTheme.primary,
-                      strokeWidth: 3,
-                      backgroundColor: Color(0x4D3D3020)),
+                      color: AppTheme.primary, strokeWidth: 3, backgroundColor: Color(0x4D3D3020)),
                 ),
                 SizedBox(height: AppSpacing.xl),
                 Text('Analyzing your challenge…',
-                    style: TextStyle(
-                        color: AppTheme.textB,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500)),
+                    style: TextStyle(color: AppTheme.textB, fontSize: 15, fontWeight: FontWeight.w500)),
                 SizedBox(height: AppSpacing.sm),
-                Text('Selecting the best agents for your team',
-                    style: TextStyle(color: AppTheme.textM, fontSize: 12)),
+                Text('Selecting the best agents for your team', style: TextStyle(color: AppTheme.textM, fontSize: 12)),
               ],
             ),
           ),
@@ -259,8 +229,7 @@ class GuildMasterScreen extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       final isNarrow = AppBreakpoints.isMobile(constraints.maxWidth);
       if (isNarrow) {
-        final panelH =
-            (constraints.maxHeight * 0.32).clamp(220.0, 320.0);
+        final panelH = (constraints.maxHeight * 0.32).clamp(220.0, 320.0);
         return Column(children: [
           SizedBox(height: panelH, child: _LeftPanel(ctrl: ctrl)),
           Expanded(child: _ChatArea(ctrl: ctrl)),
@@ -293,8 +262,7 @@ class _LeftPanel extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         // Header
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.md),
           child: Obx(() => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -308,26 +276,20 @@ class _LeftPanel extends StatelessWidget {
                         color: AppTheme.primary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.shield,
-                          color: AppTheme.primary, size: 14),
+                      child: const Icon(Icons.shield, color: AppTheme.primary, size: 14),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     const Expanded(
                       child: Text('YOUR TEAM',
                           style: TextStyle(
-                              color: AppTheme.primary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.5)),
+                              color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                     ),
                     TextButton.icon(
                       icon: const Icon(Icons.group_add_rounded, size: 14),
-                      label: const Text('Select',
-                          style: TextStyle(fontSize: 11)),
+                      label: const Text('Select', style: TextStyle(fontSize: 11)),
                       style: TextButton.styleFrom(
                         foregroundColor: AppTheme.primary,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -336,30 +298,20 @@ class _LeftPanel extends StatelessWidget {
                   ]),
                   const SizedBox(height: AppSpacing.sm),
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          ctrl.suggestion.value?['suggested_name']
-                                  as String? ??
-                              'Custom Squad',
-                          style: const TextStyle(
-                              color: AppTheme.textH,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold),
+                          ctrl.suggestion.value?['suggested_name'] as String? ?? 'Custom Squad',
+                          style: const TextStyle(color: AppTheme.textH, fontSize: 18, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          ctrl.suggestion.value?['reasoning'] as String? ??
-                              '',
-                          style: const TextStyle(
-                              color: AppTheme.textB,
-                              fontSize: 12,
-                              height: 1.4),
+                          ctrl.suggestion.value?['reasoning'] as String? ?? '',
+                          style: const TextStyle(color: AppTheme.textB, fontSize: 12, height: 1.4),
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -377,18 +329,14 @@ class _LeftPanel extends StatelessWidget {
             if (ctrl.teamAgents.isEmpty) {
               return Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.group_off_outlined,
-                      color: AppTheme.textM.withValues(alpha: 0.5),
-                      size: 40),
+                  Icon(Icons.group_off_outlined, color: AppTheme.textM.withValues(alpha: 0.5), size: 40),
                   const SizedBox(height: AppSpacing.md),
-                  const Text('No agents found',
-                      style: TextStyle(color: AppTheme.textM, fontSize: 13)),
+                  const Text('No agents found', style: TextStyle(color: AppTheme.textM, fontSize: 13)),
                 ]),
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
               itemCount: ctrl.teamAgents.length,
               itemBuilder: (_, i) {
                 final agent = ctrl.teamAgents[i];
@@ -412,8 +360,7 @@ class _LeftPanel extends StatelessWidget {
             children: [
               Obx(() => Text(
                     '${ctrl.selectedAgentIds.length} of ${ctrl.teamAgents.length} active',
-                    style: const TextStyle(
-                        color: AppTheme.textM, fontSize: 11),
+                    style: const TextStyle(color: AppTheme.textM, fontSize: 11),
                     textAlign: TextAlign.center,
                   )),
               const SizedBox(height: AppSpacing.sm),
@@ -421,8 +368,7 @@ class _LeftPanel extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.textB,
                   side: const BorderSide(color: AppTheme.border),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 icon: const Icon(Icons.refresh, size: 16),
                 label: const Text('New Problem'),
@@ -442,8 +388,7 @@ class _AgentCheckTile extends StatefulWidget {
   final Map<String, dynamic> agent;
   final int agentId;
   final GuildMasterController ctrl;
-  const _AgentCheckTile(
-      {required this.agent, required this.agentId, required this.ctrl});
+  const _AgentCheckTile({required this.agent, required this.agentId, required this.ctrl});
 
   @override
   State<_AgentCheckTile> createState() => _AgentCheckTileState();
@@ -459,8 +404,7 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
     showMenu<String>(
       context: context,
       color: AppTheme.card2,
-      position: RelativeRect.fromLTRB(
-          offset.dx, offset.dy + box.size.height, offset.dx + box.size.width, 0),
+      position: RelativeRect.fromLTRB(offset.dx, offset.dy + box.size.height, offset.dx + box.size.width, 0),
       items: [
         PopupMenuItem(
           value: 'leader',
@@ -489,9 +433,7 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
             ),
             const SizedBox(width: 8),
             Text(
-              widget.ctrl.selectedAgentIds.contains(widget.agentId)
-                  ? 'Deactivate'
-                  : 'Activate',
+              widget.ctrl.selectedAgentIds.contains(widget.agentId) ? 'Deactivate' : 'Activate',
               style: const TextStyle(color: AppTheme.textH, fontSize: 13),
             ),
           ]),
@@ -505,8 +447,7 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
 
   @override
   Widget build(BuildContext context) {
-    final charType =
-        characterTypeFromString(widget.agent['character_type'] as String? ?? '');
+    final charType = characterTypeFromString(widget.agent['character_type'] as String? ?? '');
     final color = charType.primaryColor;
 
     return Obx(() {
@@ -551,13 +492,9 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
                   height: 26,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: selected
-                        ? color.withValues(alpha: 0.18)
-                        : AppTheme.surface,
+                    color: selected ? color.withValues(alpha: 0.18) : AppTheme.surface,
                     border: Border.all(
-                      color: selected
-                          ? color
-                          : AppTheme.border2.withValues(alpha: 0.5),
+                      color: selected ? color : AppTheme.border2.withValues(alpha: 0.5),
                       width: selected ? 2 : 1,
                     ),
                   ),
@@ -570,9 +507,7 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
                               shape: BoxShape.circle,
                               color: color,
                               boxShadow: [
-                                BoxShadow(
-                                    color: color.withValues(alpha: 0.6),
-                                    blurRadius: 4),
+                                BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 4),
                               ],
                             ),
                           ),
@@ -607,8 +542,7 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
                           shape: BoxShape.circle,
                           border: Border.all(color: AppTheme.surface, width: 1.5),
                         ),
-                        child: const Icon(Icons.star_rounded,
-                            size: 8, color: Color(0xFF1E1A14)),
+                        child: const Icon(Icons.star_rounded, size: 8, color: Color(0xFF1E1A14)),
                       ),
                     ),
                 ],
@@ -622,28 +556,21 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
                     Text(
                       widget.agent['title'] as String? ?? 'Agent',
                       style: TextStyle(
-                          color: isActiveTab ? color : AppTheme.textH,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600),
+                          color: isActiveTab ? color : AppTheme.textH, fontSize: 13, fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      isLeader
-                          ? '★ Team Leader'
-                          : charType.displayName,
+                      isLeader ? '★ Team Leader' : charType.displayName,
                       style: TextStyle(
-                          color: isLeader
-                              ? AppTheme.gold
-                              : color.withValues(alpha: 0.8),
+                          color: isLeader ? AppTheme.gold : color.withValues(alpha: 0.8),
                           fontSize: 10,
                           fontWeight: isLeader ? FontWeight.w600 : FontWeight.normal),
                     ),
                   ],
                 ),
               ),
-              if (isActiveTab)
-                Icon(Icons.chat_bubble_rounded, color: color, size: 14),
+              if (isActiveTab) Icon(Icons.chat_bubble_rounded, color: color, size: 14),
             ]),
           ),
         ),
@@ -696,8 +623,7 @@ class _TabBar extends StatelessWidget {
             ),
             ...ctrl.teamAgents.map((agent) {
               final id = (agent['id'] as num).toInt();
-              final charType = characterTypeFromString(
-                  agent['character_type'] as String? ?? '');
+              final charType = characterTypeFromString(agent['character_type'] as String? ?? '');
               return _TabItem(
                 label: agent['title'] as String? ?? 'Agent',
                 icon: _charTypeIcon(charType),
@@ -744,20 +670,15 @@ class _TabItemState extends State<_TabItem> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.lg, vertical: 0),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 0),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
-                color: widget.isActive
-                    ? widget.color
-                    : Colors.transparent,
+                color: widget.isActive ? widget.color : Colors.transparent,
                 width: 2,
               ),
             ),
-            color: _hovered && !widget.isActive
-                ? AppTheme.card.withValues(alpha: 0.5)
-                : Colors.transparent,
+            color: _hovered && !widget.isActive ? AppTheme.card.withValues(alpha: 0.5) : Colors.transparent,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -773,9 +694,7 @@ class _TabItemState extends State<_TabItem> {
                 style: TextStyle(
                   color: widget.isActive ? widget.color : AppTheme.textM,
                   fontSize: 12,
-                  fontWeight: widget.isActive
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                  fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.normal,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -832,29 +751,22 @@ class _MessageListState extends State<_MessageList> {
       if (thread.isEmpty && !loading) {
         return Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.forum_outlined,
-                color: AppTheme.textM.withValues(alpha: 0.4), size: 48),
+            Icon(Icons.forum_outlined, color: AppTheme.textM.withValues(alpha: 0.4), size: 48),
             const SizedBox(height: AppSpacing.md),
             const Text('Ask your team anything!',
-                style: TextStyle(
-                    color: AppTheme.textB,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500)),
+                style: TextStyle(color: AppTheme.textB, fontSize: 15, fontWeight: FontWeight.w500)),
             const SizedBox(height: AppSpacing.xs),
             Text(
               activeId == null
                   ? 'Messages broadcast to all selected agents'
                   : 'Messages to this agent and team discussions appear here',
-              style:
-                  const TextStyle(color: AppTheme.textM, fontSize: 12),
+              style: const TextStyle(color: AppTheme.textM, fontSize: 12),
             ),
           ]),
         );
       }
 
-      final itemCount = thread.length +
-          (loading ? 1 : 0) +
-          (crossLoading ? 1 : 0);
+      final itemCount = thread.length + (loading ? 1 : 0) + (crossLoading ? 1 : 0);
 
       return ListView.builder(
         controller: _scrollCtrl,
@@ -868,8 +780,7 @@ class _MessageListState extends State<_MessageList> {
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: AppTheme.primary),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
                 ),
               ),
             );
@@ -877,17 +788,11 @@ class _MessageListState extends State<_MessageList> {
           if (i == thread.length + (loading ? 1 : 0) && crossLoading) {
             return Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
-              child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.sync,
-                        size: 12,
-                        color: AppTheme.gold.withValues(alpha: 0.7)),
-                    const SizedBox(width: 6),
-                    const Text('Team discussing…',
-                        style: TextStyle(
-                            color: AppTheme.textM, fontSize: 11)),
-                  ]),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.sync, size: 12, color: AppTheme.gold.withValues(alpha: 0.7)),
+                const SizedBox(width: 6),
+                const Text('Team discussing…', style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+              ]),
             );
           }
 
@@ -935,8 +840,7 @@ class _InputAreaState extends State<_InputArea> {
         color: AppTheme.surface,
         border: Border(top: BorderSide(color: AppTheme.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -973,10 +877,8 @@ class _InputAreaState extends State<_InputArea> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: AppTheme.textH,
-                        disabledBackgroundColor:
-                            AppTheme.primary.withValues(alpha: 0.4),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                        disabledBackgroundColor: AppTheme.primary.withValues(alpha: 0.4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: EdgeInsets.zero,
                       ),
                       onPressed: widget.ctrl.isChatLoading.value ||
@@ -995,9 +897,7 @@ class _InputAreaState extends State<_InputArea> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               'Type @ to mention agents · # for missions · Shift+Enter for newline',
-              style: TextStyle(
-                  color: AppTheme.textM.withValues(alpha: 0.6),
-                  fontSize: 10),
+              style: TextStyle(color: AppTheme.textM.withValues(alpha: 0.6), fontSize: 10),
             ),
           ),
           Obx(() {
@@ -1009,9 +909,7 @@ class _InputAreaState extends State<_InputArea> {
                 const Icon(Icons.error_outline, size: 12, color: AppTheme.primary),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(err,
-                      style: const TextStyle(
-                          color: AppTheme.primary, fontSize: 11)),
+                  child: Text(err, style: const TextStyle(color: AppTheme.primary, fontSize: 11)),
                 ),
               ]),
             );
@@ -1029,8 +927,7 @@ class _ProblemPromptComposer extends StatefulWidget {
   const _ProblemPromptComposer({required this.ctrl});
 
   @override
-  State<_ProblemPromptComposer> createState() =>
-      _ProblemPromptComposerState();
+  State<_ProblemPromptComposer> createState() => _ProblemPromptComposerState();
 }
 
 class _ProblemPromptComposerState extends State<_ProblemPromptComposer> {
@@ -1089,16 +986,10 @@ class _ProblemPromptComposerState extends State<_ProblemPromptComposer> {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppSizing.cardRadius - 2),
             border: Border.all(color: AppTheme.border),
-            boxShadow: const [
-              BoxShadow(
-                  color: Color(0x20000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2))
-            ],
+            boxShadow: const [BoxShadow(color: Color(0x20000000), blurRadius: 8, offset: Offset(0, 2))],
           ),
           child: ClipRRect(
-            borderRadius:
-                BorderRadius.circular(AppSizing.cardRadius - 2),
+            borderRadius: BorderRadius.circular(AppSizing.cardRadius - 2),
             child: Obx(() => MentionComposer(
                   key: _composerKey,
                   height: 160,
@@ -1117,19 +1008,13 @@ class _ProblemPromptComposerState extends State<_ProblemPromptComposer> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.primary,
               foregroundColor: AppTheme.textH,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             icon: _isSubmitting
                 ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppTheme.textH))
+                    width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.textH))
                 : const Icon(Icons.groups, size: 18),
-            label: const Text('Find My Team',
-                style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w600)),
+            label: const Text('Find My Team', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             onPressed: _isSubmitting ? null : _submit,
           ),
         ),
@@ -1162,21 +1047,17 @@ class _AgentPickerDialogState extends State<_AgentPickerDialog> {
   @override
   Widget build(BuildContext context) {
     final all = widget.ctrl.libraryAgents;
-    final existing = widget.ctrl.teamAgents
-        .map((a) => (a['id'] as num).toInt())
-        .toSet();
+    final existing = widget.ctrl.teamAgents.map((a) => (a['id'] as num).toInt()).toSet();
     final filtered = all
-        .where((a) =>
-            !existing.contains(a.id) &&
-            (a.title.toLowerCase().contains(_query.toLowerCase()) ||
-                _query.isEmpty))
+        .where(
+            (a) => !existing.contains(a.id) && (a.title.toLowerCase().contains(_query.toLowerCase()) || _query.isEmpty))
         .toList();
 
     return AlertDialog(
       backgroundColor: AppTheme.card,
       insetPadding: const EdgeInsets.all(32),
-      title: const Text('Add Agents',
-          style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.bold)),
+      title:
+          const Text('Add Agents', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.bold)),
       content: SizedBox(
         width: 400,
         height: 420,
@@ -1191,11 +1072,9 @@ class _AgentPickerDialogState extends State<_AgentPickerDialog> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.textM, size: 16),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppTheme.border)),
+                  borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: const BorderSide(color: AppTheme.border)),
+                  borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.border)),
             ),
             onChanged: (v) => setState(() => _query = v),
           ),
@@ -1203,8 +1082,7 @@ class _AgentPickerDialogState extends State<_AgentPickerDialog> {
           Expanded(
             child: filtered.isEmpty
                 ? const Center(
-                    child: Text('No agents available',
-                        style: TextStyle(color: AppTheme.textM, fontSize: 13)))
+                    child: Text('No agents available', style: TextStyle(color: AppTheme.textM, fontSize: 13)))
                 : ListView.builder(
                     itemCount: filtered.length,
                     itemBuilder: (_, i) {
@@ -1223,14 +1101,12 @@ class _AgentPickerDialogState extends State<_AgentPickerDialog> {
                           ),
                           child: Icon(_charTypeIcon(charType), color: color, size: 16),
                         ),
-                        title: Text(agent.title,
-                            style: const TextStyle(color: AppTheme.textH, fontSize: 13)),
+                        title: Text(agent.title, style: const TextStyle(color: AppTheme.textH, fontSize: 13)),
                         subtitle: Text(charType.displayName,
                             style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 10)),
                         trailing: isPicked
                             ? Icon(Icons.check_circle_rounded, color: color, size: 18)
-                            : Icon(Icons.add_circle_outline_rounded,
-                                color: AppTheme.textM, size: 18),
+                            : const Icon(Icons.add_circle_outline_rounded, color: AppTheme.textM, size: 18),
                         onTap: () => setState(() {
                           if (isPicked) {
                             _picked.remove(agent.id);
@@ -1291,8 +1167,7 @@ class _PrivateMarkerRow extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               'Private → $agentName',
-              style: const TextStyle(
-                  color: AppTheme.textM, fontSize: 11, fontStyle: FontStyle.italic),
+              style: const TextStyle(color: AppTheme.textM, fontSize: 11, fontStyle: FontStyle.italic),
             ),
           ],
         ),
@@ -1310,8 +1185,7 @@ class _UserBubble extends StatelessWidget {
   Widget build(BuildContext context) => Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(
-              bottom: AppSpacing.md, left: 60),
+          margin: const EdgeInsets.only(bottom: AppSpacing.md, left: 60),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: AppTheme.primary,
@@ -1320,15 +1194,11 @@ class _UserBubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              SelectableText(text,
-                  style: const TextStyle(
-                      color: AppTheme.textH, fontSize: 14, height: 1.4)),
+              SelectableText(text, style: const TextStyle(color: AppTheme.textH, fontSize: 14, height: 1.4)),
               const SizedBox(height: 4),
               Text(
                 _fmt(timestamp),
-                style: TextStyle(
-                    color: AppTheme.textH.withValues(alpha: 0.5),
-                    fontSize: 10),
+                style: TextStyle(color: AppTheme.textH.withValues(alpha: 0.5), fontSize: 10),
               ),
             ],
           ),
@@ -1346,17 +1216,14 @@ class _AgentResponseCard extends StatefulWidget {
   State<_AgentResponseCard> createState() => _AgentResponseCardState();
 }
 
-class _AgentResponseCardState extends State<_AgentResponseCard>
-    with SingleTickerProviderStateMixin {
+class _AgentResponseCardState extends State<_AgentResponseCard> with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
   late final Animation<double> _opacity;
 
   @override
   void initState() {
     super.initState();
-    _anim = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 350))
-      ..forward();
+    _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 350))..forward();
     _opacity = CurvedAnimation(parent: _anim, curve: Curves.easeIn);
   }
 
@@ -1368,8 +1235,7 @@ class _AgentResponseCardState extends State<_AgentResponseCard>
 
   @override
   Widget build(BuildContext context) {
-    final charType = characterTypeFromString(
-        widget.message.characterType ?? '');
+    final charType = characterTypeFromString(widget.message.characterType ?? '');
     final color = charType.primaryColor;
     final isCross = widget.message.isCrossAgent;
 
@@ -1378,13 +1244,10 @@ class _AgentResponseCardState extends State<_AgentResponseCard>
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.md),
         decoration: BoxDecoration(
-          color: isCross
-              ? AppTheme.card.withValues(alpha: 0.7)
-              : AppTheme.card,
+          color: isCross ? AppTheme.card.withValues(alpha: 0.7) : AppTheme.card,
           borderRadius: BorderRadius.circular(10),
           border: isCross
-              ? Border.all(
-                  color: AppTheme.gold.withValues(alpha: 0.25))
+              ? Border.all(color: AppTheme.gold.withValues(alpha: 0.25))
               : Border(left: BorderSide(color: color, width: 3)),
         ),
         child: Padding(
@@ -1397,22 +1260,16 @@ class _AgentResponseCardState extends State<_AgentResponseCard>
                 if (isCross)
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
-                    child: Icon(Icons.swap_horiz_rounded,
-                        size: 12,
-                        color:
-                            AppTheme.gold.withValues(alpha: 0.7)),
+                    child: Icon(Icons.swap_horiz_rounded, size: 12, color: AppTheme.gold.withValues(alpha: 0.7)),
                   ),
                 Container(
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
-                    color: isCross
-                        ? AppTheme.gold.withValues(alpha: 0.12)
-                        : color.withValues(alpha: 0.15),
+                    color: isCross ? AppTheme.gold.withValues(alpha: 0.12) : color.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: Icon(_charTypeIcon(charType),
-                      color: isCross ? AppTheme.gold : color, size: 13),
+                  child: Icon(_charTypeIcon(charType), color: isCross ? AppTheme.gold : color, size: 13),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -1422,17 +1279,12 @@ class _AgentResponseCardState extends State<_AgentResponseCard>
                       Text(
                         widget.message.agentTitle ?? 'Agent',
                         style: TextStyle(
-                            color: isCross ? AppTheme.gold : color,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600),
+                            color: isCross ? AppTheme.gold : color, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       if (widget.message.role != null)
                         Text(
-                          isCross
-                              ? '↔ Team Discussion'
-                              : widget.message.role!,
-                          style: const TextStyle(
-                              color: AppTheme.textM, fontSize: 10),
+                          isCross ? '↔ Team Discussion' : widget.message.role!,
+                          style: const TextStyle(color: AppTheme.textM, fontSize: 10),
                         ),
                     ],
                   ),
@@ -1441,8 +1293,7 @@ class _AgentResponseCardState extends State<_AgentResponseCard>
               const SizedBox(height: AppSpacing.sm),
               SelectableText(
                 widget.message.text,
-                style: const TextStyle(
-                    color: AppTheme.textB, fontSize: 13, height: 1.6),
+                style: const TextStyle(color: AppTheme.textB, fontSize: 13, height: 1.6),
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(

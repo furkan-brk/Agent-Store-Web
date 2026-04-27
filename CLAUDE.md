@@ -9,15 +9,15 @@ AI Agent prompt paylaşım platformu. Kullanıcılar agent promptlarını keşfe
 
 
 ## Teknoloji Yığını
-| Katman | Teknoloji |
-|---|---|
-| Frontend | Flutter Web (Dart) |
-| Backend | Go 1.22 + Gin + GORM |
-| Veritabanı | PostgreSQL 16 |
-| Blockchain | Monad Testnet (EVM) · Solidity 0.8.24 |
-| Konteyner | Docker + docker-compose |
-| Deploy | Vercel (Flutter static) + Railway/Fly.io (Go API) |
-| AI | Claude API (prompt analiz + karakter tipi belirleme) |
+| Katman     | Teknoloji                                            |
+| ---------- | ---------------------------------------------------- |
+| Frontend   | Flutter Web (Dart)                                   |
+| Backend    | Go 1.22 + Gin + GORM                                 |
+| Veritabanı | PostgreSQL 16                                        |
+| Blockchain | Monad Testnet (EVM) · Solidity 0.8.24                |
+| Konteyner  | Docker + docker-compose                              |
+| Deploy     | Vercel (Flutter static) + Railway/Fly.io (Go API)    |
+| AI         | Claude API (prompt analiz + karakter tipi belirleme) |
 
 ---
 
@@ -25,7 +25,7 @@ AI Agent prompt paylaşım platformu. Kullanıcılar agent promptlarını keşfe
 ```
 Agent_Store_Full/
 ├── agent_store/          # Flutter Web frontend
-│   ├── lib/
+│   ├── lib/c
 │   │   ├── app/          # Router, Theme
 │   │   ├── features/     # store | agent_detail | library | create_agent | wallet | character
 │   │   ├── shared/       # models | services | widgets
@@ -51,18 +51,18 @@ Agent_Store_Full/
 ---
 
 ## API Endpointleri (Go)
-| Method | Path | Açıklama |
-|---|---|---|
-| POST | /api/v1/auth/nonce | Cüzdan için nonce üret |
-| POST | /api/v1/auth/verify | İmzayı doğrula → JWT döndür |
-| GET | /api/v1/agents | Agent listesi (filtre + sayfalama) |
-| POST | /api/v1/agents | Yeni agent oluştur |
-| GET | /api/v1/agents/:id | Agent detayı |
-| POST | /api/v1/agents/:id/generate | Karakter üret (Claude AI) |
-| GET | /api/v1/user/library | Kütüphane |
-| POST | /api/v1/user/library/:id | Kütüphaneye ekle |
-| DELETE | /api/v1/user/library/:id | Kütüphaneden çıkar |
-| GET | /api/v1/user/credits | Kredi sorgula |
+| Method | Path                        | Açıklama                           |
+| ------ | --------------------------- | ---------------------------------- |
+| POST   | /api/v1/auth/nonce          | Cüzdan için nonce üret             |
+| POST   | /api/v1/auth/verify         | İmzayı doğrula → JWT döndür        |
+| GET    | /api/v1/agents              | Agent listesi (filtre + sayfalama) |
+| POST   | /api/v1/agents              | Yeni agent oluştur                 |
+| GET    | /api/v1/agents/:id          | Agent detayı                       |
+| POST   | /api/v1/agents/:id/generate | Karakter üret (Claude AI)          |
+| GET    | /api/v1/user/library        | Kütüphane                          |
+| POST   | /api/v1/user/library/:id    | Kütüphaneye ekle                   |
+| DELETE | /api/v1/user/library/:id    | Kütüphaneden çıkar                 |
+| GET    | /api/v1/user/credits        | Kredi sorgula                      |
 
 ---
 
@@ -79,16 +79,16 @@ library_entries : user_wallet, agent_id, saved_at
 ## Karakter Sistemi (Gamification)
 Prompt → Claude API analiz → character_type → Flutter CustomPainter pixel-art
 
-| Karakter | Prompt Tipi | Renk Paleti |
-|---|---|---|
-| Wizard | backend / kod | Mor, Gece mavisi |
-| Strategist | planlayıcı / PM | Kırmızı, Altın |
-| Oracle | veri / analitik | Sarı, Turuncu |
-| Guardian | güvenlik / infra | Gri, Mavi |
-| Artisan | frontend / tasarım | Pembe, Turkuaz |
-| Bard | yaratıcı / yazarlık | Yeşil, Limon |
-| Scholar | araştırma / eğitim | Bej, Kahve |
-| Merchant | iş / pazarlama | Altın, Lacivert |
+| Karakter   | Prompt Tipi         | Renk Paleti      |
+| ---------- | ------------------- | ---------------- |
+| Wizard     | backend / kod       | Mor, Gece mavisi |
+| Strategist | planlayıcı / PM     | Kırmızı, Altın   |
+| Oracle     | veri / analitik     | Sarı, Turuncu    |
+| Guardian   | güvenlik / infra    | Gri, Mavi        |
+| Artisan    | frontend / tasarım  | Pembe, Turkuaz   |
+| Bard       | yaratıcı / yazarlık | Yeşil, Limon     |
+| Scholar    | araştırma / eğitim  | Bej, Kahve       |
+| Merchant   | iş / pazarlama      | Altın, Lacivert  |
 
 Nadir dereceler: Common → Uncommon → Rare → Epic → Legendary
 
@@ -114,66 +114,66 @@ services:
 ---
 
 ## Team Agents
-| Agent | Sorumluluk |
-|---|---|
-| Team Leader (Claude ana) | Koordinasyon, entegrasyon, CLAUDE.md |
-| Backend | Go API, veritabanı, servisler |
-| Frontend | Flutter UI, routing, state |
-| Gamification Master | Pixel-art karakterler, rarity sistemi |
-| Blockchain Expert | Solidity kontrat, Web3 auth, Monad deploy |
+| Agent                    | Sorumluluk                                |
+| ------------------------ | ----------------------------------------- |
+| Team Leader (Claude ana) | Koordinasyon, entegrasyon, CLAUDE.md      |
+| Backend                  | Go API, veritabanı, servisler             |
+| Frontend                 | Flutter UI, routing, state                |
+| Gamification Master      | Pixel-art karakterler, rarity sistemi     |
+| Blockchain Expert        | Solidity kontrat, Web3 auth, Monad deploy |
 
 ---
 
 ## Dosya Haritası (Team Leader tarafından oluşturuldu)
 
 ### Backend (Go) — 14 dosya ✅
-| Dosya | Açıklama |
-|---|---|
-| `cmd/server/main.go` | Giriş noktası, config + DB + router başlatır |
-| `config/config.go` | Env değişkenlerinden yapılandırma yükler |
-| `internal/database/db.go` | GORM bağlantısı + AutoMigrate |
-| `internal/models/user.go` | User modeli (wallet_address PK, credits) |
-| `internal/models/agent.go` | Agent + LibraryEntry modelleri |
-| `internal/services/auth_service.go` | Nonce üret, imza doğrula, JWT |
-| `internal/services/agent_service.go` | Agent CRUD, kütüphane, kredi |
+| Dosya                                    | Açıklama                                     |
+| ---------------------------------------- | -------------------------------------------- |
+| `cmd/server/main.go`                     | Giriş noktası, config + DB + router başlatır |
+| `config/config.go`                       | Env değişkenlerinden yapılandırma yükler     |
+| `internal/database/db.go`                | GORM bağlantısı + AutoMigrate                |
+| `internal/models/user.go`                | User modeli (wallet_address PK, credits)     |
+| `internal/models/agent.go`               | Agent + LibraryEntry modelleri               |
+| `internal/services/auth_service.go`      | Nonce üret, imza doğrula, JWT                |
+| `internal/services/agent_service.go`     | Agent CRUD, kütüphane, kredi                 |
 | `internal/services/character_service.go` | Prompt analiz → karakter tipi + nadir derece |
-| `internal/api/router.go` | Gin router + CORS kurulumu |
-| `internal/api/handlers/auth_handler.go` | GET /auth/nonce, POST /auth/verify |
-| `internal/api/handlers/agent_handler.go` | CRUD + library endpoints |
-| `internal/api/middleware/auth.go` | JWT doğrulama middleware |
-| `Dockerfile` | Multi-stage Go build |
+| `internal/api/router.go`                 | Gin router + CORS kurulumu                   |
+| `internal/api/handlers/auth_handler.go`  | GET /auth/nonce, POST /auth/verify           |
+| `internal/api/handlers/agent_handler.go` | CRUD + library endpoints                     |
+| `internal/api/middleware/auth.go`        | JWT doğrulama middleware                     |
+| `Dockerfile`                             | Multi-stage Go build                         |
 
 ### Frontend (Flutter Web) — 17 dosya ✅
-| Dosya | Açıklama |
-|---|---|
-| `lib/main.dart` | MaterialApp.router giriş noktası |
-| `lib/app/theme.dart` | Koyu tema (indigo + dark bg) |
-| `lib/app/router.dart` | GoRouter + AppShell sidebar |
-| `lib/core/constants/api_constants.dart` | API URL sabitleri |
-| `lib/features/character/character_types.dart` | CharacterType + CharacterRarity enum |
-| `lib/features/character/character_data.dart` | 8 karakter × 16×16 pixel matrix |
-| `lib/features/character/pixel_art_painter.dart` | CustomPainter + glow + float animasyon |
-| `lib/shared/widgets/pixel_character_widget.dart` | Karakter widget (frame + stats + badge) |
-| `lib/shared/models/agent_model.dart` | AgentModel.fromJson |
-| `lib/shared/services/api_service.dart` | HTTP istemcisi (auth, agents, library) |
-| `lib/shared/services/wallet_service.dart` | MetaMask köprüsü (JS interop) |
-| `lib/features/store/screens/store_screen.dart` | Agent grid, arama, filtre |
-| `lib/features/store/widgets/agent_card.dart` | Karakter + meta kart |
-| `lib/features/agent_detail/screens/` | Detay + prompt kopyala + kütüphane toggle |
-| `lib/features/library/screens/` | Kayıtlı agentlar grid |
-| `lib/features/create_agent/screens/` | Form + canlı karakter önizleme |
-| `lib/features/wallet/screens/` | MetaMask bağla / kredi görüntüle |
-| `Dockerfile + nginx.conf` | Flutter web build + nginx SPA |
+| Dosya                                            | Açıklama                                  |
+| ------------------------------------------------ | ----------------------------------------- |
+| `lib/main.dart`                                  | MaterialApp.router giriş noktası          |
+| `lib/app/theme.dart`                             | Koyu tema (indigo + dark bg)              |
+| `lib/app/router.dart`                            | GoRouter + AppShell sidebar               |
+| `lib/core/constants/api_constants.dart`          | API URL sabitleri                         |
+| `lib/features/character/character_types.dart`    | CharacterType + CharacterRarity enum      |
+| `lib/features/character/character_data.dart`     | 8 karakter × 16×16 pixel matrix           |
+| `lib/features/character/pixel_art_painter.dart`  | CustomPainter + glow + float animasyon    |
+| `lib/shared/widgets/pixel_character_widget.dart` | Karakter widget (frame + stats + badge)   |
+| `lib/shared/models/agent_model.dart`             | AgentModel.fromJson                       |
+| `lib/shared/services/api_service.dart`           | HTTP istemcisi (auth, agents, library)    |
+| `lib/shared/services/wallet_service.dart`        | MetaMask köprüsü (JS interop)             |
+| `lib/features/store/screens/store_screen.dart`   | Agent grid, arama, filtre                 |
+| `lib/features/store/widgets/agent_card.dart`     | Karakter + meta kart                      |
+| `lib/features/agent_detail/screens/`             | Detay + prompt kopyala + kütüphane toggle |
+| `lib/features/library/screens/`                  | Kayıtlı agentlar grid                     |
+| `lib/features/create_agent/screens/`             | Form + canlı karakter önizleme            |
+| `lib/features/wallet/screens/`                   | MetaMask bağla / kredi görüntüle          |
+| `Dockerfile + nginx.conf`                        | Flutter web build + nginx SPA             |
 
 ### Blockchain (Solidity) — 6 dosya ✅
-| Dosya | Açıklama |
-|---|---|
-| `contracts/AgentStoreCredits.sol` | ERC-20 benzeri kredi sistemi |
-| `contracts/AgentRegistry.sol` | Agent sahipliği + içerik hash kaydı |
-| `hardhat.config.js` | Monad testnet + localhost ağ konfigü |
-| `package.json` | Hardhat + OpenZeppelin bağımlılıkları |
-| `scripts/deploy.js` | Deploy + deployments.json kaydı |
-| `test/AgentStoreCredits.test.js` | Mocha/Chai birim testleri (7 test) |
+| Dosya                             | Açıklama                              |
+| --------------------------------- | ------------------------------------- |
+| `contracts/AgentStoreCredits.sol` | ERC-20 benzeri kredi sistemi          |
+| `contracts/AgentRegistry.sol`     | Agent sahipliği + içerik hash kaydı   |
+| `hardhat.config.js`               | Monad testnet + localhost ağ konfigü  |
+| `package.json`                    | Hardhat + OpenZeppelin bağımlılıkları |
+| `scripts/deploy.js`               | Deploy + deployments.json kaydı       |
+| `test/AgentStoreCredits.test.js`  | Mocha/Chai birim testleri (7 test)    |
 
 ## Sprint Notları
 - [x] v0.1 — Proje iskeleti + Docker + CLAUDE.md (Team Leader)
@@ -198,6 +198,13 @@ services:
 - [x] **v3.1 — UX Improvement Sprint** (Frontend) ✅ Guild emoji→Material Icon, keyboard nav, Mission redesign, hover consistency
 - [x] **v3.2 — UX Overhaul + DB Persistence Fix** (Frontend + Backend) ✅ 24 task
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
+- [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
+- [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [~] **v3.6 — Quality Foundation + Mobile Pass + Bug Bash** (in progress)
+  - ✅ Quality: testutil package (sqlite-in-memory via glebarez/sqlite), `pkg/database/db.go` dialector swap, 40 backend tests (auth 12, agent 28), 43 Flutter tests (CardEditor 18, MentionFilter 15, LegendService 10), CI workflow (`.github/workflows/ci.yml`)
+  - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
+  - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
+  - ⏳ 2-day bug bash — pending
 
 ## v3.2 UX Overhaul + DB Persistence Fix (2026-03-22)
 6 feature, 24 task:
@@ -234,6 +241,33 @@ services:
 - **Execution History UI**: Her çalışma satırı genişletilebilir (expandable node detayları), süre etiketi (Xs/Xm), tamamlanan çalışmalar için Rerun butonu, `onRerun` callback
 - **Yeni dosyalar**: `legend_templates.dart`, `legend_templates_dialog.dart`
 - **`_ToolbarButton`**: `disabled` parametresi eklendi (gri renk + onTap=null)
+
+## v3.5 Polish (2026-04-27)
+- **Legend overflow fixes**: toolbar workflow name `Flexible` + `ellipsis`; toolbar's 12+ button right-cluster wrapped in `SingleChildScrollView(scrollDirection: horizontal, reverse: true)` so narrow viewports scroll instead of overflowing; onboarding step `Text` `maxLines`/`overflow`; execution-history node label `ellipsis`.
+- **GuildMaster @-mention sectioning**: backend `/user/library` endpoint never set `owned: true` on agent JSON, so frontend always rendered everything as "Store". Fix: `GuildMasterController.ensureLibraryLoaded` now tags library entries via `copyWith(owned: true)` before merging. Composer split into separate `lib.take(6)` + `store.take(8)` (was single `take(8)`) so store hits never crowd library out.
+
+## v3.6 Quality Foundation (2026-04-27, partial)
+83 tests + CI gate; mobile pass + bug bash deferred.
+- **Backend test infra**: `pkg/database/db.go` now exposes `ConnectWithDialector` + `SetForTest`; production code path unchanged. New `internal/testutil/` package with sqlite in-memory DB (pure-Go via `github.com/glebarez/sqlite` — no CGO), agent/user/wallet factories, ECDSA signing helper.
+- **Backend tests**: `services/auth/service_test.go` (12 tests, real ECDSA round-trip; 87-100% on covered functions), `services/agent/service_test.go` (28 tests covering ListAgents filter/pagination/sort/cache, GetAgent, AddToLibrary idempotency + save_count, RemoveFromLibrary, GetLibrary isolation, IsPurchased, UpdateAgent owner check + whitelist + traits/profile JSON merge, BatchGetAgents prompt redaction, GetCategories, GetTrending, IncrementUseCount).
+- **Flutter test infra**: `mocktail` + `fake_async` added. New `test/unit/` and `test/widget/` directories. Default counter test removed.
+- **Flutter tests**: `test/unit/card_editor_controller_test.dart` (18 tests — history, undo/redo, dirty tracking, reDetectFromPrompt, history limit), `test/unit/mention_filter_test.dart` (15 tests — section split, library-first ordering, `kMentionLibraryLimit=6` + `kMentionStoreLimit=8` caps, case-insensitive filter), `test/unit/legend_service_test.dart` (10 tests — `newWorkflow`, singleton stability, `workflows` immutability, SyncStatus contract).
+- **Mention composer refactor**: extracted `filterAgentSuggestions` into standalone `lib/features/guild_master/widgets/mention_filter.dart` so tests don't pull `MonacoEditorWidget` (`dart:js_interop` blocks `flutter test` on non-web).
+- **CI**: new `.github/workflows/ci.yml` — `backend-test` (go vet + race-enabled test + coverage artifact upload) and `frontend-test` (flutter analyze + flutter test) jobs run on PR + main push. Existing `deploy.yml` untouched.
+- **Shared infra**: `lib/shared/widgets/responsive_layout.dart` — `ResponsiveLayout(mobile, tablet?, desktop)` LayoutBuilder helper using existing `AppBreakpoints`. `isNarrow(BuildContext)` helper for the AppShell-aligned 768px split.
+
+## v3.4 Card Editor (2026-04-26)
+Split-view canlı kart editörü — lor-card-maker'dan UX ilhamı, tema vintage koyu (LoR görselleri YOK):
+- **Backend genişletme**: `PUT /api/v1/agents/:id` whitelist'i artık prompt, category, subclass, price, card_version, service_description, profile_mood/role_purpose, traits, stats kabul ediyor. character_data JSON merge ile stats/traits/profile içeriği güvenle güncelleniyor; owner check değişmedi. (`backend/services/agent/{handler,service}.go`)
+- **CardEditorController**: `_original` + `draft` AgentModel, debounced save (600ms), undo/redo history stack (max 50, v3.3 Legend pattern'i), SyncStatus enum (idle/dirty/saving/saved/error), exponential backoff retry, `reDetectFromPrompt()` keyword scoring re-run.
+- **Split-view ekran**: sol form panel (6 accordion section: Identity, Prompt, Taxonomy, Stats, Narrative, Visuals) + sağ canlı `AgentCard` preview (`RepaintBoundary` + S/M/L boyut toggle). Mobile fallback stacked layout.
+- **Reusable field widget'ları**: EditTextField, EditLongText, EditTagChips, EditStatSlider, EditSubclassPicker — hepsi controller'a `updateField()` callback'iyle bağlı.
+- **Type/rarity politikası**: manuel override YOK; "Re-detect from prompt" butonu mevcut keyword scoring'i tekrar çalıştırır → yeni type seçilirse subclass otomatik resetlenir.
+- **Toolbar**: SyncStatusBadge (renkli pill), Undo/Redo butonları (disabled state'li), Save (Ctrl+S), Clone (`/agents/:id/fork` zincirleme + yeni ID'ye redirect), Export ▼ menü (JSON pretty + PNG 3× DPR), Close. Ctrl+Z/Y/S/Esc kısayolları + PopScope unsaved-changes onayı (v3.2 ConfirmDialog).
+- **Giriş noktaları (3)**: Agent Detail title row'da Edit Card butonu (sadece `isOwnAgent`), Library kartı hover'da gold edit pencil (sadece creator), Creator Dashboard'da yeni "Manage Card" aksiyonu (mevcut quick edit dialog'un yanına).
+- **Export**: `dart:js_interop` + `package:web` ile Blob+AnchorElement download; JSON `toJson()` (character_data nested), PNG `RepaintBoundary.toImage(pixelRatio: 3.0)`.
+- **Yeni rota**: `/agent/:id/edit` → `CardEditorScreen`, binding GetX `Get.put` tag-scoped.
+- **Yeni dosyalar**: `lib/features/card_editor/{controllers/card_editor_controller.dart, bindings/card_editor_binding.dart, screens/card_editor_screen.dart, services/card_export_service.dart, widgets/{editor_preview_panel.dart, editor_toolbar.dart, sections/editor_sections.dart, fields/editor_fields.dart}}` + `agent_model.dart`'a `toJson()`/`toUpdatePayload()`.
 
 ## Sprint Takip Dosyalari
 - `SPRINT_V2.md` — Detayli plan ve teknik kararlar

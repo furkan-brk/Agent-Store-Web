@@ -95,7 +95,16 @@
       "Bash(apt list:*)",
       "Read(//tmp/add_credits/**)",
       "Bash(go mod:*)",
-      "Bash(go run:*)"
+      "Bash(go run:*)",
+      "Bash(flutter devices *)",
+      "Bash(flutter --version)",
+      "Bash(GOSUMDB=off go get gorm.io/driver/sqlite github.com/stretchr/testify)",
+      "Bash(go test *)",
+      "Bash(GOSUMDB=off go get github.com/glebarez/sqlite)",
+      "Bash(GOSUMDB=off go mod tidy)",
+      "Bash(go tool *)",
+      "Bash(flutter test *)",
+      "PowerShell(Get-ChildItem -Path 'C:\\\\Projeler\\\\Agent-Store-Web\\\\backend\\\\services\\\\auth' | ForEach-Object { $_.Name })"
     ]
   }
 }

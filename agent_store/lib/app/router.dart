@@ -13,12 +13,14 @@ import '../features/guild/screens/guild_create_screen.dart';
 import '../features/wallet/screens/credit_history_screen.dart';
 import '../features/leaderboard/screens/leaderboard_screen.dart';
 import '../features/creator/screens/creator_dashboard_screen.dart';
+import '../shared/services/network_guard.dart';
 import '../shared/widgets/notification_panel.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
 import '../features/guild_master/screens/guild_master_screen.dart';
 import '../features/missions/screens/missions_screen.dart';
 import '../features/legend/screens/legend_screen.dart';
+import '../features/card_editor/screens/card_editor_screen.dart';
 import '../controllers/auth_controller.dart';
 import '../shared/services/app_telemetry_service.dart';
 import 'theme.dart';
@@ -73,6 +75,17 @@ class AppRouter {
                 return const SizedBox.shrink();
               }
               return AgentDetailScreen(agentId: id);
+            },
+          ),
+          GoRoute(
+            path: '/agent/:id/edit',
+            builder: (ctx, s) {
+              final id = int.tryParse(s.pathParameters['id'] ?? '');
+              if (id == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => ctx.go('/'));
+                return const SizedBox.shrink();
+              }
+              return CardEditorScreen(agentId: id);
             },
           ),
           GoRoute(path: '/library', builder: (_, __) => const LibraryScreen()),
@@ -142,6 +155,18 @@ class AppShellState {
 }
 
 class _AppShellState extends State<_AppShell> {
+  @override
+  void initState() {
+    super.initState();
+    // Wire push-side chain listener once the shell mounts. Earlier registration
+    // in main() would race against MetaMask's late-loaded `window.ethereum`.
+    if (Get.isRegistered<NetworkGuard>()) {
+      // Fire and forget — the guard is permanent and tracks its own listener
+      // wiring state.
+      Get.find<NetworkGuard>().initListener();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = GoRouterState.of(context).uri.toString();
@@ -219,10 +244,66 @@ class _AppShellState extends State<_AppShell> {
         },
         child: Focus(
           autofocus: true,
-          child: isNarrow ? _NarrowLayout(child: widget.child) : _WideLayout(child: widget.child),
+          child: _NetworkBanner(
+            child: isNarrow ? _NarrowLayout(child: widget.child) : _WideLayout(child: widget.child),
+          ),
         ),
       ),
     );
+  }
+}
+
+/// Persistent banner shown above the app content when the wallet is on
+/// the wrong chain. Watches NetworkGuard.onCorrectNetwork and offers a
+/// one-tap switch to Monad.
+class _NetworkBanner extends StatelessWidget {
+  final Widget child;
+  const _NetworkBanner({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!Get.isRegistered<NetworkGuard>()) return child;
+    final guard = Get.find<NetworkGuard>();
+    return Obx(() {
+      if (guard.onCorrectNetwork.value) return child;
+      return Column(
+        children: [
+          Material(
+            color: AppTheme.primary.withValues(alpha: 0.9),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Wrong network — switch to Monad Testnet to use signed actions.'
+                        '${guard.currentChainId.value != null ? " (current: ${guard.currentChainId.value})" : ""}',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => guard.requestSwitchToMonad(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.black.withValues(alpha: 0.2),
+                      ),
+                      child: const Text('Switch to Monad'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(child: child),
+        ],
+      );
+    });
   }
 }
 
