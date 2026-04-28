@@ -257,10 +257,17 @@ class _FilterBar extends StatelessWidget {
                   icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.textM, size: 20),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All Types')),
-                    DropdownMenuItem(value: 'create', child: Text('Create')),
-                    DropdownMenuItem(value: 'fork', child: Text('Fork')),
+                    // New v3.7-8.1 action_type values (ledger)
+                    DropdownMenuItem(value: 'create_agent', child: Text('Create Agent')),
+                    DropdownMenuItem(value: 'regen_image', child: Text('Regen Image')),
+                    DropdownMenuItem(value: 'legend_run_node', child: Text('Legend Run')),
+                    DropdownMenuItem(value: 'purchase', child: Text('Purchase')),
                     DropdownMenuItem(value: 'topup', child: Text('Topup')),
-                    DropdownMenuItem(value: 'initial', child: Text('Initial')),
+                    DropdownMenuItem(value: 'dev_grant', child: Text('Dev Grant')),
+                    // Legacy `type` values (preserved so older rows still filter)
+                    DropdownMenuItem(value: 'create', child: Text('Create (legacy)')),
+                    DropdownMenuItem(value: 'fork', child: Text('Fork (legacy)')),
+                    DropdownMenuItem(value: 'initial', child: Text('Initial (legacy)')),
                   ],
                   onChanged: (v) => ctrl.setTypeFilter(v ?? 'all'),
                 ),
@@ -461,6 +468,10 @@ class _HoverIconButtonState extends State<_HoverIconButton> {
 
 // -- Local micro-controller with filter support -----------------------------
 
+/// v3.7-8.1: prefers the new structured `entries` field (CreditLedgerEntry rows
+/// with action_type / node_ref / cost_breakdown). Falls back to the legacy
+/// `transactions` field when the server is older or migration hasn't run.
+/// _TxCard reads action_type-aware fields so both shapes render uniformly.
 class _CreditHistoryController extends GetxController {
   final transactions = <Map<String, dynamic>>[].obs;
   final balance = 0.obs;
@@ -481,20 +492,24 @@ class _CreditHistoryController extends GetxController {
   List<Map<String, dynamic>> get filteredTransactions {
     var result = transactions.toList();
 
-    // Search by agent_title
+    // Search by agent_title or action_type
     if (searchQuery.value.isNotEmpty) {
       final q = searchQuery.value.toLowerCase();
       result = result.where((tx) {
         final title = (tx['agent_title'] as String? ?? '').toLowerCase();
-        return title.contains(q);
+        final action = (tx['action_type'] as String? ?? '').toLowerCase();
+        final node = (tx['node_ref'] as String? ?? '').toLowerCase();
+        return title.contains(q) || action.contains(q) || node.contains(q);
       }).toList();
     }
 
-    // Filter by type
+    // Filter by type / action_type (ledger entries use action_type, legacy
+    // entries use type — _TxCard normalises but the filter must match both)
     if (typeFilter.value != 'all') {
-      result = result.where((tx) =>
-        (tx['type'] as String? ?? '') == typeFilter.value
-      ).toList();
+      result = result.where((tx) {
+        final action = tx['action_type'] as String? ?? tx['type'] as String? ?? '';
+        return action == typeFilter.value;
+      }).toList();
     }
 
     // Filter by date
@@ -533,8 +548,12 @@ class _CreditHistoryController extends GetxController {
     error.value = null;
     final data = await ApiService.instance.getCreditHistory();
     if (data != null) {
-      final rawList = List<Map<String, dynamic>>.from(data['transactions'] as List? ?? []);
-      transactions.value = rawList;
+      // Prefer the structured ledger; fall back to legacy `transactions` when
+      // the server response predates v3.7-8.1.
+      final entries = data['entries'] as List?;
+      final legacy = data['transactions'] as List?;
+      final source = entries != null && entries.isNotEmpty ? entries : legacy;
+      transactions.value = List<Map<String, dynamic>>.from(source ?? const []);
       balance.value = data['balance'] as int? ?? 0;
       _applySort();
     } else {
@@ -571,45 +590,87 @@ class _TxCard extends StatefulWidget {
 
 class _TxCardState extends State<_TxCard> {
   bool _hovered = false;
+  bool _expanded = false;
+
+  /// Maps both new (action_type) and legacy (type) values to a display
+  /// label + icon + colour. Falls back to a humanised version of the raw
+  /// string so future server-side action types still render reasonably.
+  ({IconData icon, Color color, String label}) _classifyAction(String action) {
+    switch (action) {
+      // v3.7-8.1 action_type values
+      case 'create_agent':
+        return (icon: Icons.add_box_outlined, color: AppTheme.primary, label: 'Agent Created');
+      case 'regen_image':
+        return (icon: Icons.image_outlined, color: AppTheme.gold, label: 'Image Regenerated');
+      case 'legend_run_node':
+        return (icon: Icons.account_tree_outlined, color: AppTheme.gold, label: 'Legend Node Run');
+      case 'purchase':
+        return (icon: Icons.shopping_bag_outlined, color: AppTheme.primary, label: 'Agent Purchased');
+      case 'dev_grant':
+        return (icon: Icons.science_outlined, color: AppTheme.olive, label: 'Dev Grant');
+      // Legacy `type` values
+      case 'create':
+        return (icon: Icons.add_box_outlined, color: AppTheme.primary, label: 'Agent Created');
+      case 'fork':
+        return (icon: Icons.fork_right, color: AppTheme.gold, label: 'Agent Forked');
+      case 'initial':
+        return (icon: Icons.card_giftcard_rounded, color: AppTheme.olive, label: 'Welcome Bonus');
+      case 'topup':
+        return (icon: Icons.add_card_rounded, color: AppTheme.olive, label: 'Credits Purchased');
+      default:
+        // Humanise unknown action keys (e.g. "future_thing" -> "Future Thing")
+        final words = action.split('_').where((w) => w.isNotEmpty).map(
+              (w) => w[0].toUpperCase() + w.substring(1),
+            );
+        return (
+          icon: Icons.bolt_rounded,
+          color: AppTheme.textM,
+          label: words.isEmpty ? action : words.join(' '),
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final type = widget.tx['type'] as String? ?? 'unknown';
-    final amount = widget.tx['amount'] as int? ?? 0;
+    // Prefer action_type (ledger), fall back to type (legacy).
+    final action = (widget.tx['action_type'] as String?) ??
+        (widget.tx['type'] as String? ?? 'unknown');
+    // Ledger uses `delta` (signed), legacy uses `amount`.
+    final amount = (widget.tx['delta'] as int?) ??
+        (widget.tx['amount'] as int? ?? 0);
     final agentTitle = widget.tx['agent_title'] as String?;
+    final nodeRef = widget.tx['node_ref'] as String?;
+    final breakdownRaw = widget.tx['cost_breakdown'];
+    Map<String, dynamic>? breakdown;
+    if (breakdownRaw is Map) {
+      breakdown = Map<String, dynamic>.from(breakdownRaw);
+    } else if (breakdownRaw is String && breakdownRaw.isNotEmpty) {
+      // Server may serialise jsonb as a string when the driver doesn't decode.
+      try {
+        final parsed = breakdownRaw.startsWith('{')
+            ? Map<String, dynamic>.from({})
+            : null;
+        breakdown = parsed;
+      } catch (_) {}
+    }
+    final hasDetail = (nodeRef != null && nodeRef.isNotEmpty) ||
+        (breakdown != null && breakdown.isNotEmpty);
     final createdAt = widget.tx['created_at'] as String? ?? '';
     final isDeduction = amount < 0;
 
-    final IconData icon;
-    final Color iconColor;
-    final String label;
-    switch (type) {
-      case 'create':
-        icon = Icons.add_box_outlined;
-        iconColor = AppTheme.primary;
-        label = 'Agent Created';
-      case 'fork':
-        icon = Icons.fork_right;
-        iconColor = AppTheme.gold;
-        label = 'Agent Forked';
-      case 'initial':
-        icon = Icons.card_giftcard_rounded;
-        iconColor = AppTheme.olive;
-        label = 'Welcome Bonus';
-      case 'topup':
-        icon = Icons.add_card_rounded;
-        iconColor = AppTheme.olive;
-        label = 'Credits Purchased';
-      default:
-        icon = Icons.bolt_rounded;
-        iconColor = AppTheme.textM;
-        label = type;
-    }
+    final cls = _classifyAction(action);
+    final icon = cls.icon;
+    final iconColor = cls.color;
+    final label = cls.label;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
+      child: GestureDetector(
+        onTap: hasDetail
+            ? () => setState(() => _expanded = !_expanded)
+            : null,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(14),
@@ -620,7 +681,8 @@ class _TxCardState extends State<_TxCard> {
             color: _hovered ? AppTheme.border2 : AppTheme.border,
           ),
         ),
-        child: Row(children: [
+        child: Column(children: [
+          Row(children: [
           // Icon circle
           Container(
             width: 42,
@@ -701,7 +763,80 @@ class _TxCardState extends State<_TxCard> {
               ),
             ]),
           ),
+          if (hasDetail) ...[
+            const SizedBox(width: 6),
+            Icon(
+              _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              size: 18,
+              color: AppTheme.textM,
+            ),
+          ],
+          ]),
+          // ── Expanded detail: node_ref + cost_breakdown ───────────────
+          if (_expanded && hasDetail) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.bg.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (nodeRef != null && nodeRef.isNotEmpty) ...[
+                    Row(children: [
+                      const Icon(Icons.link_rounded, size: 13, color: AppTheme.textM),
+                      const SizedBox(width: 6),
+                      const Text('Node:',
+                          style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: SelectableText(
+                          nodeRef,
+                          style: const TextStyle(
+                            color: AppTheme.textB,
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ],
+                  if (breakdown != null && breakdown.isNotEmpty) ...[
+                    if (nodeRef != null && nodeRef.isNotEmpty)
+                      const SizedBox(height: 8),
+                    const Text('Breakdown',
+                        style: TextStyle(
+                            color: AppTheme.textM,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    ...breakdown.entries.map((e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 1),
+                          child: Row(children: [
+                            Text('${e.key}:',
+                                style: const TextStyle(
+                                    color: AppTheme.textM, fontSize: 11)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${e.value}',
+                                style: const TextStyle(
+                                    color: AppTheme.textB, fontSize: 11),
+                              ),
+                            ),
+                          ]),
+                        )),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ]),
+      ),
       ),
     );
   }

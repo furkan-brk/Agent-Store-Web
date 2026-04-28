@@ -10,6 +10,11 @@ import 'local_kv_store.dart';
 
 enum SyncStatus { synced, syncing, pending, failed }
 
+/// Outcome of [MissionService.updateMission] (v3.7-13.1).
+/// `conflict` means the server returned 409 — caller should surface the
+/// ConflictDialog so the user can choose mine / theirs / merge.
+enum MissionUpdateOutcome { ok, conflict, error, notFound, invalid }
+
 class MissionService {
   MissionService._();
 
@@ -248,13 +253,24 @@ class MissionService {
     await _save();
   }
 
-  Future<void> updateMission({required String id, required String title, required String prompt}) async {
+  /// Result of [updateMission]. The mission detail screen uses this to
+  /// route 409 conflicts through [ConflictResolver] / [showConflictDialog]
+  /// (v3.7-13.1). Today the screen layer doesn't yet handle conflicts —
+  /// [updateMission]'s local row is preserved on conflict and will retry
+  /// on the next save with the freshly-merged revisionId.
+  Future<MissionUpdateOutcome> updateMission({
+    required String id,
+    required String title,
+    required String prompt,
+  }) async {
     final idx = _missions.indexWhere((m) => m.id == id);
-    if (idx == -1) return;
+    if (idx == -1) return MissionUpdateOutcome.notFound;
 
     final cleanTitle = title.trim();
     final cleanPrompt = prompt.trim();
-    if (cleanTitle.isEmpty || cleanPrompt.isEmpty) return;
+    if (cleanTitle.isEmpty || cleanPrompt.isEmpty) {
+      return MissionUpdateOutcome.invalid;
+    }
 
     var slug = MissionModel.slugify(cleanTitle);
     var i = 2;
@@ -269,14 +285,31 @@ class MissionService {
       prompt: cleanPrompt,
     );
     _sort();
+    var outcome = MissionUpdateOutcome.ok;
     if (ApiService.instance.isAuthenticated) {
-      final saved = await ApiService.instance.saveMission(_missions[idx]);
-      if (saved != null) {
-        _missions[idx] = saved;
-        _sort();
+      final r = await ApiService.instance.saveMissionWithRevision(_missions[idx]);
+      if (r.saved != null) {
+        // Find by id again — the list may have re-ordered after _sort.
+        final savedIdx = _missions.indexWhere((m) => m.id == r.saved!.id);
+        if (savedIdx != -1) {
+          _missions[savedIdx] = r.saved!;
+          _sort();
+        }
+      } else if (r.hasConflict) {
+        // Server-side row is newer. Update our local revision so the next
+        // save sends a fresh If-Match — but keep the user's edits in place
+        // so they can decide via UI (mine / theirs / merge).
+        final serverRev = r.serverRow['revision_id'];
+        if (serverRev is int) {
+          _missions[idx] = _missions[idx].copyWith(revisionId: serverRev);
+        }
+        outcome = MissionUpdateOutcome.conflict;
+      } else if (r.isError) {
+        outcome = MissionUpdateOutcome.error;
       }
     }
     await _save();
+    return outcome;
   }
 
   Future<void> deleteMission(String id) async {
@@ -302,11 +335,19 @@ class MissionService {
     _missions[idx] = _missions[idx].copyWith(useCount: _missions[idx].useCount + 1);
     _sort();
     if (ApiService.instance.isAuthenticated) {
-      final saved = await ApiService.instance.saveMission(_missions[idx]);
-      if (saved != null) {
-        final savedIdx = _missions.indexWhere((m) => m.id == saved.id);
-        if (savedIdx != -1) _missions[savedIdx] = saved;
+      // Use the conflict-aware path so a stale revision (concurrent update
+      // from another tab) silently rotates to the server value. Use-count
+      // bumps don't surface a user-facing dialog — best-effort.
+      final r = await ApiService.instance.saveMissionWithRevision(_missions[idx]);
+      if (r.saved != null) {
+        final savedIdx = _missions.indexWhere((m) => m.id == r.saved!.id);
+        if (savedIdx != -1) _missions[savedIdx] = r.saved!;
         _sort();
+      } else if (r.hasConflict) {
+        final serverRev = r.serverRow['revision_id'];
+        if (serverRev is int) {
+          _missions[idx] = _missions[idx].copyWith(revisionId: serverRev);
+        }
       }
     }
     await _save();

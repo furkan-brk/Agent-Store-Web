@@ -6,6 +6,7 @@ import '../models/agent_model.dart';
 import '../models/mission_model.dart';
 import '../models/guild_model.dart';
 import '../../core/constants/api_constants.dart';
+import 'conflict_resolver.dart';
 import 'local_kv_store.dart';
 
 const _kTokenKey = 'jwt_token';
@@ -373,19 +374,45 @@ class ApiService {
     return [];
   }
 
-  Future<MissionModel?> saveMission(MissionModel mission) async {
+  /// Saves [mission] with optimistic-concurrency support (v3.7-13.1). When
+  /// the mission carries a non-zero revisionId, sends `If-Match: <rev>`;
+  /// the server returns 409 + the current row when stored revision has
+  /// advanced past ours.
+  Future<MissionSaveResult> saveMissionWithRevision(MissionModel mission) async {
     try {
+      final headers = Map<String, String>.from(_headers);
+      if (mission.revisionId > 0) {
+        headers['If-Match'] = '${mission.revisionId}';
+      }
       final res = await http.post(
         Uri.parse(ApiConstants.userMissions),
-        headers: _headers,
+        headers: headers,
         body: jsonEncode(mission.toJson()),
       );
       if (res.statusCode == 200) {
-        return MissionModel.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+        return MissionSaveResult.ok(
+          MissionModel.fromJson(jsonDecode(res.body) as Map<String, dynamic>),
+        );
+      }
+      if (res.statusCode == 409) {
+        Map<String, dynamic>? body;
+        try {
+          body = jsonDecode(res.body) as Map<String, dynamic>;
+        } catch (_) {}
+        return MissionSaveResult.conflict(body ?? const {});
       }
       debugPrint('saveMission: HTTP ${res.statusCode} — ${res.body}');
-    } catch (e) { debugPrint('saveMission: $e'); }
-    return null;
+    } catch (e) {
+      debugPrint('saveMission: $e');
+    }
+    return const MissionSaveResult.error();
+  }
+
+  /// Backward-compatible wrapper for callers that don't yet handle 409.
+  /// Discards conflict outcomes and returns null.
+  Future<MissionModel?> saveMission(MissionModel mission) async {
+    final r = await saveMissionWithRevision(mission);
+    return r.saved;
   }
 
   Future<bool> deleteMission(String id) async {
@@ -665,6 +692,9 @@ class ApiService {
     String? profileMood,
     String? profileRolePurpose,
     List<String>? traits,
+    /// v3.7-4.2 — when non-null, sent as `If-Match` so the server can
+    /// reject (409) when the stored revision has advanced past ours.
+    int? ifMatch,
   }) async {
     try {
       final body = <String, dynamic>{};
@@ -683,15 +713,29 @@ class ApiService {
 
       if (body.isEmpty) return null; // nothing to do — don't waste a round-trip
 
+      final headers = Map<String, String>.from(_headers);
+      if (ifMatch != null && ifMatch > 0) {
+        headers['If-Match'] = '$ifMatch';
+      }
       final res = await http.put(
         Uri.parse('${ApiConstants.agents}/$agentId'),
-        headers: _headers,
+        headers: headers,
         body: jsonEncode(body),
       ).timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
         invalidateCache('agents');
         return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      if (res.statusCode == 409) {
+        // Surface as ConflictException so the [ConflictResolver] picks it up.
+        Map<String, dynamic> serverRow;
+        try {
+          serverRow = jsonDecode(res.body) as Map<String, dynamic>;
+        } catch (_) {
+          serverRow = const {};
+        }
+        throw ConflictException(serverRow);
       }
       final err = jsonDecode(res.body);
       throw Exception(err['error'] ?? 'Failed to update agent');
@@ -865,4 +909,42 @@ class ApiService {
     } catch (e) { debugPrint('teamChat: $e'); }
     return null;
   }
+}
+
+/// Outcome of a [ApiService.saveMissionWithRevision] call (v3.7-13.1).
+/// Three-state result so callers can distinguish 200 success from 409
+/// optimistic-concurrency conflict from a generic transport/server error.
+class MissionSaveResult {
+  /// Saved row returned by the server (with bumped revisionId). null on
+  /// conflict or error.
+  final MissionModel? saved;
+
+  /// Server's current row when the response was 409. Empty map on success
+  /// or generic error. Use [hasConflict] to test.
+  final Map<String, dynamic> serverRow;
+
+  /// True when the server rejected the save with 409 because the stored
+  /// revision was newer than ours.
+  final bool hasConflict;
+
+  /// True when the request failed for any other reason (transport, 4xx,
+  /// 5xx). Use this to surface a generic error to the user.
+  final bool isError;
+
+  const MissionSaveResult.ok(this.saved)
+      : serverRow = const {},
+        hasConflict = false,
+        isError = false;
+
+  const MissionSaveResult.conflict(Map<String, dynamic> server)
+      : saved = null,
+        serverRow = server,
+        hasConflict = true,
+        isError = false;
+
+  const MissionSaveResult.error()
+      : saved = null,
+        serverRow = const {},
+        hasConflict = false,
+        isError = true;
 }

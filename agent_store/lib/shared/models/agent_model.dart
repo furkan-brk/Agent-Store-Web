@@ -35,6 +35,10 @@ class AgentModel {
   final String? serviceDescription;
   /// Whether the current user owns this agent (creator or purchased).
   final bool owned;
+  /// v3.7-4.2 — server-issued optimistic-concurrency token. 0 when the
+  /// model was constructed locally without a backend round-trip; positive
+  /// when persisted. Card Editor sends `If-Match: <revisionId>` on PATCH.
+  final int revisionId;
 
   const AgentModel({
     required this.id,
@@ -61,6 +65,7 @@ class AgentModel {
     this.promptScore = 0,
     this.serviceDescription,
     this.owned = false,
+    this.revisionId = 0,
   });
 
   AgentModel copyWith({
@@ -88,6 +93,7 @@ class AgentModel {
     int? promptScore,
     String? serviceDescription,
     bool? owned,
+    int? revisionId,
   }) =>
       AgentModel(
         id: id ?? this.id,
@@ -114,6 +120,7 @@ class AgentModel {
         promptScore: promptScore ?? this.promptScore,
         serviceDescription: serviceDescription ?? this.serviceDescription,
         owned: owned ?? this.owned,
+        revisionId: revisionId ?? this.revisionId,
       );
 
   /// Full JSON export (matches the backend `Agent` model shape, with
@@ -241,6 +248,7 @@ class AgentModel {
       promptScore:       (json['prompt_score'] as num?)?.toInt() ?? 0,
       serviceDescription: json['service_description'] as String?,
       owned:             json['owned'] as bool? ?? false,
+      revisionId:        (json['revision_id'] as num?)?.toInt() ?? 0,
     );
   }
 }

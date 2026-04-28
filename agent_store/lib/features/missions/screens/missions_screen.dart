@@ -189,14 +189,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
           final prompt = promptCtrl.text.trim();
           if (title.isEmpty || prompt.isEmpty) return;
           Navigator.of(ctx).pop();
-          await MissionService.instance.updateMission(
+          final outcome = await MissionService.instance.updateMission(
             id: m.id,
             title: title,
             prompt: prompt,
           );
-          if (mounted) {
-            setState(() {});
-            AppSnackBar.success(context, 'Mission updated');
+          if (!mounted) return;
+          setState(() {});
+          switch (outcome) {
+            case MissionUpdateOutcome.ok:
+              AppSnackBar.success(context, 'Mission updated');
+            case MissionUpdateOutcome.conflict:
+              AppSnackBar.info(context,
+                  'Conflict: this mission was edited elsewhere. Your changes are kept locally — save again to overwrite.');
+            case MissionUpdateOutcome.error:
+              AppSnackBar.info(context,
+                  'Update saved locally — server sync will retry.');
+            case MissionUpdateOutcome.notFound:
+            case MissionUpdateOutcome.invalid:
+              break;
           }
         },
       ),
