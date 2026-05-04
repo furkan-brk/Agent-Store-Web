@@ -80,8 +80,17 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		// Public trial script endpoint (no auth, token-based)
 		v1.GET("/trial/:token/script", handler.GetTrialScript)
 
+		agents.GET("/for-you", auth, handler.GetForYou)
+
 		v1.GET("/users/:wallet", handler.GetPublicProfile)
+		v1.POST("/users/:wallet/follow", auth, handler.FollowUser)
+		v1.DELETE("/users/:wallet/follow", auth, handler.UnfollowUser)
+		v1.GET("/users/:wallet/followers", handler.GetFollowers)
+		v1.GET("/users/:wallet/following", handler.GetFollowing)
+		v1.GET("/users/:wallet/feed", handler.GetActivityFeed)
+		v1.GET("/users/:wallet/follow-status", auth, handler.GetFollowStatus)
 		v1.GET("/leaderboard", handler.GetLeaderboard)
+		v1.GET("/og/agent/:id", handler.GetOGMeta)
 	}
 
 	// Internal endpoints for cross-service communication

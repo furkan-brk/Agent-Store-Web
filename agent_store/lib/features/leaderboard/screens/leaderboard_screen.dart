@@ -85,56 +85,65 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     final topPad = isMobile ? 20.0 : 28.0;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(hPad, topPad, hPad, 0),
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-      ),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(hPad, topPad, hPad, isMobile ? 10 : 12),
+      decoration: const BoxDecoration(color: AppTheme.surface),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Crown icon
-          Container(
-            width: isMobile ? 32 : 36,
-            height: isMobile ? 32 : 36,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppTheme.gold.withValues(alpha: 0.25),
-                  AppTheme.gold.withValues(alpha: 0.08),
-                ],
+          Row(
+            children: [
+              // Crown icon
+              Container(
+                width: isMobile ? 32 : 36,
+                height: isMobile ? 32 : 36,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppTheme.gold.withValues(alpha: 0.25),
+                      AppTheme.gold.withValues(alpha: 0.08),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
+                ),
+                child: Icon(
+                  Icons.workspace_premium_rounded,
+                  color: AppTheme.gold,
+                  size: isMobile ? 18 : 20,
+                ),
               ),
-              borderRadius: BorderRadius.circular(isMobile ? 8 : 10),
-            ),
-            child: Icon(
-              Icons.workspace_premium_rounded,
-              color: AppTheme.gold,
-              size: isMobile ? 18 : 20,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Title with gradient
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [AppTheme.textH, AppTheme.gold],
-            ).createShader(bounds),
-            child: Text(
-              'Leaderboard',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: isMobile ? 18 : 22,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.3,
+              const SizedBox(width: 12),
+              // Title with gradient
+              ShaderMask(
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppTheme.textH, AppTheme.gold],
+                ).createShader(bounds),
+                child: Text(
+                  'Leaderboard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.3,
+                  ),
+                ),
               ),
-            ),
+              const Spacer(),
+              // Refresh button
+              Obx(() => _HoverIconButton(
+                    icon: Icons.refresh_rounded,
+                    tooltip: 'Refresh',
+                    isLoading: _ctrl.isLoading.value,
+                    onPressed: () => _ctrl.load(),
+                  )),
+            ],
           ),
-          const Spacer(),
-          // Refresh button
-          Obx(() => _HoverIconButton(
-                icon: Icons.refresh_rounded,
-                tooltip: 'Refresh',
-                isLoading: _ctrl.isLoading.value,
-                onPressed: () => _ctrl.load(),
+          const SizedBox(height: 12),
+          // ── Time window selector chips ────────────────────────────────
+          Obx(() => _WindowSelector(
+                selected: _ctrl.window.value,
+                onSelect: _ctrl.selectWindow,
               )),
         ],
       ),
@@ -840,6 +849,66 @@ class _StatChip extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// _WindowSelector — 3 time-window chips: 7d / 30d / All-time
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _WindowSelector extends StatelessWidget {
+  final String selected;
+  final void Function(String) onSelect;
+
+  static const _windows = [
+    ('7d', '7 Days'),
+    ('30d', '30 Days'),
+    ('all', 'All Time'),
+  ];
+
+  const _WindowSelector({required this.selected, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: _windows.map((pair) {
+        final (key, label) = pair;
+        final isSelected = selected == key;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            child: InkWell(
+              onTap: () => onSelect(key),
+              borderRadius: BorderRadius.circular(20),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppTheme.gold.withValues(alpha: 0.15)
+                      : AppTheme.card2,
+                  border: Border.all(
+                    color: isSelected
+                        ? AppTheme.gold.withValues(alpha: 0.6)
+                        : AppTheme.border,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? AppTheme.gold : AppTheme.textM,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

@@ -635,15 +635,148 @@ func (h *Handler) GetCreditHistory(c *gin.Context) {
 	})
 }
 
-// GetLeaderboard handles GET /api/v1/leaderboard
+// GetLeaderboard handles GET /api/v1/leaderboard?window=7d|30d|all
 func (h *Handler) GetLeaderboard(c *gin.Context) {
-	rankings, err := h.agentSvc.GetLeaderboard()
+	window := c.DefaultQuery("window", "all")
+	rankings, err := h.agentSvc.GetLeaderboardWindowed(window)
 	if err != nil {
 		log.Printf("[AgentHandler.GetLeaderboard] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"rankings": rankings, "count": len(rankings)})
+	c.JSON(http.StatusOK, gin.H{"rankings": rankings, "count": len(rankings), "window": window})
+}
+
+// GetForYou handles GET /api/v1/agents/for-you (auth required)
+func (h *Handler) GetForYou(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	agents, err := h.agentSvc.GetForYou(wallet)
+	if err != nil {
+		log.Printf("[AgentHandler.GetForYou] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"agents": agents, "total": len(agents)})
+}
+
+// FollowUser handles POST /api/v1/users/:wallet/follow
+func (h *Handler) FollowUser(c *gin.Context) {
+	follower := c.GetString("wallet")
+	followee := c.Param("wallet")
+	err := h.agentSvc.FollowUser(follower, followee)
+	if err == ErrSelfFollow {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot follow yourself"})
+		return
+	}
+	if err == ErrAlreadyFollowing {
+		c.JSON(http.StatusConflict, gin.H{"error": "already following"})
+		return
+	}
+	if err != nil {
+		log.Printf("[AgentHandler.FollowUser] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// UnfollowUser handles DELETE /api/v1/users/:wallet/follow
+func (h *Handler) UnfollowUser(c *gin.Context) {
+	follower := c.GetString("wallet")
+	followee := c.Param("wallet")
+	err := h.agentSvc.UnfollowUser(follower, followee)
+	if err == ErrNotFollowing {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not following"})
+		return
+	}
+	if err != nil {
+		log.Printf("[AgentHandler.UnfollowUser] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// GetFollowers handles GET /api/v1/users/:wallet/followers
+func (h *Handler) GetFollowers(c *gin.Context) {
+	wallet := c.Param("wallet")
+	entries, err := h.agentSvc.GetFollowers(wallet)
+	if err != nil {
+		log.Printf("[AgentHandler.GetFollowers] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"followers": entries, "count": len(entries)})
+}
+
+// GetFollowing handles GET /api/v1/users/:wallet/following
+func (h *Handler) GetFollowing(c *gin.Context) {
+	wallet := c.Param("wallet")
+	entries, err := h.agentSvc.GetFollowing(wallet)
+	if err != nil {
+		log.Printf("[AgentHandler.GetFollowing] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"following": entries, "count": len(entries)})
+}
+
+// GetActivityFeed handles GET /api/v1/users/:wallet/feed?before_id=&limit=
+func (h *Handler) GetActivityFeed(c *gin.Context) {
+	wallet := c.Param("wallet")
+	beforeID, _ := strconv.ParseUint(c.Query("before_id"), 10, 64)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	items, err := h.agentSvc.GetActivityFeed(wallet, uint(beforeID), limit)
+	if err != nil {
+		log.Printf("[AgentHandler.GetActivityFeed] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	// Return the smallest ID in the page as the next cursor.
+	var nextCursor uint
+	if len(items) > 0 {
+		nextCursor = items[len(items)-1].ID
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"items":       items,
+		"count":       len(items),
+		"next_cursor": nextCursor,
+	})
+}
+
+// GetFollowStatus handles GET /api/v1/users/:wallet/follow-status (auth required)
+// Returns whether the authenticated user follows the given wallet + counts.
+func (h *Handler) GetFollowStatus(c *gin.Context) {
+	myWallet := c.GetString("wallet")
+	targetWallet := c.Param("wallet")
+	isFollowing := h.agentSvc.IsFollowing(myWallet, targetWallet)
+	counts := h.agentSvc.GetFollowCounts(targetWallet)
+	c.JSON(http.StatusOK, gin.H{
+		"is_following": isFollowing,
+		"followers":    counts.Followers,
+		"following":    counts.Following,
+	})
+}
+
+// GetOGMeta handles GET /api/v1/og/agent/:id — returns HTML for social crawlers.
+func (h *Handler) GetOGMeta(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.String(http.StatusBadRequest, "bad id")
+		return
+	}
+	scheme := "https"
+	if c.Request.TLS == nil {
+		scheme = "http"
+	}
+	baseURL := scheme + "://" + c.Request.Host
+	meta, err := h.agentSvc.GetOGMeta(uint(id), baseURL)
+	if err != nil {
+		c.String(http.StatusNotFound, "not found")
+		return
+	}
+	c.Header("Cache-Control", "public, max-age=3600")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(RenderOGHTML(meta)))
 }
 
 // RecordPurchase handles POST /api/v1/agents/:id/purchase

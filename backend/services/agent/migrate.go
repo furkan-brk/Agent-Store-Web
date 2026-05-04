@@ -23,6 +23,8 @@ func Migrate() {
 		&models.TrialToken{},
 		&models.CreditTransaction{},
 		&models.CreditLedgerEntry{},
+		&models.UserFollow{},
+		&models.UserActivity{},
 	); err != nil {
 		log.Fatalf("Agent Service migration failed: %v", err)
 	}

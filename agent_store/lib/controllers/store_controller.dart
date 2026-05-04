@@ -29,6 +29,10 @@ class StoreController extends GetxController with QueryStatePersistence {
   final trendingAgents = <AgentModel>[].obs;
   final trendingLoading = true.obs;
 
+  // ── For You ───────────────────────────────────────────────────────────────
+  final forYouAgents = <AgentModel>[].obs;
+  final forYouLoading = false.obs;
+
   Timer? _debounce;
 
   int get activeFilterCount {
@@ -103,6 +107,7 @@ class StoreController extends GetxController with QueryStatePersistence {
     loadCategories();
     loadTrending();
     load();
+    loadForYou();
   }
 
   @override
@@ -135,6 +140,25 @@ class StoreController extends GetxController with QueryStatePersistence {
       trendingAgents.value = list;
     } catch (_) {}
     trendingLoading.value = false;
+  }
+
+  /// Load personalised "For You" agents — only when authenticated.
+  /// Silently no-ops when unauthenticated or already populated.
+  Future<void> loadForYou() async {
+    if (!ApiService.instance.isAuthenticated) return;
+    if (forYouAgents.isNotEmpty) return;
+    forYouLoading.value = true;
+    try {
+      final list = await ApiService.instance.getForYou();
+      forYouAgents.value = list;
+    } catch (_) {}
+    forYouLoading.value = false;
+  }
+
+  /// Refresh For You — called after the user saves/removes from library.
+  void refreshForYou() {
+    forYouAgents.clear();
+    loadForYou();
   }
 
   Future<void> _loadRecentSearches() async {

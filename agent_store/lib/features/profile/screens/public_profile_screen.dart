@@ -115,8 +115,19 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           SliverFillRemaining(child: _buildErrorState(ctrl))
         else ...[
           SliverToBoxAdapter(child: _ProfileHeader(wallet: widget.wallet, ctrl: ctrl)),
-          // Stats row
+          // Stats row + follow counts
           SliverToBoxAdapter(child: _StatsRow(ctrl: ctrl)),
+          // Follow button (only for other profiles, not own)
+          if (!_isOwnProfile)
+            SliverToBoxAdapter(
+              child: Obx(() => Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: _FollowSection(
+                  ctrl: ctrl,
+                  isOwnProfile: false,
+                ),
+              )),
+            ),
           // Achievements section
           if (ctrl.badges.isNotEmpty)
             SliverToBoxAdapter(child: _BadgesSection(badges: ctrl.badges)),
@@ -285,6 +296,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                 ),
               ),
             ),
+          // ── Activity Feed ─────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Obx(() => _ActivityFeedSection(ctrl: ctrl)),
+          ),
         ],
       ]),
     ));
@@ -743,6 +758,17 @@ class _PublicProfileController extends GetxController {
   final isLoading = true.obs;
   final error = RxnString();
 
+  // Social state
+  final isFollowing = false.obs;
+  final followerCount = 0.obs;
+  final followingCount = 0.obs;
+  final isFollowLoading = false.obs;
+
+  // Activity feed
+  final activityItems = <Map<String, dynamic>>[].obs;
+  final activityLoading = false.obs;
+  final activityNextCursor = 0.obs;
+
   // Filter/sort state
   final searchQuery = ''.obs;
   final sortMode = 'newest'.obs; // newest, most_saved, most_used
@@ -822,6 +848,8 @@ class _PublicProfileController extends GetxController {
   void onInit() {
     super.onInit();
     load();
+    _loadSocial();
+    loadActivity();
   }
 
   Future<void> load() async {
@@ -841,6 +869,291 @@ class _PublicProfileController extends GetxController {
       error.value = 'Failed to load profile.';
     }
     isLoading.value = false;
+  }
+
+  Future<void> _loadSocial() async {
+    final data = await ApiService.instance.getFollowStatus(wallet);
+    if (data != null) {
+      isFollowing.value = data['is_following'] as bool? ?? false;
+      followerCount.value = (data['followers'] as num?)?.toInt() ?? 0;
+      followingCount.value = (data['following'] as num?)?.toInt() ?? 0;
+    }
+  }
+
+  Future<void> toggleFollow() async {
+    if (isFollowLoading.value) return;
+    isFollowLoading.value = true;
+    final wasFollowing = isFollowing.value;
+    // Optimistic update.
+    isFollowing.value = !wasFollowing;
+    followerCount.value += wasFollowing ? -1 : 1;
+
+    final ok = wasFollowing
+        ? await ApiService.instance.unfollowUser(wallet)
+        : await ApiService.instance.followUser(wallet);
+
+    if (!ok) {
+      // Revert on failure.
+      isFollowing.value = wasFollowing;
+      followerCount.value += wasFollowing ? 1 : -1;
+    }
+    isFollowLoading.value = false;
+  }
+
+  Future<void> loadActivity({bool loadMore = false}) async {
+    if (activityLoading.value) return;
+    activityLoading.value = true;
+    final beforeId = loadMore ? activityNextCursor.value : 0;
+    final data = await ApiService.instance.getActivityFeed(
+      wallet,
+      beforeId: beforeId,
+      limit: 10,
+    );
+    if (data != null) {
+      final items = (data['items'] as List<dynamic>? ?? [])
+          .map((e) => e as Map<String, dynamic>)
+          .toList();
+      if (loadMore) {
+        activityItems.addAll(items);
+      } else {
+        activityItems.value = items;
+      }
+      activityNextCursor.value = (data['next_cursor'] as num?)?.toInt() ?? 0;
+    }
+    activityLoading.value = false;
+  }
+}
+
+// ── Follow Section ──────────────────────────────────────────────────────────
+
+class _FollowSection extends StatelessWidget {
+  final _PublicProfileController ctrl;
+  final bool isOwnProfile;
+  const _FollowSection({required this.ctrl, required this.isOwnProfile});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Follower / Following count pills
+        _CountPill(
+          icon: Icons.people_outline_rounded,
+          count: ctrl.followerCount.value,
+          label: 'followers',
+        ),
+        const SizedBox(width: 10),
+        _CountPill(
+          icon: Icons.person_add_alt_1_outlined,
+          count: ctrl.followingCount.value,
+          label: 'following',
+        ),
+        if (!isOwnProfile) ...[
+          const Spacer(),
+          // Follow / Unfollow button
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: ctrl.isFollowLoading.value
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    key: ValueKey(ctrl.isFollowing.value),
+                    onPressed: ctrl.toggleFollow,
+                    icon: Icon(
+                      ctrl.isFollowing.value
+                          ? Icons.person_remove_outlined
+                          : Icons.person_add_alt_1_outlined,
+                      size: 16,
+                    ),
+                    label: Text(
+                      ctrl.isFollowing.value ? 'Unfollow' : 'Follow',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ctrl.isFollowing.value
+                          ? AppTheme.textM
+                          : AppTheme.primary,
+                      side: BorderSide(
+                        color: ctrl.isFollowing.value
+                            ? AppTheme.border
+                            : AppTheme.primary,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CountPill extends StatelessWidget {
+  final IconData icon;
+  final int count;
+  final String label;
+  const _CountPill({required this.icon, required this.count, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.card2,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: AppTheme.textM),
+        const SizedBox(width: 5),
+        Text(
+          '$count',
+          style: const TextStyle(
+            color: AppTheme.textH,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── Activity Feed Section ───────────────────────────────────────────────────
+
+class _ActivityFeedSection extends StatelessWidget {
+  final _PublicProfileController ctrl;
+  const _ActivityFeedSection({required this.ctrl});
+
+  static const _activityIcons = {
+    'agent_created': (Icons.add_circle_outline_rounded, Color(0xFF66BB6A)),
+    'agent_forked': (Icons.fork_right_rounded, Color(0xFF42A5F5)),
+    'agent_saved': (Icons.bookmark_add_outlined, AppTheme.gold),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    if (ctrl.activityItems.isEmpty && !ctrl.activityLoading.value) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(color: AppTheme.border, height: 32),
+          const Row(children: [
+            Icon(Icons.timeline_rounded, size: 16, color: AppTheme.textM),
+            SizedBox(width: 8),
+            Text(
+              'Recent Activity',
+              style: TextStyle(
+                color: AppTheme.textH,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          if (ctrl.activityLoading.value && ctrl.activityItems.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            ...ctrl.activityItems.map((item) {
+              final type = item['type'] as String? ?? '';
+              final agentTitle = item['agent_title'] as String? ?? 'Unknown agent';
+              final createdAt = item['created_at'] as String?;
+              final (icon, color) = _activityIcons[type] ??
+                  (Icons.circle_outlined, AppTheme.textM);
+              final verb = switch (type) {
+                'agent_created' => 'Created',
+                'agent_forked' => 'Forked',
+                'agent_saved' => 'Saved',
+                _ => type,
+              };
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 16, color: color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          color: AppTheme.textB,
+                          fontSize: 13,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '$verb ',
+                            style: TextStyle(
+                              color: color,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          TextSpan(text: agentTitle),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (createdAt != null)
+                    Text(
+                      _relativeTime(createdAt),
+                      style: const TextStyle(
+                        color: AppTheme.textM,
+                        fontSize: 11,
+                      ),
+                    ),
+                ]),
+              );
+            }),
+          if (ctrl.activityNextCursor.value > 0)
+            TextButton(
+              onPressed: () => ctrl.loadActivity(loadMore: true),
+              child: const Text('Load more'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _relativeTime(String iso) {
+    try {
+      final dt = DateTime.parse(iso).toUtc();
+      final diff = DateTime.now().toUtc().difference(dt);
+      if (diff.inDays > 30) return '${(diff.inDays / 30).floor()}mo ago';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return '';
+    }
   }
 }
 

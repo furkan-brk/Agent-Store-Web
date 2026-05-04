@@ -795,6 +795,65 @@ class _StoreScreenState extends State<StoreScreen> {
     return Padding(
     padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 0),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // ── "For You" section — authenticated users only ──
+      Obx(() {
+        final isAuth = ApiService.instance.isAuthenticated;
+        final agents = _ctrl.forYouAgents;
+        final loading = _ctrl.forYouLoading.value;
+        if (!isAuth) return const SizedBox.shrink();
+        if (!loading && agents.isEmpty) return const SizedBox.shrink();
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(Icons.recommend_rounded, size: 14, color: AppTheme.primary),
+            ),
+            const SizedBox(width: 8),
+            const Text('For You', style: TextStyle(color: AppTheme.textH, fontSize: 14, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            const Text('· personalised picks', style: TextStyle(color: AppTheme.textM, fontSize: 11)),
+          ]),
+          const SizedBox(height: 10),
+          if (loading)
+            SizedBox(
+              height: 120,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: 5,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, __) => Container(
+                  width: 100,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: AppTheme.card,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 112,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: agents.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => _ForYouMiniCard(
+                  agent: agents[i],
+                  onSave: () => _onSaveAgent(agents[i]),
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+          const Divider(color: AppTheme.border, height: 1),
+          const SizedBox(height: 14),
+        ]);
+      }),
       // "Browse by Category" header
       Row(mainAxisSize: MainAxisSize.min, children: [
         Container(
@@ -1023,6 +1082,94 @@ class _HoverTagChipState extends State<_HoverTagChip> {
               fontSize: 11,
               fontWeight: _hovered ? FontWeight.w600 : FontWeight.normal,
             )),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Compact "For You" mini card (horizontal row)
+// ══════════════════════════════════════════════════════════════════════════════
+
+class _ForYouMiniCard extends StatefulWidget {
+  final AgentModel agent;
+  final VoidCallback onSave;
+  const _ForYouMiniCard({required this.agent, required this.onSave});
+
+  @override
+  State<_ForYouMiniCard> createState() => _ForYouMiniCardState();
+}
+
+class _ForYouMiniCardState extends State<_ForYouMiniCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = widget.agent.characterType;
+    final color = type.primaryColor;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => context.go('/agent/${widget.agent.id}'),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 120,
+          height: 112,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _hovered ? AppTheme.card2 : AppTheme.card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _hovered ? color.withValues(alpha: 0.5) : AppTheme.border,
+              width: _hovered ? 1.5 : 1,
+            ),
+            boxShadow: _hovered
+              ? [BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 8, spreadRadius: 1)]
+              : [],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Character type colour strip + save button row
+            Row(children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: widget.onSave,
+                child: Tooltip(
+                  message: 'Save to library',
+                  child: Icon(
+                    Icons.bookmark_add_outlined,
+                    size: 14,
+                    color: _hovered ? AppTheme.gold : AppTheme.textM,
+                  ),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 4),
+            Text(
+              widget.agent.title,
+              style: const TextStyle(
+                color: AppTheme.textH,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Spacer(),
+            Text(
+              widget.agent.category.isEmpty ? type.displayName : widget.agent.category,
+              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ]),
         ),
       ),

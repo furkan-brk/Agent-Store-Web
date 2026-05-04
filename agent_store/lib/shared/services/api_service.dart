@@ -342,12 +342,87 @@ class ApiService {
     return null;
   }
 
-  Future<Map<String, dynamic>?> getLeaderboard() async {
+  Future<Map<String, dynamic>?> getLeaderboard({String window = 'all'}) async {
     try {
-      final res = await http.get(Uri.parse(ApiConstants.leaderboard), headers: _headers);
+      final uri = Uri.parse(ApiConstants.leaderboard).replace(
+        queryParameters: {'window': window},
+      );
+      final res = await http.get(uri, headers: _headers);
       if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) { debugPrint('getLeaderboard: $e'); }
     return null;
+  }
+
+  // ── Social: Follow / Unfollow ────────────────────────────────────────────
+
+  Future<bool> followUser(String wallet) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.apiV1}/users/$wallet/follow'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('followUser: $e'); return false; }
+  }
+
+  Future<bool> unfollowUser(String wallet) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConstants.apiV1}/users/$wallet/follow'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('unfollowUser: $e'); return false; }
+  }
+
+  /// Returns {is_following, followers, following} or null on error.
+  Future<Map<String, dynamic>?> getFollowStatus(String wallet) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.apiV1}/users/$wallet/follow-status'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('getFollowStatus: $e'); }
+    return null;
+  }
+
+  // ── Social: Activity Feed ────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> getActivityFeed(
+    String wallet, {
+    int beforeId = 0,
+    int limit = 20,
+  }) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.apiV1}/users/$wallet/feed').replace(
+        queryParameters: {
+          if (beforeId > 0) 'before_id': '$beforeId',
+          'limit': '$limit',
+        },
+      );
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('getActivityFeed: $e'); }
+    return null;
+  }
+
+  // ── For You recommendations ──────────────────────────────────────────────
+
+  Future<List<AgentModel>> getForYou() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.agents}/for-you'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['agents'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => AgentModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) { debugPrint('getForYou: $e'); }
+    return [];
   }
 
   Future<Map<String, dynamic>?> getPublicProfile(String wallet) async {

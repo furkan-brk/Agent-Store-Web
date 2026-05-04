@@ -437,6 +437,10 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
 	s.cache.Delete("categories")
+	// Record activity (best-effort).
+	s.RecordActivity(input.CreatorWallet, models.ActivityAgentCreated, agent.ID, map[string]any{
+		"title": agent.Title,
+	})
 	return agent, nil
 }
 
@@ -501,6 +505,8 @@ func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
 	database.DB.Model(&models.Agent{}).Where("id = ?", agentID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
+	s.cache.Delete("for-you|" + wallet)
+	s.RecordActivity(wallet, models.ActivityAgentSaved, agentID, nil)
 	return nil
 }
 
@@ -613,6 +619,10 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		database.DB.Create(&entry)
 		database.DB.Model(&models.Agent{}).Where("id = ?", fork.ID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	}
+	s.RecordActivity(creatorWallet, models.ActivityAgentForked, fork.ID, map[string]any{
+		"original_id":    originalID,
+		"original_title": fork.Title,
+	})
 
 	return fork, nil
 }

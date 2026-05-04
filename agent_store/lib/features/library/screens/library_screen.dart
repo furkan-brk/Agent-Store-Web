@@ -13,6 +13,8 @@ import '../../../shared/services/wallet_service.dart';
 import '../../../shared/widgets/achievement_badge.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
+import '../../../controllers/store_controller.dart';
+import '../../character/character_types.dart';
 import '../../store/widgets/agent_card.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -460,9 +462,14 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   Widget _buildEmptySavedState() {
     final isMobile = AppBreakpoints.isMobile(MediaQuery.sizeOf(context).width);
-    return Center(
+    // Pull trending nudge agents from the (permanent) StoreController.
+    final storeCtrl = Get.isRegistered<StoreController>() ? Get.find<StoreController>() : null;
+    final nudgeAgents = storeCtrl?.trendingAgents.take(5).toList() ?? [];
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 40),
+        padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 40, vertical: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -500,6 +507,52 @@ class _LibraryScreenState extends State<LibraryScreen>
               icon: const Icon(Icons.explore_outlined, size: 18),
               label: const Text('Browse the Store'),
             ),
+            // ── Trending nudge ────────────────────────────────────────────
+            if (nudgeAgents.isNotEmpty) ...[
+              const SizedBox(height: 32),
+              const Divider(color: AppTheme.border),
+              const SizedBox(height: 20),
+              const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.trending_up_rounded, size: 14, color: AppTheme.gold),
+                SizedBox(width: 6),
+                Text(
+                  'Try saving these trending agents',
+                  style: TextStyle(
+                    color: AppTheme.textH,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ]),  // const Row
+              const SizedBox(height: 14),
+              SizedBox(
+                height: 116,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: nudgeAgents.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final agent = nudgeAgents[i];
+                    return _TrendingNudgeCard(
+                      agent: agent,
+                      onSave: () async {
+                        final ok = await ApiService.instance.addToLibrary(agent.id);
+                        if (mounted) {
+                          if (ok) {
+                            AppSnackBar.success(context, 'Saved "${agent.title}" to library');
+                            _ctrl.load();
+                          } else {
+                            AppSnackBar.info(context, 'Already in library');
+                          }
+                        }
+                      },
+                      onTap: () => context.go('/agent/${agent.id}'),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ],
         ),
       ),
@@ -1207,6 +1260,105 @@ class _LibraryScreenState extends State<LibraryScreen>
         ],
       )),
     ]);
+}
+
+// ── Trending Nudge Card (library empty state) ─────────────────────────────────
+
+class _TrendingNudgeCard extends StatefulWidget {
+  final AgentModel agent;
+  final VoidCallback onSave;
+  final VoidCallback onTap;
+  const _TrendingNudgeCard({
+    required this.agent,
+    required this.onSave,
+    required this.onTap,
+  });
+
+  @override
+  State<_TrendingNudgeCard> createState() => _TrendingNudgeCardState();
+}
+
+class _TrendingNudgeCardState extends State<_TrendingNudgeCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final type = widget.agent.characterType;
+    final color = type.primaryColor;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 130,
+          height: 116,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: _hovered ? AppTheme.card2 : AppTheme.card,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _hovered ? color.withValues(alpha: 0.5) : AppTheme.border,
+              width: _hovered ? 1.5 : 1,
+            ),
+            boxShadow: _hovered
+                ? [BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 8)]
+                : [],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 8, height: 8,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: widget.onSave,
+                child: Tooltip(
+                  message: 'Save to library',
+                  child: Icon(
+                    Icons.bookmark_add_outlined,
+                    size: 15,
+                    color: _hovered ? AppTheme.gold : AppTheme.textM,
+                  ),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              widget.agent.title,
+              style: const TextStyle(
+                color: AppTheme.textH,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Spacer(),
+            Row(children: [
+              const Icon(Icons.bookmark_rounded, size: 10, color: AppTheme.textM),
+              const SizedBox(width: 3),
+              Text(
+                '${widget.agent.saveCount}',
+                style: const TextStyle(color: AppTheme.textM, fontSize: 10),
+              ),
+              const Spacer(),
+              Text(
+                type.displayName,
+                style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ]),
+          ]),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Filter Chip ───────────────────────────────────────────────────────────────
