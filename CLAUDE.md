@@ -200,6 +200,7 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [x] **v3.9 — Discovery + Engagement** (Backend + Frontend) ✅ social follow, For You, leaderboard time windows, OG meta, activity feed
 - [x] **v3.8 — Explainability + Action Bridge** (Backend + Frontend) ✅ 9 task
 - [x] **v3.7 — Reliability Closure** (Backend + Frontend) ✅ 12 task
 - [~] **v3.6 — Quality Foundation + Mobile Pass + Bug Bash** (in progress)
@@ -299,10 +300,50 @@ route ve Mission→Legend bridge endpoint yok).
 service'iyle aynı modeli paylaşıyor — monolith bağlam altında bu
 katman cross-cutting yerine library reuse oluyor.
 
-**Sırada**: v3.9 Discovery + Engagement (fuzzy/semantic search,
-For You recommendations, Follow/Unfollow + activity feed, OG/Twitter
-dynamic meta, Leaderboard time window selector + personal rank badge,
-deferred Mission→Legend CTA + mention preview).
+## v3.9 Discovery + Engagement (2026-05-04)
+
+**Backend** — `backend/pkg/models/social.go` + `backend/services/agent/social.go` + `social_test.go`:
+- **UserFollow model**: composite `uniqueIndex:idx_follow_pair` (follower+followee), `FollowUser`
+  uses `clause.OnConflict{DoNothing:true}` (idempotent), `UnfollowUser` hard deletes.
+- **UserActivity model**: `idx_activity_wallet_time` composite index; `RecordActivity` has
+  nil-DB guard (`if database.DB == nil { return }`) — goroutine-safe after race-condition fix.
+  All `RecordActivity` calls in CreateAgent/AddToLibrary/ForkAgent are **synchronous** (not goroutines)
+  to avoid t.Cleanup reset race in tests.
+- **GetActivityFeed**: ID-cursor pagination (`before_id`), scope limited to target wallet,
+  ordered by id DESC.
+- **GetForYou**: character_type majority from user's library → ranked store agents, excludes
+  saved IDs + own agents (`strings.ToLower(a.CreatorWallet) == wallet`); trending fallback
+  when < 5 results; 5-min cache keyed `for-you|<wallet>`.
+- **GetLeaderboardWindowed**: raw SQL LEFT JOIN on `library_entries.saved_at >= cutoff` +
+  `agent_use_logs.created_at >= cutoff`; works in both SQLite (tests) and PostgreSQL (prod).
+- **RenderOGHTML**: escapes `&`, `"`, `<`, `>`; `meta http-equiv refresh` → SPA; served at
+  `/api/v1/og/agent/:id` as `text/html; charset=utf-8` with `Cache-Control: public, max-age=3600`.
+- **24 new tests** in social_test.go (follow CRUD, activity cursor, For You exclusions,
+  OG meta fields/truncation/escaping, leaderboard windowed time filtering).
+
+**Frontend**:
+- `api_constants.dart`: `agentsForYou` + `users` endpoints added.
+- `api_service.dart`: `followUser`, `unfollowUser`, `getFollowStatus`, `getActivityFeed`
+  (cursor), `getForYou`, `getLeaderboard` now accepts `window` param.
+- `leaderboard_controller.dart`: `window = 'all'.obs` + `selectWindow` + windowed `load`.
+- `leaderboard_screen.dart`: `_WindowSelector` — 3 chips (7 Days / 30 Days / All Time)
+  with `AnimatedContainer` gold highlight on selected.
+- `public_profile_screen.dart`: `_FollowSection` sliver (follower/following count pills +
+  optimistic Follow/Unfollow — flip state, revert on API failure); `_ActivityFeedSection`
+  sliver (timeline, type icons, relative timestamps, load-more cursor).
+- `store_controller.dart`: `forYouAgents` + `forYouLoading` + `loadForYou` (auth-gated,
+  no-op if unauthenticated or already populated) + `refreshForYou` (clears + reloads).
+- `store_screen.dart`: `_ForYouMiniCard` horizontal row inside `_buildDiscovery()` —
+  auth-only, lazy skeleton placeholders while loading, divider separator.
+- `library_screen.dart`: `_buildEmptySavedState` now renders 5 trending nudge cards
+  (`_TrendingNudgeCard`) pulled from permanent `StoreController.trendingAgents`; save
+  action triggers `_ctrl.load()` to exit empty state immediately.
+
+**Yeni dosyalar**: `backend/pkg/models/social.go`, `backend/services/agent/social.go`,
+`backend/services/agent/social_test.go`.
+
+**Karar**: `RecordActivity` synchronous (not goroutine) because t.Cleanup resets
+`database.DB` before goroutines finish — avoids "no such table" flakiness in tests.
 
 ## v3.7 Reliability Closure (2026-05-04)
 12 task tamamlandı; "stabilite açığı" maddelerinin tümü kapatıldı. Backlog
