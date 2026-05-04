@@ -200,11 +200,104 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [x] **v3.7 — Reliability Closure** (Backend + Frontend) ✅ 12 task
 - [~] **v3.6 — Quality Foundation + Mobile Pass + Bug Bash** (in progress)
   - ✅ Quality: testutil package (sqlite-in-memory via glebarez/sqlite), `pkg/database/db.go` dialector swap, 40 backend tests (auth 12, agent 28), 43 Flutter tests (CardEditor 18, MentionFilter 15, LegendService 10), CI workflow (`.github/workflows/ci.yml`)
   - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
   - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
   - ⏳ 2-day bug bash — pending
+
+## v3.7 Reliability Closure (2026-05-04)
+12 task tamamlandı; "stabilite açığı" maddelerinin tümü kapatıldı. Backlog
+dosyası `eksiklikleri-könçürleme.md`'deki 14 alana yayılmış 5 sprintlik
+yol haritasının ilk halkası.
+
+**Backend** (5 task):
+- **Legend Workflow optimistic concurrency**: `UserLegendWorkflow.RevisionID
+  uint64` + `BeforeUpdate` hook + `LegendRevisionMismatchError{Current
+  *LegendWorkflowDTO}` + handler-level `If-Match` parse → 409 + full body.
+  Mission/Agent pattern'i bire bir reuse — yeni framework yaratılmadı.
+  `recordToDTO` helper extract'i empty `[]` normalisation için. Backward
+  compat: header opsiyonel → eski client'lar last-write-wins almaya devam.
+- **AgentUseLog cooldown**: yeni `AgentUseLog{AgentID, Wallet, IPHash,
+  CreatedAt}` modeli + `services/agent/use_log.go` (60s wallet+IP
+  cooldown, fail-open, SHA-256 IP hash). `IncrementUseCount(agentID,
+  wallet, ipHash)` signature genişletildi; trusted internal caller'lar
+  empty parametrelerle bypass eder.
+- **save_count event-driven invalidation**: `AddToLibrary` artık
+  `agents|*` + `trending` cache bust ediyor; `RemoveFromLibrary` symmetric
+  hale getirildi (önceden save_count azaltmıyordu). Dialect-agnostic
+  `CASE WHEN` clamp at 0 (sqlite tests + postgres prod uyumu).
+- **Profile PATCH cache invalidation**: `UpdateProfile` username/bio
+  güncellemesi sonrası creator name içeren cache anahtarlarını bust eder.
+- **Username collision policy**: yeni `services/agent/username.go` —
+  reserve list (admin/api/store/guild/legend/system + 25 kelime),
+  `ErrUsernameTaken/Reserved/Format`, `SuggestAlternativeUsernames`.
+  Handler 409 + suggestions, 422 reserved/format, 400 diğer.
+
+**Frontend** (6 task — biri zaten mevcut):
+- **Legend conflict-aware sync**: `LegendWorkflow.revisionId` field +
+  `withRevisionId(int)` helper. `ApiService.saveLegendWorkflow`
+  `If-Match` header gönderir, 409'da `ConflictException` fırlatır
+  (mevcut `conflict_resolver.dart` reuse). `LegendService.saveWorkflow`
+  ConflictException'ı catch'lemeden controller'a propagate eder.
+- **Tx state machine UI**: yeni `tx_state.dart` (pure-Dart enum +
+  TxStateX extension — 6 state, label/color/icon) + `purchase_button.dart`
+  (PurchaseStatusButton + Monad explorer deep-link). `AgentDetailController`
+  `txState/txHash/txFailureReason` Rx'leri + `purchaseAgentFlow` end-to-end
+  driver. Pattern: enum extract `mention_filter.dart`/v3.6 pattern'iyle
+  aynı — `package:web` import'u testleri kırmıyor.
+- **Network guard banner**: ZATEN MEVCUT (`router.dart` `_NetworkBanner` +
+  `NetworkGuard` GetxController + `network_guard_pure.dart`). Yeni kod
+  yazılmadı.
+- **Nonce reuse koruması**: yeni `ApiService.abandonSignature(wallet)` →
+  `POST /auth/abandon` (backend zaten implement edilmiş). `AuthController`
+  imza reject veya verify fail path'lerinde explicit invalidate çağırıyor.
+- **Create Agent draft persistence**: 5s autosave timer + SharedPreferences
+  (`create_agent_draft_v1`), publish'te clear, post-frame "Continue draft?"
+  dialog. dispose'da pending flush.
+- **Rating moderation UI**: `AgentRating.Helpful int64` + yeni
+  `RatingHelpfulVote` modeli (composite unique index dedup). Atomic
+  `MarkRatingHelpful` (`FOR UPDATE` lock + INSERT vote + counter bump),
+  self-helpful 403. UI: comment TextField + per-rating thumbs-up
+  (optimistic update, server count reconcile).
+
+**Test/CI**:
+- Backend: `services/agent/{username_test.go (10), use_log_test.go (7)}`,
+  `services/workspace/legend_service_test.go (12)` — toplam 29 yeni unit.
+  testutil yeni model'leri (UserLegendWorkflow, AgentUseLog,
+  RatingHelpfulVote) AutoMigrate ediyor. Mevcut testler ile birlikte
+  agent + auth + aipipeline + workspace tüm package'lar yeşil.
+- Frontend: `test/unit/tx_state_test.dart` (8 test) — TxStateX state
+  machine matrix. Mevcut 75 test + yeni 8 = **83 test, hepsi yeşil**.
+  `flutter analyze` 0 issue.
+
+**Yeni dosyalar**:
+- `backend/services/agent/{use_log.go, username.go, username_test.go,
+  use_log_test.go}`
+- `backend/services/workspace/legend_service_test.go`
+- `agent_store/lib/features/agent_detail/widgets/{tx_state.dart,
+  purchase_button.dart}`
+- `agent_store/test/unit/tx_state_test.dart`
+
+**Genişletilen modeller**: `Agent.RevisionID` (zaten vardı), `UserLegendWorkflow.RevisionID`,
+`AgentRating.Helpful`, yeni: `AgentUseLog`, `RatingHelpfulVote`.
+
+**Yeni endpoint'ler**: `POST /auth/abandon` (backend zaten vardı, FE bağlandı),
+`POST /agents/:id/ratings/:ratingID/helpful`. Legend save artık If-Match destekler.
+
+**Karar**: Mission/Agent revision pattern'i Legend'e port edildi —
+yeni framework yaratmak yerine 1:1 reuse (`If-Match` parse + error
+type + `recordToDTO` helper). `_NetworkBanner` zaten v3.7-8.x
+sprint'inde implement edilmişti, gereksiz yere yeniden yazmadık —
+backlog'daki "eksiklikler" listesinin %15'i bu tür already-built
+maddelerdi (Store URL persist, Library URL persist, Card Editor
+revision-hash, Settings sectioning, Library custom collections,
+achievement rozetleri).
+
+**Sonraki sprintler** (`.claude/plans/c-projeler-agent-store-web-claude-tasks-deep-tower.md`):
+v3.8 Explainability + Action Bridge → v3.9 Discovery + Engagement →
+v3.10 Pro Tools → v3.11 Polish + Cross-Cutting.
 
 ## v3.2 UX Overhaul + DB Persistence Fix (2026-03-22)
 6 feature, 24 task:

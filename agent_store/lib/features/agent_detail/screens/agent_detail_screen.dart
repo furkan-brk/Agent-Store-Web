@@ -15,7 +15,6 @@ import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/mission_service.dart';
-import '../../../shared/services/wallet_service.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
@@ -204,26 +203,20 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
     if (confirmed != true || !mounted) return;
 
-    try {
-      final txHash = await WalletService.instance.sendTransaction(
-        agent.creatorWallet, agent.price,
-      );
-      if (txHash == null) {
-        if (mounted) {
-          AppSnackBar.info(context, 'Transaction cancelled or failed. No funds were sent.');
-        }
-        return;
-      }
-      final ok = await _ctrl.purchaseAgent(txHash, agent.price);
-      if (mounted) {
-        if (ok) {
-          AppSnackBar.success(context, 'Agent purchased successfully!');
-        } else {
-          AppSnackBar.error(context, 'Purchase failed. Try again.');
-        }
-      }
-    } catch (e) {
-      if (mounted) AppSnackBar.error(context, 'Purchase error: $e');
+    // v3.7 tx state machine: every leg of the purchase (sign → mempool →
+    // reconcile → confirmed) lights up a distinct pill in PurchaseStatusButton
+    // and surfaces the on-chain hash with an explorer deep-link. The Snackbar
+    // here is now a low-noise affirmation; the inline pill carries the real UX.
+    final ok = await _ctrl.purchaseAgentFlow(
+      creatorWallet: agent.creatorWallet,
+      priceMon: agent.price,
+    );
+    if (!mounted) return;
+    if (ok) {
+      AppSnackBar.success(context, 'Agent purchased successfully!');
+    } else {
+      final reason = _ctrl.txFailureReason.value ?? 'Purchase failed. Try again.';
+      AppSnackBar.error(context, reason);
     }
   }
 

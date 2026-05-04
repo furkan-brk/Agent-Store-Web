@@ -138,14 +138,35 @@ func (h *Handler) GetLegendWorkflows(c *gin.Context) {
 }
 
 // SaveLegendWorkflow creates or updates a workflow.
+//
+// Supports optimistic concurrency via the If-Match header (uint64 revision id).
+// Header absent → opt-out, last-write-wins behaviour preserved for older clients.
+// Header present and stale → 409 Conflict with the current workflow in the body.
 func (h *Handler) SaveLegendWorkflow(c *gin.Context) {
 	var input SaveLegendWorkflowInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	workflow, err := h.legendSvc.SaveUserWorkflow(c.GetString("wallet"), input)
+
+	// If-Match optimistic concurrency on update path. Absent → opt-out.
+	var ifMatchRev *uint64
+	if raw := strings.Trim(c.GetHeader("If-Match"), `" `); raw != "" {
+		v, perr := strconv.ParseUint(raw, 10, 64)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid If-Match header (must be uint64)"})
+			return
+		}
+		ifMatchRev = &v
+	}
+
+	workflow, err := h.legendSvc.SaveUserWorkflow(c.GetString("wallet"), input, ifMatchRev)
 	if err != nil {
+		var revErr *LegendRevisionMismatchError
+		if errors.As(err, &revErr) {
+			c.JSON(http.StatusConflict, revErr.Current)
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

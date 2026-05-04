@@ -3,9 +3,13 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import 'package:web/web.dart' as web;
+import 'dart:js_interop';
 import '../../../app/theme.dart';
 import '../../../controllers/guild_master_controller.dart';
 import '../../../features/character/character_types.dart';
+import '../../../features/legend/models/workflow_models.dart';
+import '../../../features/legend/services/legend_service.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../widgets/mention_composer.dart';
 
@@ -15,6 +19,77 @@ String _fmt(DateTime t) {
   final h = t.hour.toString().padLeft(2, '0');
   final m = t.minute.toString().padLeft(2, '0');
   return '$h:$m';
+}
+
+void _downloadMarkdown(String filename, String content) {
+  final blob = web.Blob(
+    [content.toJS].toJS,
+    web.BlobPropertyBag(type: 'text/markdown'),
+  );
+  final url = web.URL.createObjectURL(blob);
+  final anchor = web.HTMLAnchorElement()
+    ..href = url
+    ..download = filename;
+  web.document.body?.append(anchor);
+  anchor.click();
+  anchor.remove();
+  web.URL.revokeObjectURL(url);
+}
+
+void _exportChat(GuildMasterController ctrl) {
+  final teamName = ctrl.suggestion.value?['suggested_name'] as String? ?? 'Guild Session';
+  final agents = ctrl.teamAgents.map((a) => a['title'] as String? ?? 'Agent').join(', ');
+  final buf = StringBuffer();
+  buf.writeln('# Guild Session: $teamName');
+  buf.writeln('## Team: $agents');
+  buf.writeln();
+  buf.writeln('---');
+  buf.writeln();
+  buf.writeln('## Messages');
+  buf.writeln();
+  for (final msg in ctrl.allMessages) {
+    if (msg.isPrivateMarker) continue;
+    final who = msg.isUser ? 'User' : (msg.agentTitle ?? 'Agent');
+    buf.writeln('[${_fmt(msg.timestamp)}] **$who**: ${msg.text}');
+    buf.writeln();
+  }
+  _downloadMarkdown('guild_session_${DateTime.now().millisecondsSinceEpoch}.md', buf.toString());
+}
+
+void _sendTeamToLegend(BuildContext context, GuildMasterController ctrl) {
+  final name = ctrl.suggestion.value?['suggested_name'] as String? ?? 'Guild Team';
+  final wf = LegendService.instance.newWorkflow(name);
+  final nodes = <WorkflowNode>[];
+  final edges = <WorkflowEdge>[];
+
+  final startId = '${wf.id}_start';
+  nodes.add(WorkflowNode(id: startId, type: WorkflowNodeType.start, label: 'START', x: 60, y: 100));
+
+  for (int i = 0; i < ctrl.teamAgents.length; i++) {
+    final agent = ctrl.teamAgents[i];
+    final nodeId = '${wf.id}_agent_$i';
+    nodes.add(WorkflowNode(
+      id: nodeId,
+      type: WorkflowNodeType.agent,
+      label: agent['title'] as String? ?? 'Agent',
+      x: 60 + (i + 1) * 260.0,
+      y: 100,
+      refId: agent['id']?.toString(),
+    ));
+    final prevId = i == 0 ? startId : '${wf.id}_agent_${i - 1}';
+    edges.add(WorkflowEdge(id: '${prevId}_$nodeId', fromId: prevId, toId: nodeId));
+  }
+
+  final endId = '${wf.id}_end';
+  final lastX = 60 + (ctrl.teamAgents.length + 1) * 260.0;
+  nodes.add(WorkflowNode(id: endId, type: WorkflowNodeType.end, label: 'END', x: lastX, y: 100));
+  if (nodes.length > 1) {
+    final prev = nodes[nodes.length - 2];
+    edges.add(WorkflowEdge(id: '${prev.id}_$endId', fromId: prev.id, toId: endId));
+  }
+
+  LegendService.instance.saveWorkflow(wf.copyWithNodes(nodes, edges));
+  context.go('/legend');
 }
 
 const _kExamplePrompts = [
@@ -374,6 +449,20 @@ class _LeftPanel extends StatelessWidget {
                 label: const Text('New Problem'),
                 onPressed: ctrl.reset,
               ),
+              const SizedBox(height: AppSpacing.sm),
+              Obx(() => ctrl.teamAgents.isNotEmpty
+                  ? FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: AppTheme.primary, width: 0.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.account_tree_outlined, size: 16),
+                      label: const Text('Open in Legend'),
+                      onPressed: () => _sendTeamToLegend(context, ctrl),
+                    )
+                  : const SizedBox.shrink()),
             ],
           ),
         ),
@@ -397,52 +486,148 @@ class _AgentCheckTile extends StatefulWidget {
 class _AgentCheckTileState extends State<_AgentCheckTile> {
   bool _hovered = false;
 
-  void _showLeaderMenu(BuildContext context) {
-    final RenderBox box = context.findRenderObject() as RenderBox;
-    final offset = box.localToGlobal(Offset.zero);
-    final isLeader = widget.ctrl.leaderAgentId.value == widget.agentId;
-    showMenu<String>(
+  void _showAgentDetail(BuildContext context) {
+    final agent = widget.agent;
+    final charType = characterTypeFromString(agent['character_type'] as String? ?? '');
+    final color = charType.primaryColor;
+    final agentId = widget.agentId;
+    final outerContext = context;
+
+    showModalBottomSheet(
       context: context,
-      color: AppTheme.card2,
-      position: RelativeRect.fromLTRB(offset.dx, offset.dy + box.size.height, offset.dx + box.size.width, 0),
-      items: [
-        PopupMenuItem(
-          value: 'leader',
-          child: Row(children: [
-            Icon(
-              isLeader ? Icons.star_border_rounded : Icons.star_rounded,
-              size: 14,
-              color: AppTheme.gold,
+      backgroundColor: AppTheme.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.border2,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              isLeader ? 'Remove Leader' : 'Set as Leader',
-              style: const TextStyle(color: AppTheme.textH, fontSize: 13),
-            ),
-          ]),
+            Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: color.withValues(alpha: 0.4)),
+                ),
+                child: Icon(_charTypeIcon(charType), color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      agent['title'] as String? ?? 'Agent',
+                      style: const TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(charType.displayName,
+                            style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(agent['category'] as String? ?? '',
+                          style: const TextStyle(color: AppTheme.textM, fontSize: 10)),
+                    ]),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            const Divider(color: AppTheme.border),
+            const SizedBox(height: 8),
+            if ((agent['description'] as String?)?.isNotEmpty == true) ...[
+              const Text('Description',
+                  style: TextStyle(color: AppTheme.textM, fontSize: 11, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(
+                agent['description'] as String? ?? '',
+                style: const TextStyle(color: AppTheme.textB, fontSize: 13, height: 1.4),
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 10),
+            ],
+            if ((agent['prompt'] as String?)?.isNotEmpty == true) ...[
+              const Text('Prompt Preview',
+                  style: TextStyle(color: AppTheme.textM, fontSize: 11, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: Text(
+                  (agent['prompt'] as String? ?? '').length > 300
+                      ? '${(agent['prompt'] as String).substring(0, 300)}...'
+                      : agent['prompt'] as String,
+                  style: const TextStyle(
+                      color: AppTheme.textB, fontSize: 11, height: 1.5, fontFamily: 'monospace'),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.open_in_new, size: 14),
+                  label: const Text('View Full'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primary,
+                    side: const BorderSide(color: AppTheme.primary),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(sheetCtx);
+                    outerContext.push('/agent/$agentId');
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Obx(() {
+                  final isLeader = widget.ctrl.leaderAgentId.value == agentId;
+                  return FilledButton.icon(
+                    icon: Icon(isLeader ? Icons.star_border_rounded : Icons.star_rounded, size: 14),
+                    label: Text(isLeader ? 'Remove Leader' : 'Set Leader'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppTheme.gold,
+                      foregroundColor: const Color(0xFF1E1A14),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(sheetCtx);
+                      widget.ctrl.setLeader(agentId);
+                    },
+                  );
+                }),
+              ),
+            ]),
+          ],
         ),
-        PopupMenuItem(
-          value: 'toggle',
-          child: Row(children: [
-            Icon(
-              widget.ctrl.selectedAgentIds.contains(widget.agentId)
-                  ? Icons.toggle_off_rounded
-                  : Icons.toggle_on_rounded,
-              size: 14,
-              color: AppTheme.primary,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              widget.ctrl.selectedAgentIds.contains(widget.agentId) ? 'Deactivate' : 'Activate',
-              style: const TextStyle(color: AppTheme.textH, fontSize: 13),
-            ),
-          ]),
-        ),
-      ],
-    ).then((val) {
-      if (val == 'leader') widget.ctrl.setLeader(widget.agentId);
-      if (val == 'toggle') widget.ctrl.toggleAgentSelection(widget.agentId);
-    });
+      ),
+    );
   }
 
   @override
@@ -461,7 +646,7 @@ class _AgentCheckTileState extends State<_AgentCheckTile> {
         onExit: (_) => setState(() => _hovered = false),
         child: GestureDetector(
           onTap: () => widget.ctrl.switchToTab(widget.agentId),
-          onLongPress: () => _showLeaderMenu(context),
+          onLongPress: () => _showAgentDetail(context),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 140),
             margin: const EdgeInsets.only(bottom: 6),
@@ -588,6 +773,29 @@ class _ChatArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(children: [
+      Container(
+        height: 36,
+        color: AppTheme.surface,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        child: Row(children: [
+          Obx(() {
+            final name = ctrl.suggestion.value?['suggested_name'] as String? ?? 'Guild Session';
+            return Text(name,
+                style: const TextStyle(
+                    color: AppTheme.textM, fontSize: 11, fontWeight: FontWeight.w600));
+          }),
+          const Spacer(),
+          Tooltip(
+            message: 'Export chat as Markdown',
+            child: IconButton(
+              icon: const Icon(Icons.download_outlined, color: AppTheme.textM, size: 16),
+              onPressed: () => _exportChat(ctrl),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            ),
+          ),
+        ]),
+      ),
       _TabBar(ctrl: ctrl),
       Expanded(child: _MessageList(ctrl: ctrl)),
       _InputArea(ctrl: ctrl),

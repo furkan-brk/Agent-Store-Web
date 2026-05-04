@@ -66,11 +66,22 @@ type SaveLegendWorkflowInput struct {
 
 // LegendWorkflowDTO is the response representation of a workflow.
 type LegendWorkflowDTO struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	Nodes     json.RawMessage `json:"nodes"`
-	Edges     json.RawMessage `json:"edges"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID         string          `json:"id"`
+	Name       string          `json:"name"`
+	Nodes      json.RawMessage `json:"nodes"`
+	Edges      json.RawMessage `json:"edges"`
+	RevisionID uint64          `json:"revision_id"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+}
+
+// LegendRevisionMismatchError signals an If-Match precondition failure on a workflow.
+// The handler converts this to 409 Conflict with the current workflow in the body.
+type LegendRevisionMismatchError struct {
+	Current *LegendWorkflowDTO
+}
+
+func (e *LegendRevisionMismatchError) Error() string {
+	return "revision mismatch"
 }
 
 // WorkflowNodeParsed is the internal representation of a workflow node.
@@ -148,18 +159,44 @@ func (s *LegendService) ListUserWorkflows(wallet string) ([]LegendWorkflowDTO, e
 			edges = json.RawMessage("[]")
 		}
 		result = append(result, LegendWorkflowDTO{
-			ID:        record.ClientID,
-			Name:      record.Name,
-			Nodes:     nodes,
-			Edges:     edges,
-			UpdatedAt: record.UpdatedAt,
+			ID:         record.ClientID,
+			Name:       record.Name,
+			Nodes:      nodes,
+			Edges:      edges,
+			RevisionID: record.RevisionID,
+			UpdatedAt:  record.UpdatedAt,
 		})
 	}
 	return result, nil
 }
 
+// recordToDTO converts a UserLegendWorkflow model row to a LegendWorkflowDTO,
+// normalising empty JSON fields to "[]".
+func recordToDTO(record *models.UserLegendWorkflow) *LegendWorkflowDTO {
+	nodes := json.RawMessage(record.NodesJSON)
+	edges := json.RawMessage(record.EdgesJSON)
+	if len(nodes) == 0 {
+		nodes = json.RawMessage("[]")
+	}
+	if len(edges) == 0 {
+		edges = json.RawMessage("[]")
+	}
+	return &LegendWorkflowDTO{
+		ID:         record.ClientID,
+		Name:       record.Name,
+		Nodes:      nodes,
+		Edges:      edges,
+		RevisionID: record.RevisionID,
+		UpdatedAt:  record.UpdatedAt,
+	}
+}
+
 // SaveUserWorkflow creates or updates a workflow after validation.
-func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflowInput) (*LegendWorkflowDTO, error) {
+//
+// If ifMatchRev is non-nil and the row already exists, it must equal the row's
+// current RevisionID — otherwise a *LegendRevisionMismatchError is returned.
+// On create (no existing row), If-Match is ignored.
+func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflowInput, ifMatchRev *uint64) (*LegendWorkflowDTO, error) {
 	if err := validateWorkflowInput(input); err != nil {
 		return nil, err
 	}
@@ -167,12 +204,18 @@ func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflow
 	wallet = strings.ToLower(wallet)
 	record := &models.UserLegendWorkflow{}
 	err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, input.ID).First(record).Error
+	existed := err == nil
 	if err != nil {
 		record = &models.UserLegendWorkflow{
 			UserWallet: wallet,
 			ClientID:   input.ID,
 		}
 	}
+
+	if existed && ifMatchRev != nil && *ifMatchRev != record.RevisionID {
+		return nil, &LegendRevisionMismatchError{Current: recordToDTO(record)}
+	}
+
 	updatedAt := input.UpdatedAt.Time
 	if updatedAt.IsZero() {
 		updatedAt = time.Now()
@@ -186,13 +229,7 @@ func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflow
 		return nil, err
 	}
 
-	return &LegendWorkflowDTO{
-		ID:        record.ClientID,
-		Name:      record.Name,
-		Nodes:     json.RawMessage(record.NodesJSON),
-		Edges:     json.RawMessage(record.EdgesJSON),
-		UpdatedAt: record.UpdatedAt,
-	}, nil
+	return recordToDTO(record), nil
 }
 
 // BatchSyncWorkflows upserts multiple workflows in one request and returns the

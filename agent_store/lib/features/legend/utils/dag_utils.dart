@@ -1,5 +1,7 @@
 // lib/features/legend/utils/dag_utils.dart
 
+import 'dart:math' as math;
+
 import '../models/workflow_models.dart';
 
 /// Topological sort using Kahn's algorithm.
@@ -48,6 +50,43 @@ String detectWorkflowType(List<WorkflowNode> nodes, List<WorkflowEdge> edges) {
   if (!hasFanOut && !hasFanIn) return 'sequential';
   if (hasFanOut && !hasFanIn) return 'parallel';
   return 'hierarchical';
+}
+
+/// BFS from all zero-in-degree nodes. Returns map<nodeId, level>.
+Map<String, int> assignLevels(
+    List<WorkflowNode> nodes, List<WorkflowEdge> edges) {
+  final adj = <String, List<String>>{};
+  final inDegree = <String, int>{};
+  for (final n in nodes) {
+    adj[n.id] = [];
+    inDegree[n.id] = 0;
+  }
+  for (final e in edges) {
+    adj[e.fromId]?.add(e.toId);
+    inDegree[e.toId] = (inDegree[e.toId] ?? 0) + 1;
+  }
+  final queue = <String>[];
+  final levels = <String, int>{};
+  for (final entry in inDegree.entries) {
+    if (entry.value == 0) {
+      queue.add(entry.key);
+      levels[entry.key] = 0;
+    }
+  }
+  while (queue.isNotEmpty) {
+    final cur = queue.removeAt(0);
+    for (final neighbor in adj[cur] ?? <String>[]) {
+      inDegree[neighbor] = (inDegree[neighbor] ?? 1) - 1;
+      levels[neighbor] =
+          math.max(levels[neighbor] ?? 0, (levels[cur] ?? 0) + 1);
+      if (inDegree[neighbor] == 0) queue.add(neighbor);
+    }
+  }
+  // Assign any disconnected nodes to level 0
+  for (final n in nodes) {
+    levels.putIfAbsent(n.id, () => 0);
+  }
+  return levels;
 }
 
 /// Get ordered agent nodes (excluding start/end) in topological order.

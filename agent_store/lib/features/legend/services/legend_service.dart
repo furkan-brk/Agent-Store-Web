@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/workflow_models.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/conflict_resolver.dart' show ConflictException;
 import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/services/mission_service.dart' show SyncStatus;
 
@@ -190,6 +191,19 @@ class LegendService {
     }
   }
 
+  /// Saves a workflow locally, then to the backend.
+  ///
+  /// On a successful backend round-trip, the returned workflow carries the
+  /// server's bumped [LegendWorkflow.revisionId] so subsequent saves use the
+  /// fresh revision in the If-Match header.
+  ///
+  /// If the backend rejects the write with 409 (concurrent edit from another
+  /// tab/device), this method **rethrows [ConflictException]** without
+  /// reverting local state — callers (Legend screen / controller) must catch
+  /// it and route through `ConflictResolver` to let the user pick mine /
+  /// theirs / merge. After the resolver completes, the caller is responsible
+  /// for invoking [saveWorkflow] again with the chosen workflow (the resolver
+  /// will have updated the workflow's revisionId via its keep-mine retry).
   Future<LegendWorkflow> saveWorkflow(LegendWorkflow wf) async {
     _workflows.removeWhere((w) => w.id == wf.id);
     _workflows.insert(0, wf);
@@ -197,6 +211,8 @@ class LegendService {
     await _persist();
     if (ApiService.instance.isAuthenticated) {
       final saved = await ApiService.instance.saveLegendWorkflow(wf);
+      // ConflictException is rethrown by ApiService; reaching here with null
+      // means a non-409 transport failure (offline, 5xx). Keep local state.
       if (saved != null) {
         _workflows.removeWhere((w) => w.id == saved.id);
         _workflows.insert(0, saved);

@@ -5,8 +5,12 @@ class ApiConstants {
   );
   static const String apiV1      = '$baseUrl/api/v1';
   static const String agents     = '$apiV1/agents';
-  static const String authNonce  = '$apiV1/auth/nonce';
-  static const String authVerify = '$apiV1/auth/verify';
+  static const String authNonce   = '$apiV1/auth/nonce';
+  static const String authVerify  = '$apiV1/auth/verify';
+  // Frontend → backend "I dropped the signing request" hint so the stored
+  // nonce can be invalidated even when no verify call ever happens (user
+  // closed the popup, MetaMask threw, signature timed out, etc.).
+  static const String authAbandon = '$apiV1/auth/abandon';
   static const String userLibrary = '$apiV1/user/library';
   static const String userCredits = '$apiV1/user/credits';
   static const String userProfile = '$apiV1/user/profile';

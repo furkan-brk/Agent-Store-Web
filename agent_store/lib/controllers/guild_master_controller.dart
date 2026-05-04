@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/mission_service.dart';
@@ -46,6 +49,8 @@ class GuildChatMessage {
 // ── Controller ────────────────────────────────────────────────────────────────
 
 class GuildMasterController extends GetxController {
+  static const _kTeamKey = 'gm_team_v1';
+
   final List<Map<String, dynamic>>? initialAgents;
   final String? initialGuildName;
   GuildMasterController({this.initialAgents, this.initialGuildName});
@@ -112,6 +117,55 @@ class GuildMasterController extends GetxController {
       phase.value = GuildMasterPhase.ready;
     }
     ensureLibraryLoaded();
+    if (initialAgents == null || initialAgents!.isEmpty) {
+      _tryRestoreTeam();
+    }
+  }
+
+  // ── Persistence ─────────────────────────────────────────────────────────────
+
+  Future<void> _saveTeam() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = jsonEncode({
+        'suggestion': suggestion.value,
+        'team_agents': teamAgents.toList(),
+        'selected_ids': selectedAgentIds.toList(),
+        'leader_id': leaderAgentId.value,
+      });
+      await prefs.setString(_kTeamKey, data);
+    } catch (_) {}
+  }
+
+  Future<void> _tryRestoreTeam() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kTeamKey);
+      if (raw == null) return;
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final agents = (data['team_agents'] as List<dynamic>?)
+          ?.map((e) => e as Map<String, dynamic>)
+          .toList();
+      if (agents == null || agents.isEmpty) return;
+      suggestion.value = data['suggestion'] as Map<String, dynamic>?;
+      teamAgents.value = agents;
+      _initThreads();
+      final ids = (data['selected_ids'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          [];
+      selectedAgentIds.value = ids;
+      final leader = data['leader_id'];
+      leaderAgentId.value = leader != null ? (leader as num).toInt() : null;
+      phase.value = GuildMasterPhase.ready;
+    } catch (_) {}
+  }
+
+  Future<void> _clearSavedTeam() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kTeamKey);
+    } catch (_) {}
   }
 
   // ── Library loading ─────────────────────────────────────────────────────────
@@ -198,6 +252,7 @@ class GuildMasterController extends GetxController {
     allMessages.clear();
     activeTabId.value = null;
     phase.value = GuildMasterPhase.ready;
+    _saveTeam();
   }
 
   // ── Per-agent selection ─────────────────────────────────────────────────────
@@ -418,6 +473,7 @@ class GuildMasterController extends GetxController {
     activeTabId.value = null;
     error.value = null;
     exampleHint.value = null;
+    _clearSavedTeam();
   }
 
   // ── Utilities ───────────────────────────────────────────────────────────────

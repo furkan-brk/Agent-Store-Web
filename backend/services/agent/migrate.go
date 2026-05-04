@@ -17,6 +17,8 @@ func Migrate() {
 		&models.LibraryEntry{},
 		&models.PurchasedAgent{},
 		&models.AgentRating{},
+		&models.RatingHelpfulVote{},
+		&models.AgentUseLog{},
 		&models.TrialUse{},
 		&models.TrialToken{},
 		&models.CreditTransaction{},

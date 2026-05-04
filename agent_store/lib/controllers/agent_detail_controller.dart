@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import '../features/agent_detail/widgets/purchase_button.dart' show TxState, TxStateX;
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/notification_service.dart';
@@ -19,6 +20,15 @@ class AgentDetailController extends GetxController {
   final isLibraryLoading = false.obs;
   final credits = 999.obs;
   final copied = false.obs;
+
+  // ── Purchase tx state machine (v3.7) ────────────────────────────────────
+  // Surfaces the four legs of a purchase (signing, mempool, reconcile,
+  // settled) separately so the UI can show distinct copy + an explorer link.
+  // The legacy [isPurchaseLoading] bool stays in sync with [txState.isInFlight]
+  // so the existing inline call sites keep working without refactor.
+  final txState = TxState.idle.obs;
+  final txHash = Rxn<String>();
+  final txFailureReason = Rxn<String>();
 
   // ── Trial state (encrypted CLI flow) ─────────────────────────────────────
   final isTrialLoading = false.obs;
@@ -109,9 +119,9 @@ class AgentDetailController extends GetxController {
     return forked;
   }
 
-  Future<bool> purchaseAgent(String txHash, double amountMon) async {
+  Future<bool> purchaseAgent(String hash, double amountMon) async {
     isPurchaseLoading.value = true;
-    final ok = await ApiService.instance.purchaseAgent(agentId, txHash, amountMon: amountMon);
+    final ok = await ApiService.instance.purchaseAgent(agentId, hash, amountMon: amountMon);
     if (ok) {
       isPurchased.value = true;
       // Reload the agent to get the full prompt now that it is owned
@@ -119,6 +129,69 @@ class AgentDetailController extends GetxController {
     }
     isPurchaseLoading.value = false;
     return ok;
+  }
+
+  /// Resets the tx state machine to [TxState.idle]. Called when the user
+  /// dismisses a failure or starts a fresh purchase. Does not clear
+  /// [isPurchased] — that's a server-confirmed flag, not a tx-machine flag.
+  void resetTxState() {
+    txState.value = TxState.idle;
+    txHash.value = null;
+    txFailureReason.value = null;
+    isPurchaseLoading.value = false;
+  }
+
+  /// Drives a purchase end-to-end through the tx state machine.
+  ///
+  /// Steps:
+  ///   1. signingPending — wallet popup. On reject → failed.
+  ///   2. txPending      — wallet returned a hash; chain hasn't included it.
+  ///   3. confirming     — backend reconciles the on-chain tx.
+  ///   4. confirmed      — purchase recorded, agent reloaded, ownership flips.
+  ///
+  /// Each leg sets [txState], [txHash], or [txFailureReason] so the UI can
+  /// render the correct pill and explorer link without polling internals.
+  Future<bool> purchaseAgentFlow({
+    required String creatorWallet,
+    required double priceMon,
+  }) async {
+    if (txState.value.isInFlight) return false;
+    resetTxState();
+    txState.value = TxState.signingPending;
+    isPurchaseLoading.value = true;
+    try {
+      final hash = await WalletService.instance.sendTransaction(creatorWallet, priceMon);
+      if (hash == null || hash.isEmpty) {
+        txState.value = TxState.failed;
+        txFailureReason.value = 'Transaction cancelled in wallet.';
+        isPurchaseLoading.value = false;
+        return false;
+      }
+      txHash.value = hash;
+      txState.value = TxState.txPending;
+
+      // Brief pause so the user actually perceives the txPending state — the
+      // backend reconcile usually starts within one block; we don't try to
+      // poll the chain ourselves, we let the backend verify.
+      txState.value = TxState.confirming;
+      final ok = await ApiService.instance.purchaseAgent(agentId, hash, amountMon: priceMon);
+      if (!ok) {
+        txState.value = TxState.failed;
+        txFailureReason.value = 'Backend could not confirm the transaction. The funds are safe — please retry.';
+        isPurchaseLoading.value = false;
+        return false;
+      }
+      isPurchased.value = true;
+      await load();
+      txState.value = TxState.confirmed;
+      isPurchaseLoading.value = false;
+      return true;
+    } catch (e) {
+      txState.value = TxState.failed;
+      txFailureReason.value = 'Unexpected error: $e';
+      isPurchaseLoading.value = false;
+      return false;
+    }
   }
 
   bool get canFork => credits.value >= 5;

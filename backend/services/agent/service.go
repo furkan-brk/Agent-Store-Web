@@ -485,6 +485,10 @@ func (s *AgentService) GetLibrary(wallet string) ([]models.LibraryEntry, error) 
 }
 
 // AddToLibrary adds an agent to a user's library.
+//
+// Idempotent: re-adding an already-saved agent is a no-op (no save_count bump).
+// On a fresh insert, bumps the agent's save_count and busts the agents/trending
+// cache so list and trending endpoints reflect the new count immediately.
 func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
 	var existing models.LibraryEntry
 	if database.DB.Where("user_wallet = ? AND agent_id = ?", wallet, agentID).First(&existing).Error == nil {
@@ -495,12 +499,30 @@ func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
 		return err
 	}
 	database.DB.Model(&models.Agent{}).Where("id = ?", agentID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
+	s.cache.DeletePrefix("agents|")
+	s.cache.Delete("trending")
 	return nil
 }
 
 // RemoveFromLibrary removes an agent from a user's library.
+//
+// Symmetric with AddToLibrary: decrements the agent's save_count (clamped at 0)
+// and busts the agents/trending cache. Also no-op if the entry didn't exist.
 func (s *AgentService) RemoveFromLibrary(wallet string, agentID uint) error {
-	return database.DB.Where("user_wallet = ? AND agent_id = ?", wallet, agentID).Delete(&models.LibraryEntry{}).Error
+	res := database.DB.Where("user_wallet = ? AND agent_id = ?", wallet, agentID).Delete(&models.LibraryEntry{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected > 0 {
+		// CASE WHEN clamps at 0 in case of any race or pre-existing skew.
+		// Dialect-agnostic; works on both Postgres (prod) and sqlite (tests).
+		database.DB.Model(&models.Agent{}).
+			Where("id = ?", agentID).
+			UpdateColumn("save_count", gorm.Expr("CASE WHEN save_count > 0 THEN save_count - 1 ELSE 0 END"))
+		s.cache.DeletePrefix("agents|")
+		s.cache.Delete("trending")
+	}
+	return nil
 }
 
 // GetUserCredits returns the credit balance for a wallet.
@@ -1010,6 +1032,53 @@ func (s *AgentService) GetUserRating(agentID uint, wallet string) int {
 	return r.Rating
 }
 
+// MarkRatingHelpful records a wallet's "helpful" upvote on a specific rating
+// and returns the new helpful count (or the existing count if the wallet
+// already voted). Idempotent: a second call from the same wallet is a no-op.
+//
+// The transaction holds a row-level lock on the AgentRating row so concurrent
+// upvotes from different wallets cannot race past the unique-index check on
+// RatingHelpfulVote and over-count the counter.
+func (s *AgentService) MarkRatingHelpful(ratingID uint, wallet string) (int64, error) {
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return 0, fmt.Errorf("wallet required")
+	}
+	var newHelpful int64
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		var rating models.AgentRating
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").
+			Where("id = ?", ratingID).First(&rating).Error; err != nil {
+			return fmt.Errorf("rating %d not found: %w", ratingID, err)
+		}
+		// Self-helpful is disallowed — the author can't boost their own rating.
+		if strings.EqualFold(rating.Wallet, wallet) {
+			return fmt.Errorf("cannot mark your own rating as helpful")
+		}
+		// Already voted? Return current count, no change.
+		var existing models.RatingHelpfulVote
+		err := tx.Where("rating_id = ? AND wallet = ?", ratingID, wallet).First(&existing).Error
+		if err == nil {
+			newHelpful = rating.Helpful
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		// Insert vote + bump counter atomically.
+		if err := tx.Create(&models.RatingHelpfulVote{RatingID: ratingID, Wallet: wallet}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&rating).
+			UpdateColumn("helpful", gorm.Expr("helpful + 1")).Error; err != nil {
+			return err
+		}
+		newHelpful = rating.Helpful + 1
+		return nil
+	})
+	return newHelpful, err
+}
+
 // TopUpCredits grants credits after verifying MON payment on-chain. Writes
 // both the legacy CreditTransaction (with tx_hash for replay protection) and
 // a CreditLedgerEntry (action_type=topup, breakdown carries amount_mon + tx_hash).
@@ -1067,19 +1136,46 @@ func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) er
 }
 
 // UpdateProfile updates username and bio.
+//
+// Validates length and uniqueness, applies a username reservation policy, and
+// busts the agents/trending cache so any creator name renderings refresh on
+// the next list/trending fetch (60-120s TTL otherwise leaves stale names).
 func (s *AgentService) UpdateProfile(wallet string, input UpdateProfileInput) error {
-	if len(input.Username) > 32 {
+	username := strings.TrimSpace(input.Username)
+	if len(username) > 32 {
 		return errors.New("username too long (max 32)")
 	}
 	if len(input.Bio) > 160 {
 		return errors.New("bio too long (max 160)")
 	}
-	return database.DB.Model(&models.User{}).
+	if username != "" {
+		if err := validateUsername(username); err != nil {
+			return err
+		}
+		// Uniqueness check — case-insensitive, exclude self.
+		var existing models.User
+		err := database.DB.
+			Where("LOWER(username) = LOWER(?) AND wallet_address <> ?", username, wallet).
+			First(&existing).Error
+		if err == nil {
+			return ErrUsernameTaken
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+
+	if err := database.DB.Model(&models.User{}).
 		Where("wallet_address = ?", wallet).
 		Updates(map[string]any{
-			"username": input.Username,
+			"username": username,
 			"bio":      input.Bio,
-		}).Error
+		}).Error; err != nil {
+		return err
+	}
+	s.cache.DeletePrefix("agents|")
+	s.cache.Delete("trending")
+	return nil
 }
 
 // GetUserProfile returns public profile data for a wallet.
@@ -1138,10 +1234,18 @@ func (s *AgentService) DeductCreditsExternal(wallet string, amount int64, txType
 }
 
 // IncrementUseCount bumps the use_count for an agent. Exposed for internal API.
-func (s *AgentService) IncrementUseCount(agentID uint) {
+// Anti-abuse: callers may pass a wallet and/or ip_hash to invoke a 60-second
+// cooldown window via recordUseAttempt; pass empty strings for unconditional
+// internal increments (workflow execution, trusted server-to-server calls).
+// Returns true if the count was actually applied, false if it was suppressed.
+func (s *AgentService) IncrementUseCount(agentID uint, wallet, ipHash string) bool {
+	if (wallet != "" || ipHash != "") && !recordUseAttempt(agentID, wallet, ipHash) {
+		return false
+	}
 	database.DB.Model(&models.Agent{}).
 		Where("id = ?", agentID).
 		UpdateColumn("use_count", gorm.Expr("use_count + 1"))
+	return true
 }
 
 // expectedToAddresses returns the set of valid destination addresses for on-chain payments.

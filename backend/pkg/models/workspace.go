@@ -31,14 +31,26 @@ func (m *UserMission) BeforeUpdate(tx *gorm.DB) error {
 }
 
 type UserLegendWorkflow struct {
-	ID         uint      `gorm:"primaryKey;autoIncrement" json:"-"`
-	UserWallet string    `gorm:"column:user_wallet;not null;index;uniqueIndex:idx_user_workflow_client" json:"-"`
-	ClientID   string    `gorm:"column:client_id;not null;uniqueIndex:idx_user_workflow_client" json:"id"`
-	Name       string    `gorm:"column:name;not null" json:"name"`
-	NodesJSON  string    `gorm:"column:nodes_json;type:jsonb;not null;default:'[]'" json:"-"`
-	EdgesJSON  string    `gorm:"column:edges_json;type:jsonb;not null;default:'[]'" json:"-"`
+	ID         uint   `gorm:"primaryKey;autoIncrement" json:"-"`
+	UserWallet string `gorm:"column:user_wallet;not null;index;uniqueIndex:idx_user_workflow_client" json:"-"`
+	ClientID   string `gorm:"column:client_id;not null;uniqueIndex:idx_user_workflow_client" json:"id"`
+	Name       string `gorm:"column:name;not null" json:"name"`
+	NodesJSON  string `gorm:"column:nodes_json;type:jsonb;not null;default:'[]'" json:"-"`
+	EdgesJSON  string `gorm:"column:edges_json;type:jsonb;not null;default:'[]'" json:"-"`
+	// RevisionID supports optimistic concurrency control via If-Match header.
+	// Bumped on every successful update by the BeforeUpdate hook.
+	RevisionID uint64    `gorm:"column:revision_id;not null;default:1" json:"revision_id"`
 	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+}
+
+// BeforeUpdate increments the revision id on every update so optimistic-locking
+// PATCH callers can detect concurrent writes. Uses Statement.SetColumn so the
+// bump is applied for both struct-based and map-based GORM updates.
+func (w *UserLegendWorkflow) BeforeUpdate(tx *gorm.DB) error {
+	w.RevisionID++
+	tx.Statement.SetColumn("revision_id", w.RevisionID)
+	return nil
 }
 
 // WorkflowExecution records a single run of a legend workflow.

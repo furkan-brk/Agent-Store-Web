@@ -1,10 +1,14 @@
 // lib/features/create_agent/screens/create_agent_screen.dart
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/create_agent_controller.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/widgets/wallet_guard.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
@@ -37,6 +41,14 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   static const int _titleMaxLen = 80;
   static const int _promptMinLen = 20;
 
+  // ── Draft persistence (v3.7) ───────────────────────────────────────────
+  // Form state survives an accidental tab close, page refresh, or wallet
+  // popup-related navigation. Saves the three text fields to LocalKvStore
+  // 5 seconds after the last keystroke so we don't hammer storage on every
+  // character. Cleared on successful submit.
+  static const String _kDraftKey = 'create_agent_draft_v1';
+  Timer? _draftSaveTimer;
+
   static const List<String> _stepLabels = ['Basic Info', 'Prompt', 'Review'];
   static const List<IconData> _stepIcons = [
     Icons.info_outline_rounded,
@@ -59,17 +71,133 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
     _descCtrl.clear();
     _promptCtrl.clear();
 
-    _titleCtrl.addListener(() => _titleLen.value = _titleCtrl.text.length);
-    _descCtrl.addListener(() => _descLen.value = _descCtrl.text.length);
+    _titleCtrl.addListener(() {
+      _titleLen.value = _titleCtrl.text.length;
+      _scheduleDraftSave();
+    });
+    _descCtrl.addListener(() {
+      _descLen.value = _descCtrl.text.length;
+      _scheduleDraftSave();
+    });
     _promptCtrl.addListener(() {
       _promptLen.value = _promptCtrl.text.length;
       _promptLineCount.value =
           '\n'.allMatches(_promptCtrl.text).length + 1;
+      _scheduleDraftSave();
     });
+
+    // Defer draft restore until after first frame so the dialog can use a
+    // mounted BuildContext. If a draft exists we ask before overwriting
+    // anything (avoids surprise restores after a previous successful publish).
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeRestoreDraft());
+  }
+
+  void _scheduleDraftSave() {
+    _draftSaveTimer?.cancel();
+    _draftSaveTimer = Timer(const Duration(seconds: 5), _saveDraft);
+  }
+
+  Future<void> _saveDraft() async {
+    final hasContent = _titleCtrl.text.isNotEmpty ||
+        _descCtrl.text.isNotEmpty ||
+        _promptCtrl.text.isNotEmpty;
+    if (!hasContent) {
+      // User cleared everything → drop the persisted draft so we don't
+      // re-prompt them about an empty restore on next visit.
+      await LocalKvStore.instance.remove(_kDraftKey);
+      return;
+    }
+    await LocalKvStore.instance.setString(
+      _kDraftKey,
+      jsonEncode({
+        'title': _titleCtrl.text,
+        'description': _descCtrl.text,
+        'prompt': _promptCtrl.text,
+        'savedAt': DateTime.now().toIso8601String(),
+      }),
+    );
+  }
+
+  Future<void> _clearDraft() async {
+    _draftSaveTimer?.cancel();
+    await LocalKvStore.instance.remove(_kDraftKey);
+  }
+
+  Future<void> _maybeRestoreDraft() async {
+    final raw = await LocalKvStore.instance.getString(_kDraftKey);
+    if (raw == null || raw.isEmpty || !mounted) return;
+    Map<String, dynamic> draft;
+    try {
+      draft = jsonDecode(raw) as Map<String, dynamic>;
+    } catch (_) {
+      await _clearDraft();
+      return;
+    }
+    final title = (draft['title'] as String?) ?? '';
+    final desc = (draft['description'] as String?) ?? '';
+    final prompt = (draft['prompt'] as String?) ?? '';
+    if (title.isEmpty && desc.isEmpty && prompt.isEmpty) return;
+
+    final savedAtIso = draft['savedAt'] as String?;
+    final savedAt = savedAtIso != null ? DateTime.tryParse(savedAtIso) : null;
+    final ago = savedAt != null
+        ? _formatTimeAgo(DateTime.now().difference(savedAt))
+        : null;
+    if (!mounted) return;
+
+    final restore = await showDialog<bool>(
+      // ignore: use_build_context_synchronously — re-checked above.
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Continue draft?'),
+        content: Text(
+          ago != null
+              ? 'You have an unfinished agent draft from $ago. Restore it?'
+              : 'You have an unfinished agent draft. Restore it?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Discard'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (restore == true) {
+      _titleCtrl.text = title;
+      _descCtrl.text = desc;
+      _promptCtrl.text = prompt;
+    } else {
+      await _clearDraft();
+    }
+  }
+
+  static String _formatTimeAgo(Duration d) {
+    if (d.inMinutes < 1) return 'just now';
+    if (d.inHours < 1) return '${d.inMinutes}m ago';
+    if (d.inDays < 1) return '${d.inHours}h ago';
+    return '${d.inDays}d ago';
   }
 
   @override
   void dispose() {
+    // Flush any pending draft synchronously before tearing down the
+    // text controllers — the timer might fire after fields are disposed
+    // otherwise, reading from already-cleared controllers.
+    _draftSaveTimer?.cancel();
+    if (_titleCtrl.text.isNotEmpty ||
+        _descCtrl.text.isNotEmpty ||
+        _promptCtrl.text.isNotEmpty) {
+      // Fire-and-forget; LocalKvStore writes are async but we don't need
+      // to await — at worst the user loses the very last keystroke.
+      _saveDraft();
+    }
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _promptCtrl.dispose();
@@ -96,6 +224,10 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
       _promptCtrl.text,
     );
     if (agent != null && mounted) {
+      // Successful publish — drop the persisted draft so the user isn't
+      // re-prompted to restore it on their next visit.
+      await _clearDraft();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Agent created with unique AI character!'),

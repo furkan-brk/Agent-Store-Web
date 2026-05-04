@@ -543,7 +543,12 @@ func (h *Handler) RegenerateImage(c *gin.Context) {
 	c.JSON(http.StatusOK, agent)
 }
 
-// UpdateProfile handles PATCH /api/v1/user/profile
+// UpdateProfile handles PATCH /api/v1/user/profile.
+//
+// Username collision policy:
+//   - 409 Conflict + suggested alternatives if the username is already taken
+//   - 422 Unprocessable Entity if the username is reserved or malformed
+//   - 400 Bad Request for any other validation failure
 func (h *Handler) UpdateProfile(c *gin.Context) {
 	var input UpdateProfileInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -551,7 +556,17 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 	if err := h.agentSvc.UpdateProfile(c.GetString("wallet"), input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		switch {
+		case errors.Is(err, ErrUsernameTaken):
+			c.JSON(http.StatusConflict, gin.H{
+				"error":       err.Error(),
+				"suggestions": SuggestAlternativeUsernames(input.Username),
+			})
+		case errors.Is(err, ErrUsernameReserved), errors.Is(err, ErrUsernameFormat):
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		}
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "profile updated"})
@@ -716,6 +731,33 @@ func (h *Handler) GetRatings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ratings": ratings, "average": avg, "count": count, "user_rating": userRating})
 }
 
+// MarkRatingHelpful handles POST /api/v1/agents/:id/ratings/:ratingID/helpful.
+// Records a unique-per-wallet "helpful" upvote on a rating. Idempotent — a
+// repeat call from the same wallet returns the same count without bumping.
+// Returns 403 when the caller tries to upvote their own rating.
+func (h *Handler) MarkRatingHelpful(c *gin.Context) {
+	ratingID, err := strconv.ParseUint(c.Param("ratingID"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid rating id"})
+		return
+	}
+	wallet := c.GetString("wallet")
+	count, err := h.agentSvc.MarkRatingHelpful(uint(ratingID), wallet)
+	if err != nil {
+		if strings.Contains(err.Error(), "own rating") {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"helpful": count})
+}
+
 // TopUpCredits handles POST /api/v1/user/credits/topup
 func (h *Handler) TopUpCredits(c *gin.Context) {
 	var body struct {
@@ -845,15 +887,23 @@ func (h *Handler) InternalGetAgent(c *gin.Context) {
 	c.JSON(http.StatusOK, agent)
 }
 
-// InternalIncrementUse handles POST /internal/agents/:id/increment-use
+// InternalIncrementUse handles POST /internal/agents/:id/increment-use.
+// Optional JSON body: {"wallet": "0x...", "ip": "1.2.3.4"} — when provided,
+// triggers a 60-second per-wallet/per-ip cooldown via recordUseAttempt.
+// Trusted internal callers may omit both fields to bypass cooldown.
 func (h *Handler) InternalIncrementUse(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	h.agentSvc.IncrementUseCount(uint(id))
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	var body struct {
+		Wallet string `json:"wallet"`
+		IP     string `json:"ip"`
+	}
+	_ = c.ShouldBindJSON(&body)
+	counted := h.agentSvc.IncrementUseCount(uint(id), body.Wallet, HashIP(body.IP))
+	c.JSON(http.StatusOK, gin.H{"ok": true, "counted": counted})
 }
 
 // InternalDeductCredits handles POST /internal/credits/deduct

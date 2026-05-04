@@ -79,6 +79,11 @@ class AuthController extends GetxController {
     final message = 'Sign in to Agent Store\n\nNonce: $nonce';
     final sig = await WalletService.instance.signMessage(message);
     if (sig == null) {
+      // v3.7 nonce reuse protection: tell the backend to rotate the
+      // outstanding nonce so a leaked one can't be replayed before the user
+      // retries. Backend's Abandon handler is a silent no-op for unknown
+      // wallets, so this is safe to fire-and-forget.
+      await ApiService.instance.abandonSignature(walletAddr);
       error.value = 'Signature rejected.';
       isConnecting.value = false;
       return;
@@ -88,6 +93,10 @@ class AuthController extends GetxController {
       wallet: walletAddr, nonce: nonce, signature: sig,
     );
     if (result == null) {
+      // Backend already rotated on its end (verify failure), but we abandon
+      // here too so retries triggered by transport errors (network blip
+      // before the verify even reached the server) also rotate.
+      await ApiService.instance.abandonSignature(walletAddr);
       error.value = 'Authentication failed.';
       isConnecting.value = false;
       return;

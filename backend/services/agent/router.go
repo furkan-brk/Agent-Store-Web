@@ -64,6 +64,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.PUT("/:id/price", auth, handler.SetAgentPrice)
 		agents.POST("/:id/rate", auth, handler.RateAgent)
 		agents.GET("/:id/ratings", handler.GetRatings)
+		agents.POST("/:id/ratings/:ratingID/helpful", auth, handler.MarkRatingHelpful)
 
 		user := v1.Group("/user", auth)
 		user.GET("/library", handler.GetLibrary)

@@ -103,6 +103,24 @@ class ApiService {
     return null;
   }
 
+  /// Notifies the backend that the user dropped a signing request (rejected
+  /// the MetaMask popup, closed the tab, or otherwise abandoned the flow)
+  /// so the stored nonce can be rotated. Best-effort fire-and-forget — a
+  /// failure here is not user-facing because the next /auth/nonce call will
+  /// rotate the value anyway. Pre-empting that race closes the small window
+  /// where a leaked nonce could be replayed before the user retries.
+  Future<void> abandonSignature(String wallet) async {
+    try {
+      await http.post(
+        Uri.parse(ApiConstants.authAbandon),
+        headers: _jsonHeaders,
+        body: jsonEncode({'wallet': wallet}),
+      );
+    } catch (e) {
+      debugPrint('abandonSignature: $e');
+    }
+  }
+
   // ── Categories ──────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> getCategories() async {
@@ -466,18 +484,41 @@ class ApiService {
     return [];
   }
 
-  Future<LegendWorkflow?> saveLegendWorkflow(LegendWorkflow workflow) async {
+  /// Saves a workflow, optionally enforcing optimistic concurrency.
+  ///
+  /// If [workflow.revisionId] is > 0 and [enforceRevision] is true, an
+  /// `If-Match` header is sent so the backend can reject stale writes with
+  /// 409 Conflict. On 409 a [ConflictException] is thrown, carrying the
+  /// server's current copy of the workflow JSON for the resolver to compare.
+  /// All other failures return null (legacy contract preserved).
+  Future<LegendWorkflow?> saveLegendWorkflow(
+    LegendWorkflow workflow, {
+    bool enforceRevision = true,
+  }) async {
     try {
+      final headers = Map<String, String>.from(_headers);
+      if (enforceRevision && workflow.revisionId > 0) {
+        headers['If-Match'] = '${workflow.revisionId}';
+      }
       final res = await http.post(
         Uri.parse(ApiConstants.userLegendWorkflows),
-        headers: _headers,
+        headers: headers,
         body: jsonEncode(workflow.toJson()),
       );
       if (res.statusCode == 200) {
         return LegendWorkflow.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
       }
+      if (res.statusCode == 409) {
+        // Body is the server's current workflow row; surface to ConflictResolver.
+        final serverJson = jsonDecode(res.body) as Map<String, dynamic>;
+        throw ConflictException(serverJson);
+      }
       debugPrint('saveLegendWorkflow: HTTP ${res.statusCode} — ${res.body}');
-    } catch (e) { debugPrint('saveLegendWorkflow: $e'); }
+    } on ConflictException {
+      rethrow;
+    } catch (e) {
+      debugPrint('saveLegendWorkflow: $e');
+    }
     return null;
   }
 
@@ -613,6 +654,27 @@ class ApiService {
       );
       return r.statusCode == 200;
     } catch (e) { debugPrint('rateAgent: $e'); return false; }
+  }
+
+  /// Records a unique-per-wallet "helpful" upvote on a rating. Returns the
+  /// new helpful count from the server, or null on failure (network, 4xx).
+  /// Server-side dedup is authoritative — this method may safely be called
+  /// repeatedly; the server returns the same count without double-counting.
+  Future<int?> markRatingHelpful(int agentId, int ratingId) async {
+    try {
+      final r = await http.post(
+        Uri.parse('${ApiConstants.agents}/$agentId/ratings/$ratingId/helpful'),
+        headers: _headers,
+      );
+      if (r.statusCode == 200) {
+        final body = jsonDecode(r.body) as Map<String, dynamic>;
+        return (body['helpful'] as num?)?.toInt();
+      }
+      debugPrint('markRatingHelpful: HTTP ${r.statusCode} — ${r.body}');
+    } catch (e) {
+      debugPrint('markRatingHelpful: $e');
+    }
+    return null;
   }
 
   // ── Purchase ──────────────────────────────────────────────────────────────

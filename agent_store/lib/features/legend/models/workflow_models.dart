@@ -72,20 +72,35 @@ class WorkflowEdge {
   final String id;
   final String fromId;
   final String toId;
+  final String? label;
 
   const WorkflowEdge({
     required this.id,
     required this.fromId,
     required this.toId,
+    this.label,
   });
 
-  Map<String, dynamic> toJson() => {'id': id, 'from': fromId, 'to': toId};
+  WorkflowEdge copyWith({String? label}) => WorkflowEdge(
+        id: id,
+        fromId: fromId,
+        toId: toId,
+        label: label ?? this.label,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'from': fromId,
+        'to': toId,
+        if (label != null && label!.isNotEmpty) 'label': label,
+      };
 
   factory WorkflowEdge.fromJson(Map<String, dynamic> j) => WorkflowEdge(
-    id: j['id'] as String,
-    fromId: j['from'] as String,
-    toId: j['to'] as String,
-  );
+        id: j['id'] as String,
+        fromId: j['from'] as String,
+        toId: j['to'] as String,
+        label: j['label'] as String?,
+      );
 }
 
 class LegendWorkflow {
@@ -95,12 +110,18 @@ class LegendWorkflow {
   final List<WorkflowEdge> edges;
   final DateTime updatedAt;
 
+  /// Server-issued optimistic-concurrency revision. Bumped on every successful
+  /// PATCH/POST. Defaults to 0 for newly-created local workflows that haven't
+  /// hit the backend yet — backend treats 0 as "no If-Match" (last-write-wins).
+  final int revisionId;
+
   LegendWorkflow({
     required this.id,
     required this.name,
     required this.nodes,
     required this.edges,
     required this.updatedAt,
+    this.revisionId = 0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -109,6 +130,7 @@ class LegendWorkflow {
     'nodes': nodes.map((n) => n.toJson()).toList(),
     'edges': edges.map((e) => e.toJson()).toList(),
     'updated_at': updatedAt.toUtc().toIso8601String(),
+    'revision_id': revisionId,
   };
 
   factory LegendWorkflow.fromJson(Map<String, dynamic> j) => LegendWorkflow(
@@ -122,6 +144,7 @@ class LegendWorkflow {
         .toList(),
     updatedAt:
         DateTime.tryParse(j['updated_at'] as String? ?? '') ?? DateTime.now(),
+    revisionId: (j['revision_id'] as num?)?.toInt() ?? 0,
   );
 
   LegendWorkflow copyWithNodes(
@@ -132,6 +155,18 @@ class LegendWorkflow {
         nodes: nodes,
         edges: edges,
         updatedAt: DateTime.now(),
+        revisionId: revisionId,
+      );
+
+  /// Returns a copy with [revisionId] overridden — used when reconciling a
+  /// successful save response or after a take-theirs conflict resolution.
+  LegendWorkflow withRevisionId(int newRevision) => LegendWorkflow(
+        id: id,
+        name: name,
+        nodes: nodes,
+        edges: edges,
+        updatedAt: updatedAt,
+        revisionId: newRevision,
       );
 }
 

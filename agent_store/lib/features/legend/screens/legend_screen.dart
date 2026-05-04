@@ -14,6 +14,7 @@ import '../../../shared/services/api_service.dart';
 import '../../../shared/services/mission_service.dart' show MissionService, SyncStatus;
 import '../../../shared/widgets/monaco_editor_widget.dart';
 import '../models/workflow_models.dart';
+import '../utils/dag_utils.dart';
 import '../../../core/utils/input_mode.dart';
 import '../services/claude_export_service.dart';
 import '../services/legend_service.dart';
@@ -92,6 +93,13 @@ class _LegendScreenState extends State<LegendScreen>
   final List<_CanvasSnapshot> _redoStack = [];
   static const int _maxHistory = 50;
 
+  // ── Palette search ─────────────────────────────────────────────────────────
+  final TextEditingController _paletteSearchCtrl = TextEditingController();
+  String _paletteQuery = '';
+
+  // ── Node clipboard ─────────────────────────────────────────────────────────
+  WorkflowNode? _clipboardNode;
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
@@ -116,6 +124,7 @@ class _LegendScreenState extends State<LegendScreen>
   @override
   void dispose() {
     _pulseCtrl.dispose();
+    _paletteSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -205,6 +214,117 @@ class _LegendScreenState extends State<LegendScreen>
       _dragFromPort = null;
       _dragCurrentOffset = Offset.zero;
     });
+  }
+
+  // ── Auto-layout / Fit ──────────────────────────────────────────────────────
+  void _autoLayout() {
+    if (_nodes.isEmpty) return;
+    _pushHistory();
+    final levels = assignLevels(_nodes, _edges);
+    // Group nodes by level
+    final byLevel = <int, List<WorkflowNode>>{};
+    for (final n in _nodes) {
+      final lvl = levels[n.id] ?? 0;
+      (byLevel[lvl] ??= []).add(n);
+    }
+    const colSpacing = 280.0;
+    const rowSpacing = 130.0;
+    final newNodes = <WorkflowNode>[];
+    for (final entry in byLevel.entries) {
+      final col = entry.key;
+      final colNodes = entry.value;
+      for (int i = 0; i < colNodes.length; i++) {
+        newNodes.add(colNodes[i].copyWith(
+          x: col * colSpacing + 60,
+          y: i * rowSpacing + 60,
+        ));
+      }
+    }
+    setState(() => _nodes = newNodes);
+    _fitToCanvas();
+  }
+
+  void _fitToCanvas() {
+    if (_nodes.isEmpty) return;
+    final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final viewSize = box.size;
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = double.negativeInfinity, maxY = double.negativeInfinity;
+    for (final n in _nodes) {
+      if (n.x < minX) minX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.x + _kNodeW > maxX) maxX = n.x + _kNodeW;
+      if (n.y + _kNodeH > maxY) maxY = n.y + _kNodeH;
+    }
+    const padding = 60.0;
+    final boundsW = maxX - minX + padding * 2;
+    final boundsH = maxY - minY + padding * 2;
+    final scaleX = viewSize.width / boundsW;
+    final scaleY = viewSize.height / boundsH;
+    final newZoom = (scaleX < scaleY ? scaleX : scaleY).clamp(0.3, 2.0);
+    final centerX = (minX + maxX) / 2;
+    final centerY = (minY + maxY) / 2;
+    setState(() {
+      _zoom = newZoom;
+      _canvasOffset = Offset(
+        viewSize.width / 2 - centerX * newZoom,
+        viewSize.height / 2 - centerY * newZoom,
+      );
+    });
+  }
+
+  // ── Edge labels ────────────────────────────────────────────────────────────
+  void _showLabelEdgeDialog(String edgeId) {
+    final edge = _edges.firstWhere(
+      (e) => e.id == edgeId,
+      orElse: () => _edges.first,
+    );
+    final ctrl = TextEditingController(text: edge.label ?? '');
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        title: const Text('Label Edge', style: TextStyle(color: AppTheme.textH)),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          style: const TextStyle(color: AppTheme.textH),
+          decoration: const InputDecoration(
+            hintText: 'e.g. success, data, trigger...',
+            hintStyle: TextStyle(color: AppTheme.textM),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child:
+                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            onPressed: () {
+              Navigator.pop(context);
+              _pushHistory();
+              setState(() {
+                final trimmed = ctrl.text.trim();
+                _edges = _edges
+                    .map((e) => e.id == edgeId
+                        ? WorkflowEdge(
+                            id: e.id,
+                            fromId: e.fromId,
+                            toId: e.toId,
+                            label: trimmed.isEmpty ? null : trimmed,
+                          )
+                        : e)
+                    .toList();
+              });
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _fmtTime(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -1571,6 +1691,37 @@ class _LegendScreenState extends State<LegendScreen>
                 _undo();
               } else if (ctrl && event.logicalKey == LogicalKeyboardKey.keyY) {
                 _redo();
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.keyL) {
+                _autoLayout();
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.digit0) {
+                _fitToCanvas();
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.keyC) {
+                if (_selectedNodeId != null) {
+                  _clipboardNode = _nodes.firstWhere(
+                    (n) => n.id == _selectedNodeId,
+                    orElse: () => _nodes.first,
+                  );
+                  _showNotice('Node copied');
+                }
+              } else if (ctrl && event.logicalKey == LogicalKeyboardKey.keyV) {
+                if (_clipboardNode != null) {
+                  final newId =
+                      '${_clipboardNode!.type.name}_${DateTime.now().millisecondsSinceEpoch}';
+                  final newNode = WorkflowNode(
+                    id: newId,
+                    type: _clipboardNode!.type,
+                    label: '${_clipboardNode!.label} (copy)',
+                    x: _clipboardNode!.x + 40,
+                    y: _clipboardNode!.y + 40,
+                    refId: _clipboardNode!.refId,
+                    metadata: _clipboardNode!.metadata,
+                  );
+                  _pushHistory();
+                  setState(() {
+                    _nodes = [..._nodes, newNode];
+                    _selectedNodeId = newId;
+                  });
+                }
               } else if (event.logicalKey == LogicalKeyboardKey.escape) {
                 setState(() { _selectedNodeId = null; _selectedEdgeId = null; });
               } else if (ctrl && event.logicalKey == LogicalKeyboardKey.slash) {
@@ -1686,6 +1837,10 @@ class _LegendScreenState extends State<LegendScreen>
               _shortcutRow('Ctrl + S', 'Save workflow'),
               _shortcutRow('Ctrl + Z', 'Undo'),
               _shortcutRow('Ctrl + Y', 'Redo'),
+              _shortcutRow('Ctrl + L', 'Auto layout'),
+              _shortcutRow('Ctrl + 0', 'Fit to canvas'),
+              _shortcutRow('Ctrl + C', 'Copy node'),
+              _shortcutRow('Ctrl + V', 'Paste node'),
               _shortcutRow('Escape', 'Deselect node/edge'),
               _shortcutRow('Delete', 'Delete selected'),
               _shortcutRow('Ctrl + /', 'Show shortcuts'),
@@ -1846,6 +2001,18 @@ class _LegendScreenState extends State<LegendScreen>
           ),
           const SizedBox(width: 6),
           _ToolbarButton(
+            icon: Icons.account_tree_outlined,
+            label: 'Auto Layout',
+            onTap: _autoLayout,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.fit_screen_outlined,
+            label: 'Fit',
+            onTap: _fitToCanvas,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
             icon: Icons.undo,
             label: 'Undo',
             onTap: _undo,
@@ -1865,6 +2032,14 @@ class _LegendScreenState extends State<LegendScreen>
               label: _selectedEdgeId != null ? 'Del Edge' : 'Delete',
               danger: true,
               onTap: _deleteSelected,
+            ),
+            const SizedBox(width: 6),
+          ],
+          if (_selectedEdgeId != null) ...[
+            _ToolbarButton(
+              icon: Icons.label_outline,
+              label: 'Label Edge',
+              onTap: () => _showLabelEdgeDialog(_selectedEdgeId!),
             ),
             const SizedBox(width: 6),
           ],
@@ -2075,7 +2250,48 @@ class _LegendScreenState extends State<LegendScreen>
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _paletteSearchCtrl,
+            style: const TextStyle(color: AppTheme.textH, fontSize: 12),
+            decoration: InputDecoration(
+              hintText: 'Search agents, missions, guilds...',
+              hintStyle:
+                  const TextStyle(color: AppTheme.textM, fontSize: 11),
+              prefixIcon:
+                  const Icon(Icons.search, color: AppTheme.textM, size: 16),
+              suffixIcon: _paletteQuery.isNotEmpty
+                  ? GestureDetector(
+                      onTap: () {
+                        _paletteSearchCtrl.clear();
+                        setState(() => _paletteQuery = '');
+                      },
+                      child: const Icon(Icons.clear,
+                          color: AppTheme.textM, size: 14),
+                    )
+                  : null,
+              filled: true,
+              fillColor: AppTheme.card,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppTheme.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppTheme.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppTheme.primary),
+              ),
+              isDense: true,
+            ),
+            onChanged: (v) =>
+                setState(() => _paletteQuery = v.toLowerCase().trim()),
+          ),
+          const SizedBox(height: 8),
           const _PaletteSection(label: 'FLOW', children: [
             _DraggablePaletteItem(
               data: _NodeDragData(WorkflowNodeType.start, 'START'),
@@ -2121,6 +2337,9 @@ class _LegendScreenState extends State<LegendScreen>
                         )
                       ]
                     : _libraryAgents
+                        .where((a) =>
+                            _paletteQuery.isEmpty ||
+                            a.title.toLowerCase().contains(_paletteQuery))
                         .map(
                           (a) => _DraggablePaletteItem(
                             data: _NodeDragData(WorkflowNodeType.agent,
@@ -2147,6 +2366,9 @@ class _LegendScreenState extends State<LegendScreen>
                     )
                   ]
                 : _missions
+                    .where((m) =>
+                        _paletteQuery.isEmpty ||
+                        m.title.toLowerCase().contains(_paletteQuery))
                     .map(
                       (m) => _DraggablePaletteItem(
                         data: _NodeDragData(
@@ -2190,6 +2412,9 @@ class _LegendScreenState extends State<LegendScreen>
                         )
                       ]
                     : _guilds
+                        .where((g) =>
+                            _paletteQuery.isEmpty ||
+                            g.name.toLowerCase().contains(_paletteQuery))
                         .map(
                           (g) => _DraggablePaletteItem(
                             data: _NodeDragData(WorkflowNodeType.guild,
@@ -3968,6 +4193,10 @@ class _EdgePainter extends CustomPainter {
           ..strokeCap = StrokeCap.round;
         _drawBezier(canvas, src, dst, glowPaint);
       }
+
+      if (edge.label != null && edge.label!.isNotEmpty) {
+        _drawEdgeLabel(canvas, src, dst, edge.label!);
+      }
     }
 
     // ── Drag preview line ──────────────────────────────────────────────────
@@ -4074,6 +4303,38 @@ class _EdgePainter extends CustomPainter {
     );
     path.close();
     canvas.drawPath(path, arrowPaint);
+  }
+
+  void _drawEdgeLabel(Canvas canvas, Offset src, Offset dst, String label) {
+    final mid = Offset((src.dx + dst.dx) / 2, (src.dy + dst.dy) / 2);
+    const style = TextStyle(
+        color: AppTheme.textH, fontSize: 10, fontWeight: FontWeight.w600);
+    final span = TextSpan(text: label, style: style);
+    final painter =
+        TextPainter(text: span, textDirection: TextDirection.ltr);
+    painter.layout();
+    const hPad = 6.0;
+    const vPad = 3.0;
+    final bgRect = Rect.fromCenter(
+      center: mid,
+      width: painter.width + hPad * 2,
+      height: painter.height + vPad * 2,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bgRect, const Radius.circular(4)),
+      Paint()..color = const Color(0xFF1A1A2E),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bgRect, const Radius.circular(4)),
+      Paint()
+        ..color = AppTheme.border2
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.5,
+    );
+    painter.paint(
+      canvas,
+      Offset(mid.dx - painter.width / 2, mid.dy - painter.height / 2),
+    );
   }
 
   WorkflowNode? _nodeById(String id) {

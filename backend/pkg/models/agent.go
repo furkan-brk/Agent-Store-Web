@@ -83,3 +83,14 @@ type LibraryEntry struct {
 	Agent      Agent     `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
 	SavedAt    time.Time `gorm:"column:saved_at;autoCreateTime" json:"saved_at"`
 }
+
+// AgentUseLog records each use_count increment so anti-abuse middleware can
+// enforce per-wallet/per-IP cooldowns. Wallet may be empty for anonymous calls;
+// IPHash is the SHA-256 hex of the request IP (never the raw IP).
+type AgentUseLog struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	AgentID   uint      `gorm:"column:agent_id;not null;index:idx_use_log_agent_wallet,priority:1;index:idx_use_log_agent_iphash,priority:1" json:"agent_id"`
+	Wallet    string    `gorm:"column:wallet;index:idx_use_log_agent_wallet,priority:2" json:"wallet"`
+	IPHash    string    `gorm:"column:ip_hash;index:idx_use_log_agent_iphash,priority:2" json:"ip_hash"`
+	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime;index" json:"created_at"`
+}
