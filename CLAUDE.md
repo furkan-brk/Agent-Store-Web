@@ -200,6 +200,7 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [x] **v3.10 — Pro Tools** (Backend + Frontend) ✅ preflight, workflow versioning, mission marketplace, guild invite/permissions, compatibility explainability, creator analytics
 - [x] **v3.9 — Discovery + Engagement** (Backend + Frontend) ✅ social follow, For You, leaderboard time windows, OG meta, activity feed
 - [x] **v3.8 — Explainability + Action Bridge** (Backend + Frontend) ✅ 9 task
 - [x] **v3.7 — Reliability Closure** (Backend + Frontend) ✅ 12 task
@@ -208,6 +209,28 @@ services:
   - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
   - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
   - ⏳ 2-day bug bash — pending
+
+## v3.10 Pro Tools (2026-05-04)
+21 files changed (3 new backend + 1 new frontend screen), `go build ./... && flutter analyze` both clean.
+
+**Backend** (7 domains):
+- **Legend preflight validator**: `PreflightWorkflow` endpoint — loads workflow, parses nodes, runs `validateWorkflowStructure`, estimates credits via `creditCostForModel` map (haiku=1, sonnet=3, opus=10). Returns `{valid, issues[], estimated_credits, node_count, agent_node_count}`.
+- **Legend workflow versioning**: `LegendWorkflowVersion` model (wallet, workflowID, version, name, nodesJSON, edgesJSON). `snapshotWorkflowVersion()` called after every `SaveUserWorkflow` (best-effort, non-fatal). `ListWorkflowVersions` (max 20, newest first) + `GetWorkflowVersion` endpoints.
+- **Mission marketplace**: `Public bool` field on `UserMission`. `ListPublicMissions(catPrefix)`, `ImportPublicMission(wallet, clientID)` (slug uniqueness via `ensureUniqueSlug`), `SetMissionPublic(wallet, clientID, public)` endpoints.
+- **Guild invite links**: `GuildInvite` model (32-char crypto/rand hex token, ExpiresAt, MaxUses, UsesCount). `CreateInvite` (owner-only, 7-day default), `GetInvite`, `AcceptInvite` (increments uses_count), `DeleteInvite` endpoints.
+- **Guild permissions**: `Permissions string` JSON array on `GuildMember`. `SetMemberPermissions` validates against 5 known keys (`edit_agents`, `invite_members`, `kick_members`, `change_compatibility`, `manage_roles`).
+- **Compatibility explainability**: `ExplainCompatibility` — 3-factor breakdown (type diversity 40pt, rarity balance 30pt, role completeness 30pt). Uses `CharacterRarity` string-cast for map lookup.
+- **Creator analytics**: `GetCreatorInsights` with `since` param (7d/30d/90d). Queries library_entries + agent_use_logs + UserActivity; daily grouping via `strftime('%Y-%m-%d', ...)` (works SQLite+PostgreSQL). Per-agent `AgentInsight{TotalSaves, TotalUses, TotalForks, Daily[]DailyMetric}`.
+
+**Frontend** (4 items):
+- **api_service.dart**: 12 new methods — preflight, versions, getPublicMissions, importPublicMission, setMissionPublic, createGuildInvite, getGuildInvite, acceptGuildInvite, setMemberPermissions, explainCompatibility, getCreatorInsights.
+- **Legend preflight dialog**: `_showPreflightAndExecute()` wraps Execute button — fetches `/preflight`, shows cost notice on success, issue list on warnings, blocks on invalid. `_PreflightRow` helper widget.
+- **Mission Marketplace screen** (`lib/features/missions/screens/mission_marketplace_screen.dart`): category filter chips + search bar + list + per-item import button (spinner during import). Route `/missions/marketplace` + sidebar nav item.
+- **Guild Detail**: invite link dialog (copy to clipboard, shows token URL), `_CompatibilitySection` widget with expandable 3-factor breakdown (linear progress bars per factor).
+
+**New files**: `backend/services/agent/analytics.go`, `backend/services/guild/invite.go`, `agent_store/lib/features/missions/screens/mission_marketplace_screen.dart`.
+**New models**: `LegendWorkflowVersion`, `GuildInvite`, `UserMission.Public`.
+**Karar**: Legend node checkpoint/resume (L) + Mission scheduling (cron) deferred to v3.11 (complexity + no scheduler infra yet).
 
 ## v3.8 Explainability + Action Bridge (2026-05-04)
 9 task; 4 backend + 4 frontend + 1 test/docs. Closes the "açıklanabilirlik
