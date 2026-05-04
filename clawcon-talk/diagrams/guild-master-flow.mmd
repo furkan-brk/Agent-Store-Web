@@ -1,0 +1,33 @@
+%% Guild Master — LLM team selector flow (Slayt 14)
+%% Render: mmdc -i guild-master-flow.mmd -o guild-master-flow.svg -t dark -b transparent
+
+flowchart TB
+    USER["👤 Kullanıcı"]
+    PROBLEM["📝 Problem statement<br/><i>'Login akışı için takım öner...'</i>"]
+    GM["🤖 Guild Master<br/><i>POST /api/v1/guild-master/suggest</i>"]
+    LLM["💭 LLM<br/><i>Gemini / Claude</i>"]
+    CONTEXT["📚 Context:<br/>library + store agents"]
+
+    subgraph TEAM["🎯 Önerilen takım"]
+        A1["🧙 Wizard<br/>backend-auth"]
+        A2["🎨 Artisan<br/>frontend-form"]
+        A3["🛡 Guardian<br/>security-review"]
+    end
+
+    BRIDGE["⚡ Add to Legend"]
+    LEGEND["🔧 Legend DAG editor"]
+
+    USER --> PROBLEM
+    PROBLEM --> GM
+    GM --> CONTEXT
+    GM --> LLM
+    LLM --> TEAM
+    TEAM --> BRIDGE
+    BRIDGE --> LEGEND
+
+    style USER fill:#0d1117,stroke:#7d8590,color:#fff
+    style PROBLEM fill:#161b22,stroke:#7c3aed,color:#fff
+    style GM fill:#1e1320,stroke:#f59e0b,color:#fff
+    style LLM fill:#1e1320,stroke:#f59e0b,color:#fff
+    style TEAM fill:#1a2332,stroke:#10b981,color:#fff
+    style LEGEND fill:#2d1f3f,stroke:#ec4899,color:#fff

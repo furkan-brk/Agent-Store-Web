@@ -1,0 +1,37 @@
+%% Slayt 12 — Agent Store features ↔ OpenClaw primitives mapping
+%% Each Agent Store feature maps to an OpenClaw primitive via the bridge plugin
+%% Render: mmdc -i layered-mapping.mmd -o layered-mapping.svg -t dark -b transparent
+
+flowchart LR
+    subgraph AS["🎮 Agent Store layer"]
+        direction TB
+        F1["Agent kart<br/>+ character_type"]
+        F2["Library + Store<br/>marketplace"]
+        F3["Wallet auth<br/>(JWT)"]
+        F4["Guild Master<br/>(LLM team selector)"]
+        F5["Legend DAG<br/>(visual workflow)"]
+        F6["Card Editor<br/>(metadata editor)"]
+        F7["Per-node model<br/>haiku/sonnet/opus"]
+    end
+
+    subgraph OC["⚙️ OpenClaw primitives"]
+        direction TB
+        P1["agentId<br/>+ workspace metadata"]
+        P2["agents.list<br/>+ ClawHub"]
+        P3["auth-profiles.json<br/>per agent"]
+        P4["bindings<br/>(deterministic)"]
+        P5["sessions_spawn<br/>chain"]
+        P6["AGENTS.md<br/>per workspace"]
+        P7["tools.allow/deny<br/>+ agent runtime"]
+    end
+
+    F1 -->|maps to| P1
+    F2 -->|maps to| P2
+    F3 -->|maps to| P3
+    F4 -->|dispatched via| P4
+    F5 -->|each node =| P5
+    F6 -->|edits| P6
+    F7 -->|configures| P7
+
+    style AS fill:#1a1320,stroke:#f59e0b,color:#fff
+    style OC fill:#1e1e2e,stroke:#7c3aed,color:#fff

@@ -11,6 +11,7 @@ Redis, on-chain tarafı ise Monad Testnet üzerinde Solidity kontratları ile
 
 - [Öne Çıkan Özellikler](#öne-çıkan-özellikler)
 - [Mimari Özeti](#mimari-özeti)
+- [Built to integrate with OpenClaw](#built-to-integrate-with-openclaw)
 - [Hızlı Başlangıç](#hızlı-başlangıç)
 - [Geliştirme Modları](#geliştirme-modları)
 - [API Özeti](#api-özeti)
@@ -43,6 +44,82 @@ Gateway (Go, :8080)
 	+-- postgres (:5432 container, :5433 host)
 	+-- redis (:6379)
 ```
+
+## Built to integrate with OpenClaw
+
+Agent Store, [OpenClaw](https://docs.openclaw.ai) multi-agent foundation'ının
+üstüne **modern ürün katmanı** olarak tasarlandı. Yani:
+
+- **OpenClaw çözer:** per-agent isolation, deterministic routing, security primitives
+- **Agent Store ekler:** marketplace, web UX, gamification, on-chain economy
+
+OpenClaw'ın `VISION.md` dokümanı bu üst katmanı **kasıtlı olarak** core'a almaz
+("core lean kalsın"). Agent Store tam o boşluğu doldurur.
+
+### Stack mimarisi
+
+```text
+👤 User (browser)
+   ↓
+🎮 Agent Store (this repo)
+   • Flutter Web (Vercel)
+   • Go microservices behind API gateway
+   • Postgres + Redis
+   • Solidity contracts (Monad testnet)
+   ↓
+🌉 Bridge plugin (v2 milestone — RFC açık)
+   • Team profile → OpenClaw bindings
+   • Legend DAG → sessions_spawn chain
+   • Wallet → ephemeral agentDir
+   ↓
+⚙️ OpenClaw multi-agent runtime (optional, opt-in)
+   • routing precedence
+   • per-agent isolation
+   • per-agent sandbox
+```
+
+### Mevcut durum (v3.6) ve roadmap
+
+| Faz | Durum | Açıklama |
+|-----|-------|----------|
+| **v1 — Standalone** | ✅ Bugün | Agent Store Claude API'yi doğrudan çağırıyor; OpenClaw entegrasyonu YOK |
+| **v2 — Bridge plugin** | 🔜 Q4 2026 | `agent-store-bridge` plugin → OpenClaw'a dispatch |
+| **v3 — Reverse-register** | 🗓 Q2 2027 | OpenClaw agentlarını Agent Store library'sine register |
+
+### Agent Store ↔ OpenClaw mapping
+
+| Agent Store özelliği | OpenClaw primitif'i |
+|----------------------|---------------------|
+| Agent kart + character_type + rarity | `agentId` + workspace metadata |
+| Library + Store | `agents.list` + ClawHub |
+| Wallet auth (JWT) | `auth-profiles.json` per agent |
+| **Guild Master** (LLM team selector) | bindings (deterministic, post-LLM) |
+| **Legend DAG** (visual workflow) | `sessions_spawn` chain |
+| Card Editor | `AGENTS.md` per workspace |
+| Per-node model (haiku/sonnet/opus) | `tools.allow/deny` + agent runtime |
+
+### Bridge plugin RFC
+
+Plugin spesifikasyonu: bkz. [`docs/rfc/agent-store-bridge.md`](docs/rfc/agent-store-bridge.md)
+(Clawcon sunumu öncesi taslak; sunum sonrası ClawHub'da forum thread'i açılır.)
+
+Anahtar tasarım kararları:
+- **Opt-in:** Bridge yüklenmezse Agent Store standalone çalışmaya devam eder
+- **Loose coupling:** Plugin sınırı OpenClaw versiyon güncellemelerine dayanıklı
+- **Honest abstractions:** Manager-of-managers değil — VISION'a uyumlu
+
+### Niye OpenClaw?
+
+Agent Store kendi başına çalışan bir multi-agent ürün. Peki niye bridge?
+
+1. **Self-hosted enterprise:** Kendi OpenClaw deployment'ında Agent Store kullanmak
+2. **Sandbox/isolation güvencesi:** OpenClaw'ın per-agent docker sandbox'ını miras almak
+3. **ClawHub plugin'leri:** OpenClaw plugin ekosistemini Agent Store kullanıcılarına açmak
+4. **Multi-tenant SaaS:** Tenant başına ayrı OpenClaw deployment
+
+Standalone Agent Store yeterli olan kullanıcı için bridge zorunlu değil — hibrit tasarım.
+
+---
 
 ## Hızlı Başlangıç
 

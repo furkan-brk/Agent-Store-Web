@@ -1,0 +1,20 @@
+%% Legend — Example DAG workflow (Slayt 7 in 10-slide version)
+%% Render: mmdc -i legend-dag-example.mmd -o legend-dag-example.svg -t dark -b transparent
+
+flowchart LR
+    START(["🟢 START"])
+    A["🧙 Wizard<br/><i>JWT impl</i><br/>sonnet · 3cr"]
+    B["🎨 Artisan<br/><i>Login form</i><br/>haiku · 1cr"]
+    C["🛡 Guardian<br/><i>Security review</i><br/>opus · 10cr"]
+    END(["⭐ END<br/>14 cr total"])
+
+    START --> A
+    A --> B
+    B --> C
+    C --> END
+
+    style START fill:#10b981,stroke:#10b981,color:#fff
+    style A fill:#7c3aed,stroke:#7c3aed,color:#fff
+    style B fill:#ec4899,stroke:#ec4899,color:#fff
+    style C fill:#6b7280,stroke:#9ca3af,color:#fff
+    style END fill:#f59e0b,stroke:#f59e0b,color:#fff
