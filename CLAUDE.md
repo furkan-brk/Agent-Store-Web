@@ -200,12 +200,109 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [x] **v3.8 — Explainability + Action Bridge** (Backend + Frontend) ✅ 9 task
 - [x] **v3.7 — Reliability Closure** (Backend + Frontend) ✅ 12 task
 - [~] **v3.6 — Quality Foundation + Mobile Pass + Bug Bash** (in progress)
   - ✅ Quality: testutil package (sqlite-in-memory via glebarez/sqlite), `pkg/database/db.go` dialector swap, 40 backend tests (auth 12, agent 28), 43 Flutter tests (CardEditor 18, MentionFilter 15, LegendService 10), CI workflow (`.github/workflows/ci.yml`)
   - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
   - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
   - ⏳ 2-day bug bash — pending
+
+## v3.8 Explainability + Action Bridge (2026-05-04)
+9 task; 4 backend + 4 frontend + 1 test/docs. Closes the "açıklanabilirlik
++ tek tık akış geçişi" track of the eksiklikleri-könçürleme.md backlog.
+Mission detail "Add to Legend" CTA + mention preview hover kartı v3.9'a
+deferred (mission detail tek dosya 33KB list+edit ekranı; ayrı detail
+route ve Mission→Legend bridge endpoint yok).
+
+**Backend** (4 task):
+- **Structured suggest output kontratı**: `GuildSuggestion`'a Goal +
+  Plan ([]PlanStep) + Owners ([]OwnerAssignment) + Risks +
+  SuccessCriteria + ConfidencePerType eklendi. AI system prompt'u
+  yeni JSON shape'i zorunlu kılıyor; tolerant parser eski legacy
+  shape'i de yakalıyor (geri uyumlu). Yeni helper'lar:
+  `filterConfidencePerType` (0..1 clamp + percent normalisation),
+  `normalisePlan` (re-numbering + empty drop), `filterOwners`
+  (type whitelist), `trimStrings`.
+- **Per-agent reasoning + confidence**: `MatchingAgent` wrapper
+  (embedded `models.Agent` + Reason/Confidence/Contribution). Composite
+  rankCandidates skoru `roundConfidence` ile 2 decimal'a yuvarlanır.
+- **Chat history persistence**: yeni `models.GuildMasterSession`
+  (Wallet, Title, Problem, MessagesJSON jsonb, SuggestionJSON jsonb,
+  MessageCount). `services/guild/sessions.go` SessionService — CRUD
+  endpoints + `AppendMessages` (FOR UPDATE locked transaction +
+  4 KB content cap + role validation: user/agent/system).
+- **Action bridge endpoints**: `services/guild/bridge.go` BridgeService.
+  `ToMission` Goal + Plan + Owners + Risks + Success criteria'yı
+  Markdown prompt'una dökerek UserMission yaratır (yeni `slugify`
+  helper Mission slug regex'ine uyumlu). `ToLegend` fan-out/fan-in
+  DAG yaratır (1 START → N agent nodes → 1 END), grid-positioned.
+
+**Frontend** (3 task tamamlandı, 1 deferred):
+- **SuggestPanel widget** (`suggest_panel.dart`): pure presentational
+  5-section card (Goal / Plan / Owners / Risks+Success criteria
+  yan yana / Confidence by type linear progress / Matching agents
+  with reason + confidence chip). Bottom sheet'te modal olarak açılır.
+- **Action bridge UI**: GuildMaster sol panel'inde "Save as Mission"
+  + "Open in Legend" buton çifti + disabled hint label. Open in
+  Legend success → `LegendService.refresh()` + `context.go('/legend?id=...')`.
+- **Sessions UI**: "View plan" yanında "Sessions" link butonu,
+  bottom sheet listesi (active session highlight, swipe-action delete,
+  tap-to-resume). `loadSessionList`/`selectSession`/`deleteSession`
+  controller methods. `findTeam` artık session create + suggest
+  (session_id ile) çağırıyor — backend structured suggestion'ı
+  saklasın. SharedPreferences fallback korundu (offline path).
+
+**Test/CI**:
+- Backend: yeni `services/guild/sessions_test.go` (14 test —
+  CRUD, wallet scoping, message validation, content cap, suggestion
+  persist, list ordering) + `services/guild/guildmaster_test.go`
+  (16 test — confidence clamp/normalise, plan renumber, owners
+  whitelist, slugify, buildMissionPrompt sections). Toplam +30 yeni
+  backend unit. testutil yeni `GuildMasterSession` model'ini
+  AutoMigrate ediyor.
+- Frontend: 83 mevcut test yeşil, `flutter analyze` 0 issue.
+
+**Yeni dosyalar**:
+- `backend/pkg/models/guildmaster.go` (GuildMasterSession)
+- `backend/services/guild/sessions.go` (SessionService + CRUD)
+- `backend/services/guild/bridge.go` (BridgeService — Mission/Legend draft)
+- `backend/services/guild/{sessions,guildmaster}_test.go`
+- `agent_store/lib/features/guild_master/widgets/suggest_panel.dart`
+
+**Genişletilen modeller/dosyalar**:
+- `GuildSuggestion.{Goal,Plan,Owners,Risks,SuccessCriteria,ConfidencePerType}`
+- `MatchingAgent` (yeni wrapper, embedded `models.Agent` + 3 ek alan)
+- `services/guild/{guildmaster,handler,router,migrate}.go`
+- `services/guild/handler.go` Suggest endpoint `session_id` opsiyonel param
+- `agent_store/lib/controllers/guild_master_controller.dart`
+  (currentSessionId, sessionList, isBridgeLoading, lastBridgeMessage,
+  saveAsMission, openInLegend, loadSessionList, deleteSession,
+  selectSession)
+- `agent_store/lib/shared/services/api_service.dart` (8 yeni method:
+  list/create/get/append/delete sessions + bridge to-mission/to-legend
+  + suggestGuild's optional sessionId param)
+- `agent_store/lib/features/guild_master/screens/guild_master_screen.dart`
+  (`_BridgeActions` widget + `_showSuggestPanelSheet` + `_showSessionsSheet`)
+
+**Yeni endpoint'ler**:
+- `GET/POST /api/v1/guild-master/sessions`
+- `GET/PATCH/DELETE /api/v1/guild-master/sessions/:id`
+- `POST /api/v1/guild-master/sessions/:id/messages`
+- `POST /api/v1/guild-master/sessions/:id/to-mission`
+- `POST /api/v1/guild-master/sessions/:id/to-legend`
+- `POST /api/v1/guild-master/suggest` body'sine opsiyonel `session_id`
+
+**Karar**: Mission/Legend bridge'leri *direct DB write* ile yapılıyor
+(workspace service'i HTTP ile çağırmak yerine `models.UserMission` /
+`models.UserLegendWorkflow` Create). Tutarlılık için workspace
+service'iyle aynı modeli paylaşıyor — monolith bağlam altında bu
+katman cross-cutting yerine library reuse oluyor.
+
+**Sırada**: v3.9 Discovery + Engagement (fuzzy/semantic search,
+For You recommendations, Follow/Unfollow + activity feed, OG/Twitter
+dynamic meta, Leaderboard time window selector + personal rank badge,
+deferred Mission→Legend CTA + mention preview).
 
 ## v3.7 Reliability Closure (2026-05-04)
 12 task tamamlandı; "stabilite açığı" maddelerinin tümü kapatıldı. Backlog

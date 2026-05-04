@@ -942,16 +942,157 @@ class ApiService {
 
   // ── Guild Master ──────────────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>?> suggestGuild(String problem) async {
+  Future<Map<String, dynamic>?> suggestGuild(String problem, {int? sessionId}) async {
     try {
+      final body = <String, dynamic>{'problem': problem};
+      if (sessionId != null) body['session_id'] = sessionId;
       final res = await http.post(
         Uri.parse('${ApiConstants.guildMaster}/suggest'),
         headers: _headers,
-        body: jsonEncode({'problem': problem}),
+        body: jsonEncode(body),
       ).timeout(const Duration(seconds: 30));
       if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
       debugPrint('suggestGuild: HTTP ${res.statusCode} — ${res.body}');
     } catch (e) { debugPrint('suggestGuild: $e'); }
+    return null;
+  }
+
+  // ── v3.8 Guild Master sessions + action bridges ────────────────────────
+
+  /// Lists left-rail metadata for every Guild Master session owned by the
+  /// authenticated wallet (id, title, problem, message_count, timestamps).
+  /// Returns an empty list on transport failure so the UI doesn't have
+  /// to special-case null.
+  Future<List<Map<String, dynamic>>> listGuildMasterSessions() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.guildMaster}/sessions'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return ((data['sessions'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+      debugPrint('listGuildMasterSessions: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('listGuildMasterSessions: $e');
+    }
+    return const [];
+  }
+
+  /// Creates a new session row, optionally seeded with [problem] +
+  /// initial messages. Returns the session detail or null on failure.
+  Future<Map<String, dynamic>?> createGuildMasterSession({
+    String? title,
+    String? problem,
+    List<Map<String, dynamic>>? messages,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        if (title != null) 'title': title,
+        if (problem != null) 'problem': problem,
+        if (messages != null) 'messages': messages,
+      };
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guildMaster}/sessions'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      debugPrint('createGuildMasterSession: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('createGuildMasterSession: $e');
+    }
+    return null;
+  }
+
+  /// Fetches the full session including messages and the last suggestion.
+  Future<Map<String, dynamic>?> getGuildMasterSession(int sessionId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.guildMaster}/sessions/$sessionId'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('getGuildMasterSession: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('getGuildMasterSession: $e');
+    }
+    return null;
+  }
+
+  /// Appends one or more messages to a session and returns the refreshed
+  /// detail payload. Each message must carry `role` (user/agent/system)
+  /// and `content`; agent_id/agent_title/sent_at are optional.
+  Future<Map<String, dynamic>?> appendGuildMasterMessages(
+    int sessionId,
+    List<Map<String, dynamic>> messages,
+  ) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guildMaster}/sessions/$sessionId/messages'),
+        headers: _headers,
+        body: jsonEncode({'messages': messages}),
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('appendGuildMasterMessages: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('appendGuildMasterMessages: $e');
+    }
+    return null;
+  }
+
+  /// Hard-deletes a session. Returns true on 200, false otherwise.
+  Future<bool> deleteGuildMasterSession(int sessionId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConstants.guildMaster}/sessions/$sessionId'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('deleteGuildMasterSession: $e');
+      return false;
+    }
+  }
+
+  /// Bridges a session's stored suggestion into a new UserMission. Returns
+  /// the {mission, source} envelope on success, null on any failure path.
+  Future<Map<String, dynamic>?> bridgeSessionToMission(int sessionId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guildMaster}/sessions/$sessionId/to-mission'),
+        headers: _headers,
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      debugPrint('bridgeSessionToMission: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('bridgeSessionToMission: $e');
+    }
+    return null;
+  }
+
+  /// Bridges a session's stored suggestion into a new LegendWorkflow draft.
+  /// Returns {workflow_id, workflow_name, node_count, edge_count, source}.
+  Future<Map<String, dynamic>?> bridgeSessionToLegend(int sessionId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guildMaster}/sessions/$sessionId/to-legend'),
+        headers: _headers,
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      debugPrint('bridgeSessionToLegend: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('bridgeSessionToLegend: $e');
+    }
     return null;
   }
 

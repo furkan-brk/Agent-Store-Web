@@ -45,6 +45,18 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		gm := v1.Group("/guild-master", auth, gmRL.WalletMiddleware())
 		gm.POST("/suggest", handler.Suggest)
 		gm.POST("/chat", handler.TeamChat)
+
+		// v3.8: persistent chat history + action bridges. Session writes
+		// share the gmRL rate limiter with /suggest and /chat so a runaway
+		// frontend can't churn the table at unbounded rate.
+		gm.GET("/sessions", handler.ListSessions)
+		gm.POST("/sessions", handler.CreateSession)
+		gm.GET("/sessions/:id", handler.GetSession)
+		gm.PATCH("/sessions/:id", handler.UpdateSession)
+		gm.DELETE("/sessions/:id", handler.DeleteSession)
+		gm.POST("/sessions/:id/messages", handler.AppendMessages)
+		gm.POST("/sessions/:id/to-mission", handler.SessionToMission)
+		gm.POST("/sessions/:id/to-legend", handler.SessionToLegend)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

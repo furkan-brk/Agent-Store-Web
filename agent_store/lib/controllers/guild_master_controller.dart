@@ -92,6 +92,19 @@ class GuildMasterController extends GetxController {
   // Text preserved across input→loading→input error cycle
   String lastProblem = '';
 
+  // ── v3.8 session + action-bridge state ──────────────────────────────
+  // currentSessionId is set when /sessions creates a backend row; the AI
+  // suggest call carries it so the structured result is persisted, and
+  // the bridge buttons (Save as Mission / Open in Legend) can read the
+  // stored suggestion server-side instead of re-running the AI.
+  final currentSessionId = RxnInt();
+  final isBridgeLoading = false.obs;
+  final lastBridgeMessage = RxnString();
+
+  // History list shown in the left rail. Populated lazily by loadSessionList.
+  final sessionList = <Map<String, dynamic>>[].obs;
+  final isSessionListLoading = false.obs;
+
   // Signals the composer to fill an example text into Monaco
   final exampleHint = RxnString();
 
@@ -233,7 +246,25 @@ class GuildMasterController extends GetxController {
 
     // Expand #mission tags so the LLM sees the full mission prompt
     final expanded = await MissionService.instance.expandMissionTags(raw);
-    final result = await ApiService.instance.suggestGuild(expanded);
+
+    // v3.8: open or reuse a backend session before the suggest call so the
+    // server can persist the resulting structured suggestion. We don't
+    // gate the suggest on session creation — if it fails (offline, 500),
+    // we still show the result; bridge buttons will hide themselves
+    // until a session is available.
+    if (currentSessionId.value == null && ApiService.instance.isAuthenticated) {
+      final session = await ApiService.instance.createGuildMasterSession(
+        problem: raw,
+      );
+      if (session != null) {
+        currentSessionId.value = (session['id'] as num?)?.toInt();
+      }
+    }
+
+    final result = await ApiService.instance.suggestGuild(
+      expanded,
+      sessionId: currentSessionId.value,
+    );
     if (result == null) {
       error.value = 'Could not contact Guild Master. Check your connection.';
       phase.value = GuildMasterPhase.input;
@@ -253,6 +284,125 @@ class GuildMasterController extends GetxController {
     activeTabId.value = null;
     phase.value = GuildMasterPhase.ready;
     _saveTeam();
+  }
+
+  // ── v3.8 Action bridges ─────────────────────────────────────────────
+
+  /// Persists the current suggestion as a UserMission via the backend
+  /// bridge endpoint. Sets [lastBridgeMessage] so the screen can render
+  /// a SnackBar with the outcome. Returns the mission id (UserMission
+  /// ClientID) on success, null on failure.
+  Future<String?> saveAsMission() async {
+    final sid = currentSessionId.value;
+    if (sid == null) {
+      lastBridgeMessage.value = 'No active session yet — run a suggestion first.';
+      return null;
+    }
+    if (suggestion.value == null) {
+      lastBridgeMessage.value = 'No suggestion to save.';
+      return null;
+    }
+    isBridgeLoading.value = true;
+    try {
+      final result = await ApiService.instance.bridgeSessionToMission(sid);
+      if (result == null) {
+        lastBridgeMessage.value = 'Could not save mission — please retry.';
+        return null;
+      }
+      final mission = result['mission'] as Map<String, dynamic>?;
+      final id = mission?['id'] as String?;
+      lastBridgeMessage.value = id != null ? 'Saved as mission #$id.' : 'Mission saved.';
+      // Refresh the local mission cache so the new mission appears in
+      // any open Mission screens / mention popovers.
+      await MissionService.instance.refresh();
+      return id;
+    } finally {
+      isBridgeLoading.value = false;
+    }
+  }
+
+  /// Persists the current suggestion as a Legend Workflow draft via the
+  /// backend bridge endpoint. Returns the workflow ClientID on success.
+  Future<String?> openInLegend() async {
+    final sid = currentSessionId.value;
+    if (sid == null) {
+      lastBridgeMessage.value = 'No active session yet — run a suggestion first.';
+      return null;
+    }
+    if (suggestion.value == null) {
+      lastBridgeMessage.value = 'No suggestion to bridge.';
+      return null;
+    }
+    isBridgeLoading.value = true;
+    try {
+      final result = await ApiService.instance.bridgeSessionToLegend(sid);
+      if (result == null) {
+        lastBridgeMessage.value = 'Could not open in Legend — please retry.';
+        return null;
+      }
+      final workflowId = result['workflow_id'] as String?;
+      lastBridgeMessage.value = workflowId != null
+          ? 'Workflow created — switching to Legend…'
+          : 'Workflow created.';
+      return workflowId;
+    } finally {
+      isBridgeLoading.value = false;
+    }
+  }
+
+  // ── v3.8 Session history ────────────────────────────────────────────
+
+  /// Fetches the user's full session list. Cheap (metadata only) — safe
+  /// to call on screen mount without awaiting.
+  Future<void> loadSessionList() async {
+    if (!ApiService.instance.isAuthenticated) return;
+    isSessionListLoading.value = true;
+    try {
+      sessionList.value = await ApiService.instance.listGuildMasterSessions();
+    } finally {
+      isSessionListLoading.value = false;
+    }
+  }
+
+  /// Hard-deletes a session row + drops it from [sessionList]. If the
+  /// deleted session was the active one, also clears suggestion/team
+  /// state so the screen falls back to the input phase.
+  Future<void> deleteSession(int sessionId) async {
+    final ok = await ApiService.instance.deleteGuildMasterSession(sessionId);
+    if (!ok) return;
+    sessionList.removeWhere((s) => (s['id'] as num?)?.toInt() == sessionId);
+    if (currentSessionId.value == sessionId) {
+      currentSessionId.value = null;
+      suggestion.value = null;
+      teamAgents.clear();
+      allMessages.clear();
+      phase.value = GuildMasterPhase.input;
+    }
+  }
+
+  /// Loads a previously-saved session and switches the screen into the
+  /// ready phase against its stored suggestion. Messages are NOT
+  /// rehydrated into agentThreads here — that's a future enhancement;
+  /// for now the user sees the agents + suggestion and starts a fresh
+  /// chat thread on top.
+  Future<void> selectSession(int sessionId) async {
+    final detail = await ApiService.instance.getGuildMasterSession(sessionId);
+    if (detail == null) return;
+    final s = detail['suggestion'] as Map<String, dynamic>?;
+    if (s == null) return;
+
+    currentSessionId.value = sessionId;
+    suggestion.value = s;
+    final agents = (s['matching_agents'] as List<dynamic>? ?? [])
+        .map((e) => e as Map<String, dynamic>)
+        .toList();
+    teamAgents.value = agents;
+    selectedAgentIds.value = agents.map((a) => (a['id'] as num).toInt()).toList();
+    _initThreads();
+    allMessages.clear();
+    activeTabId.value = null;
+    lastProblem = (detail['problem'] as String?) ?? '';
+    phase.value = GuildMasterPhase.ready;
   }
 
   // ── Per-agent selection ─────────────────────────────────────────────────────

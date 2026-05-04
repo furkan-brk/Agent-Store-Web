@@ -12,6 +12,7 @@ import '../../../features/legend/models/workflow_models.dart';
 import '../../../features/legend/services/legend_service.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../widgets/mention_composer.dart';
+import '../widgets/suggest_panel.dart';
 
 // ── File-level helpers ────────────────────────────────────────────────────────
 
@@ -390,6 +391,46 @@ class _LeftPanel extends StatelessWidget {
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 10),
+                        // v3.8 explainability + history surface. "View plan"
+                        // shows the structured GuildSuggestion in a sheet;
+                        // "Sessions" lists every persisted conversation
+                        // for the wallet so the user can resume one.
+                        Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _showSuggestPanelSheet(context, ctrl),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                minimumSize: const Size(0, 28),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: AppTheme.gold,
+                              ),
+                              icon: const Icon(Icons.menu_book_outlined, size: 14),
+                              label: const Text('View plan', style: TextStyle(fontSize: 12)),
+                            ),
+                            const SizedBox(width: 6),
+                            TextButton.icon(
+                              onPressed: () => _showSessionsSheet(context, ctrl),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                minimumSize: const Size(0, 28),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                                foregroundColor: AppTheme.textB,
+                              ),
+                              icon: const Icon(Icons.history, size: 14),
+                              label: const Text('Sessions', style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        // v3.8 action bridges: Save as Mission / Open in Legend.
+                        // Disabled while the bridge call is in flight or
+                        // before a session is registered server-side
+                        // (offline first run).
+                        _BridgeActions(ctrl: ctrl),
                       ],
                     ),
                   ),
@@ -1514,4 +1555,235 @@ class _AgentResponseCardState extends State<_AgentResponseCard> with SingleTicke
       ),
     );
   }
+}
+
+// -- v3.8 Action Bridge UI --------------------------------------------------
+
+/// Shows the structured GuildSuggestion (Goal/Plan/Owners/Risks/Success
+/// criteria + per-agent confidence) in a draggable bottom sheet so the
+/// user can study the rationale without losing the chat tab.
+void _showSuggestPanelSheet(BuildContext context, GuildMasterController ctrl) {
+  final suggestion = ctrl.suggestion.value;
+  if (suggestion == null) {
+    AppSnackBar.info(context, 'No suggestion to view yet � run a problem first.');
+    return;
+  }
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        maxChildSize: 0.92,
+        minChildSize: 0.4,
+        builder: (_, scrollCtrl) => SingleChildScrollView(
+          controller: scrollCtrl,
+          padding: const EdgeInsets.all(16),
+          child: SuggestPanel(suggestion: suggestion),
+        ),
+      );
+    },
+  );
+}
+
+/// Pair of action-bridge buttons: Save as Mission (outlined) +
+/// Open in Legend (filled). Both delegate to the controller, surface
+/// the resulting message via SnackBar, and route the user when the
+/// Legend bridge succeeds.
+class _BridgeActions extends StatelessWidget {
+  final GuildMasterController ctrl;
+  const _BridgeActions({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final hasSession = ctrl.currentSessionId.value != null;
+      final hasSuggestion = ctrl.suggestion.value != null;
+      final disabled = ctrl.isBridgeLoading.value || !hasSession || !hasSuggestion;
+
+      String? disabledReason;
+      if (!hasSuggestion) {
+        disabledReason = 'Run a suggestion first.';
+      } else if (!hasSession) {
+        disabledReason = 'Connect wallet to enable bridges.';
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: disabled ? null : () => _onSaveAsMission(context),
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 14),
+                  label: const Text('Save as Mission', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    minimumSize: const Size(0, 32),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: disabled ? null : () => _onOpenInLegend(context),
+                  icon: ctrl.isBridgeLoading.value
+                      ? const SizedBox(
+                          width: 12,
+                          height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.account_tree_outlined, size: 14),
+                  label: const Text('Open in Legend', style: TextStyle(fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    minimumSize: const Size(0, 32),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (disabledReason != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              disabledReason,
+              style: const TextStyle(color: AppTheme.textM, fontSize: 10),
+            ),
+          ],
+        ],
+      );
+    });
+  }
+
+  Future<void> _onSaveAsMission(BuildContext context) async {
+    final id = await ctrl.saveAsMission();
+    if (!context.mounted) return;
+    final msg = ctrl.lastBridgeMessage.value;
+    if (id != null) {
+      AppSnackBar.success(context, msg ?? 'Mission saved.');
+    } else {
+      AppSnackBar.error(context, msg ?? 'Could not save mission.');
+    }
+  }
+
+  Future<void> _onOpenInLegend(BuildContext context) async {
+    final workflowId = await ctrl.openInLegend();
+    if (!context.mounted) return;
+    final msg = ctrl.lastBridgeMessage.value;
+    if (workflowId == null) {
+      AppSnackBar.error(context, msg ?? 'Could not open in Legend.');
+      return;
+    }
+    AppSnackBar.success(context, msg ?? 'Workflow created.');
+    // Refresh local Legend cache then route to the new workflow. The
+    // refresh is best-effort � even if it fails the route still works
+    // because LegendService falls back to a backend GET on demand.
+    await LegendService.instance.refresh();
+    if (!context.mounted) return;
+    context.go('/legend?id=$workflowId');
+  }
+}
+
+/// Bottom sheet listing every persisted Guild Master session for the
+/// wallet. Tap a row to load it, swipe-action delete to drop it.
+/// Triggers a refresh on open so the list reflects sessions created
+/// from other tabs.
+void _showSessionsSheet(BuildContext context, GuildMasterController ctrl) {
+  // Fire-and-forget: the sheet listens to ctrl.sessionList reactively,
+  // so it'll fill in once the request lands.
+  ctrl.loadSessionList();
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppTheme.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      return DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        maxChildSize: 0.85,
+        minChildSize: 0.3,
+        builder: (_, scrollCtrl) => Padding(
+          padding: const EdgeInsets.all(16),
+          child: Obx(() {
+            if (ctrl.isSessionListLoading.value && ctrl.sessionList.isEmpty) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppTheme.gold),
+              );
+            }
+            if (ctrl.sessionList.isEmpty) {
+              return const Center(
+                child: Text(
+                  'No saved sessions yet.\nRun a new suggestion to start one.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.textM, fontSize: 13),
+                ),
+              );
+            }
+            return ListView.separated(
+              controller: scrollCtrl,
+              itemCount: ctrl.sessionList.length,
+              separatorBuilder: (_, __) => const Divider(color: AppTheme.border, height: 1),
+              itemBuilder: (_, i) {
+                final s = ctrl.sessionList[i];
+                final id = (s['id'] as num).toInt();
+                final title = (s['title'] as String?) ?? 'Untitled';
+                final problem = (s['problem'] as String?) ?? '';
+                final messageCount = (s['message_count'] as num?)?.toInt() ?? 0;
+                final isActive = ctrl.currentSessionId.value == id;
+                return ListTile(
+                  dense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  leading: Icon(
+                    isActive ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                    color: isActive ? AppTheme.gold : AppTheme.textM,
+                    size: 18,
+                  ),
+                  title: Text(
+                    title,
+                    style: TextStyle(
+                      color: AppTheme.textH,
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    problem.isNotEmpty
+                        ? problem
+                        : '$messageCount message${messageCount == 1 ? '' : 's'}',
+                    style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 16, color: AppTheme.textM),
+                    splashRadius: 18,
+                    tooltip: 'Delete session',
+                    onPressed: () async {
+                      await ctrl.deleteSession(id);
+                    },
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    await ctrl.selectSession(id);
+                  },
+                );
+              },
+            );
+          }),
+        ),
+      );
+    },
+  );
 }
