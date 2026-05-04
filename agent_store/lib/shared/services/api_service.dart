@@ -246,12 +246,24 @@ class ApiService {
     try {
       final res = await http.get(Uri.parse(ApiConstants.userLibrary), headers: _headers).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
-        final entries = (jsonDecode(res.body) as Map<String, dynamic>)['entries'] as List<dynamic>;
-        final result = entries.map((e) =>
-          AgentModel.fromJson((e as Map<String, dynamic>)['agent'] as Map<String, dynamic>)).toList();
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        // Be tolerant of `null` (legacy backend used to return {"entries":null}
+        // for empty libraries) and of entries whose embedded `agent` field
+        // got dropped due to a deleted FK row.
+        final raw = (body['entries'] as List<dynamic>?) ?? const <dynamic>[];
+        final result = <AgentModel>[];
+        for (final e in raw) {
+          if (e is! Map<String, dynamic>) continue;
+          final agent = e['agent'];
+          if (agent is! Map<String, dynamic>) continue;
+          final id = (agent['id'] as num?)?.toInt() ?? 0;
+          if (id == 0) continue; // dangling FK — skip
+          result.add(AgentModel.fromJson(agent));
+        }
         _setCache(cacheKey, result);
         return result;
       }
+      debugPrint('getLibrary: HTTP ${res.statusCode} — ${res.body}');
     } catch (e) { debugPrint('getLibrary: $e'); }
     return [];
   }

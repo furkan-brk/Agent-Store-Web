@@ -430,7 +430,8 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	s.processAndSaveImage(agent, generatedImage, avatarRes)
 
 	if input.CreatorWallet != "" {
-		entry := models.LibraryEntry{UserWallet: input.CreatorWallet, AgentID: agent.ID}
+		wallet := strings.ToLower(input.CreatorWallet)
+		entry := models.LibraryEntry{UserWallet: wallet, AgentID: agent.ID}
 		database.DB.Create(&entry)
 		database.DB.Model(&models.Agent{}).Where("id = ?", agent.ID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	}
@@ -480,11 +481,19 @@ func (s *AgentService) processAndSaveImage(agent *models.Agent, generatedImage s
 }
 
 // GetLibrary returns all library entries for a wallet.
+//
+// Wallet matching is case-insensitive (LOWER(user_wallet) = LOWER(?)) so
+// entries written before the v3.7 wallet-lowercasing pass are still surfaced
+// correctly when the JWT carries a lowercased wallet. Returns an allocated
+// empty slice (never nil) so the JSON response is `{"entries":[]}` and the
+// frontend never has to parse `null`.
 func (s *AgentService) GetLibrary(wallet string) ([]models.LibraryEntry, error) {
-	var entries []models.LibraryEntry
+	entries := make([]models.LibraryEntry, 0)
 	err := database.DB.Preload("Agent", func(db *gorm.DB) *gorm.DB {
-		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, image_url, price, prompt_score, card_version, created_at, updated_at")
-	}).Where("user_wallet = ?", wallet).Find(&entries).Error
+		return db.Select("id, title, description, service_description, category, creator_wallet, character_type, character_data, subclass, rarity, tags, save_count, use_count, image_url, generated_image, price, prompt_score, card_version, created_at, updated_at")
+	}).Where("LOWER(user_wallet) = LOWER(?)", wallet).
+		Order("saved_at DESC").
+		Find(&entries).Error
 	return entries, err
 }
 
@@ -493,9 +502,17 @@ func (s *AgentService) GetLibrary(wallet string) ([]models.LibraryEntry, error) 
 // Idempotent: re-adding an already-saved agent is a no-op (no save_count bump).
 // On a fresh insert, bumps the agent's save_count and busts the agents/trending
 // cache so list and trending endpoints reflect the new count immediately.
+//
+// Wallet is normalised to lowercase before insertion and matched case-
+// insensitively on lookup so a single user is never split across casings.
 func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return errors.New("wallet required")
+	}
 	var existing models.LibraryEntry
-	if database.DB.Where("user_wallet = ? AND agent_id = ?", wallet, agentID).First(&existing).Error == nil {
+	if database.DB.Where("LOWER(user_wallet) = ? AND agent_id = ?", wallet, agentID).
+		First(&existing).Error == nil {
 		return nil
 	}
 	entry := models.LibraryEntry{UserWallet: wallet, AgentID: agentID}
@@ -514,8 +531,14 @@ func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
 //
 // Symmetric with AddToLibrary: decrements the agent's save_count (clamped at 0)
 // and busts the agents/trending cache. Also no-op if the entry didn't exist.
+// Wallet matching is case-insensitive to mirror AddToLibrary/GetLibrary.
 func (s *AgentService) RemoveFromLibrary(wallet string, agentID uint) error {
-	res := database.DB.Where("user_wallet = ? AND agent_id = ?", wallet, agentID).Delete(&models.LibraryEntry{})
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return errors.New("wallet required")
+	}
+	res := database.DB.Where("LOWER(user_wallet) = ? AND agent_id = ?", wallet, agentID).
+		Delete(&models.LibraryEntry{})
 	if res.Error != nil {
 		return res.Error
 	}
@@ -527,6 +550,7 @@ func (s *AgentService) RemoveFromLibrary(wallet string, agentID uint) error {
 			UpdateColumn("save_count", gorm.Expr("CASE WHEN save_count > 0 THEN save_count - 1 ELSE 0 END"))
 		s.cache.DeletePrefix("agents|")
 		s.cache.Delete("trending")
+		s.cache.Delete("for-you|" + wallet)
 	}
 	return nil
 }
@@ -615,7 +639,7 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 	s.cache.Delete("categories")
 
 	if creatorWallet != "" {
-		entry := models.LibraryEntry{UserWallet: creatorWallet, AgentID: fork.ID}
+		entry := models.LibraryEntry{UserWallet: strings.ToLower(creatorWallet), AgentID: fork.ID}
 		database.DB.Create(&entry)
 		database.DB.Model(&models.Agent{}).Where("id = ?", fork.ID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	}
