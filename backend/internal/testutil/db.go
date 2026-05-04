@@ -47,7 +47,9 @@ func NewTestDB(t *testing.T) *gorm.DB {
 		&models.CreditLedgerEntry{},
 		&models.UserMission{},
 		&models.UserLegendWorkflow{},
+		&models.LegendWorkflowVersion{},
 		&models.GuildMasterSession{},
+		&models.GuildInvite{},
 		&models.UserFollow{},
 		&models.UserActivity{},
 	); err != nil {

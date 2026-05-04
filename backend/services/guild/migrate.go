@@ -15,6 +15,7 @@ func Migrate() {
 	if err := database.DB.AutoMigrate(
 		&models.Guild{},
 		&models.GuildMember{},
+		&models.GuildInvite{},
 		&models.GuildMasterSession{},
 	); err != nil {
 		log.Fatalf("Guild Service migration failed: %v", err)

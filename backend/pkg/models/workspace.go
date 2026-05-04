@@ -14,6 +14,8 @@ type UserMission struct {
 	Slug       string    `gorm:"column:slug;not null;index" json:"slug"`
 	Prompt     string    `gorm:"column:prompt;type:text;not null" json:"prompt"`
 	UseCount   int64     `gorm:"column:use_count;default:0" json:"use_count"`
+	// Public enables opt-in sharing to the mission marketplace.
+	Public     bool      `gorm:"column:public;default:false" json:"public"`
 	// RevisionID supports optimistic concurrency control via If-Match header.
 	// Bumped on every successful update by the BeforeUpdate hook.
 	RevisionID uint64    `gorm:"column:revision_id;not null;default:1" json:"revision_id"`
@@ -51,6 +53,19 @@ func (w *UserLegendWorkflow) BeforeUpdate(tx *gorm.DB) error {
 	w.RevisionID++
 	tx.Statement.SetColumn("revision_id", w.RevisionID)
 	return nil
+}
+
+// LegendWorkflowVersion is a point-in-time snapshot of a workflow, stored on every save.
+// This enables version history and diff comparisons.
+type LegendWorkflowVersion struct {
+	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserWallet string    `gorm:"column:user_wallet;not null;index:idx_wfv_wallet_client" json:"-"`
+	WorkflowID string    `gorm:"column:workflow_id;not null;index:idx_wfv_wallet_client" json:"workflow_id"`
+	Version    uint64    `gorm:"column:version;not null" json:"version"` // mirrors RevisionID at save time
+	Name       string    `gorm:"column:name;not null" json:"name"`
+	NodesJSON  string    `gorm:"column:nodes_json;type:text;not null" json:"-"`
+	EdgesJSON  string    `gorm:"column:edges_json;type:text;not null" json:"-"`
+	CreatedAt  time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 }
 
 // WorkflowExecution records a single run of a legend workflow.

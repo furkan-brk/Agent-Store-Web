@@ -229,7 +229,24 @@ func (s *LegendService) SaveUserWorkflow(wallet string, input SaveLegendWorkflow
 		return nil, err
 	}
 
+	// Snapshot the saved state as a new version (best-effort — don't fail the save).
+	_ = snapshotWorkflowVersion(record)
+
 	return recordToDTO(record), nil
+}
+
+// snapshotWorkflowVersion records a LegendWorkflowVersion row for the given workflow.
+// Called after every successful save; non-fatal if it errors.
+func snapshotWorkflowVersion(w *models.UserLegendWorkflow) error {
+	snap := &models.LegendWorkflowVersion{
+		UserWallet: w.UserWallet,
+		WorkflowID: w.ClientID,
+		Version:    w.RevisionID,
+		Name:       w.Name,
+		NodesJSON:  w.NodesJSON,
+		EdgesJSON:  w.EdgesJSON,
+	}
+	return database.DB.Create(snap).Error
 }
 
 // BatchSyncWorkflows upserts multiple workflows in one request and returns the
@@ -284,6 +301,135 @@ func (s *LegendService) BatchSyncWorkflows(wallet string, inputs []SaveLegendWor
 // DeleteUserWorkflow removes a workflow by wallet and client ID.
 func (s *LegendService) DeleteUserWorkflow(wallet, clientID string) error {
 	return database.DB.Where("user_wallet = ? AND client_id = ?", strings.ToLower(wallet), clientID).Delete(&models.UserLegendWorkflow{}).Error
+}
+
+// ─── Preflight Validator ──────────────────────────────────────────────────────
+
+// PreflightReport describes structural and resource issues before execution.
+type PreflightReport struct {
+	Valid           bool     `json:"valid"`
+	Issues          []string `json:"issues"`
+	EstimatedCredits int64   `json:"estimated_credits"`
+	NodeCount       int      `json:"node_count"`
+	AgentNodeCount  int      `json:"agent_node_count"`
+}
+
+// PreflightWorkflow validates a workflow's structure and estimates credit cost.
+func (s *LegendService) PreflightWorkflow(wallet, workflowID string) (*PreflightReport, error) {
+	wallet = strings.ToLower(wallet)
+	var workflow models.UserLegendWorkflow
+	if err := database.DB.Where("user_wallet = ? AND client_id = ?", wallet, workflowID).First(&workflow).Error; err != nil {
+		return nil, fmt.Errorf("workflow not found: %w", err)
+	}
+	nodes, edges, err := parseWorkflow(workflow.NodesJSON, workflow.EdgesJSON)
+	if err != nil {
+		return &PreflightReport{Valid: false, Issues: []string{err.Error()}}, nil
+	}
+
+	var issues []string
+	if err := validateWorkflowStructure(nodes, edges); err != nil {
+		issues = append(issues, err.Error())
+	}
+
+	// Estimate credits (Gemini = 1 cr per agent node; Claude costs are model-dependent).
+	var estimated int64
+	agentCount := 0
+	for _, n := range nodes {
+		if n.Type == "agent" {
+			agentCount++
+			meta := parseNodeMetadata(n.Metadata)
+			if meta.Engine == "claude" {
+				model := meta.Model
+				if model == "" {
+					model = "sonnet"
+				}
+				if cost, ok := creditCostForModel(model); ok {
+					estimated += cost
+				} else {
+					estimated += 3 // sonnet default
+				}
+			} else {
+				estimated++
+			}
+		}
+	}
+
+	return &PreflightReport{
+		Valid:            len(issues) == 0,
+		Issues:           issues,
+		EstimatedCredits: estimated,
+		NodeCount:        len(nodes),
+		AgentNodeCount:   agentCount,
+	}, nil
+}
+
+// creditCostForModel returns the credit cost for a Claude model.
+func creditCostForModel(model string) (int64, bool) {
+	costs := map[string]int64{"haiku": 1, "sonnet": 3, "opus": 10}
+	c, ok := costs[model]
+	return c, ok
+}
+
+// ─── Workflow Version History ─────────────────────────────────────────────────
+
+// WorkflowVersionDTO is the public representation of a workflow version.
+type WorkflowVersionDTO struct {
+	ID         uint            `json:"id"`
+	Version    uint64          `json:"version"`
+	Name       string          `json:"name"`
+	Nodes      json.RawMessage `json:"nodes,omitempty"`
+	Edges      json.RawMessage `json:"edges,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+// ListWorkflowVersions returns the version history for a workflow (newest first, max 20).
+func (s *LegendService) ListWorkflowVersions(wallet, workflowID string) ([]WorkflowVersionDTO, error) {
+	wallet = strings.ToLower(wallet)
+	var versions []models.LegendWorkflowVersion
+	if err := database.DB.
+		Where("user_wallet = ? AND workflow_id = ?", wallet, workflowID).
+		Order("version DESC").
+		Limit(20).
+		Find(&versions).Error; err != nil {
+		return nil, err
+	}
+	result := make([]WorkflowVersionDTO, 0, len(versions))
+	for _, v := range versions {
+		result = append(result, WorkflowVersionDTO{
+			ID:        v.ID,
+			Version:   v.Version,
+			Name:      v.Name,
+			CreatedAt: v.CreatedAt,
+		})
+	}
+	return result, nil
+}
+
+// GetWorkflowVersion returns a single version snapshot including full nodes/edges JSON.
+func (s *LegendService) GetWorkflowVersion(wallet, workflowID string, versionID uint) (*WorkflowVersionDTO, error) {
+	wallet = strings.ToLower(wallet)
+	var v models.LegendWorkflowVersion
+	if err := database.DB.
+		Where("user_wallet = ? AND workflow_id = ? AND id = ?", wallet, workflowID, versionID).
+		First(&v).Error; err != nil {
+		return nil, fmt.Errorf("version not found: %w", err)
+	}
+	nodes := json.RawMessage(v.NodesJSON)
+	edges := json.RawMessage(v.EdgesJSON)
+	if len(nodes) == 0 {
+		nodes = json.RawMessage("[]")
+	}
+	if len(edges) == 0 {
+		edges = json.RawMessage("[]")
+	}
+	return &WorkflowVersionDTO{
+		ID:        v.ID,
+		Version:   v.Version,
+		Name:      v.Name,
+		Nodes:     nodes,
+		Edges:     edges,
+		CreatedAt: v.CreatedAt,
+	}, nil
 }
 
 // validateWorkflowInput checks basic input constraints.

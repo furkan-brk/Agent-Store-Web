@@ -15,6 +15,7 @@ func Migrate() {
 	if err := database.DB.AutoMigrate(
 		&models.UserMission{},
 		&models.UserLegendWorkflow{},
+		&models.LegendWorkflowVersion{},
 		&models.WorkflowExecution{},
 	); err != nil {
 		log.Fatalf("Workspace Service migration failed: %v", err)

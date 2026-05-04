@@ -55,6 +55,17 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		legend.POST("/workflows/:id/execute", executeRL.WalletMiddleware(), handler.ExecuteWorkflow)
 		legend.GET("/executions", handler.ListExecutions)
 		legend.GET("/executions/:execId", handler.GetExecution)
+		// v3.10: preflight validator + version history
+		legend.GET("/workflows/:id/preflight", handler.PreflightWorkflow)
+		legend.GET("/workflows/:id/versions", handler.ListWorkflowVersions)
+		legend.GET("/workflows/:id/versions/:versionId", handler.GetWorkflowVersion)
+
+		// Mission marketplace (authenticated: set-public; public: browse/import)
+		missions.PATCH("/:id/public", handler.SetMissionPublic)
+		missions.POST("/:id/import", handler.ImportPublicMission)
+
+		// Public mission marketplace (no auth needed)
+		v1.GET("/missions/public", handler.GetPublicMissions)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

@@ -204,6 +204,100 @@ func (s *MissionService) GetMissionBySlug(wallet, slug string) (*models.UserMiss
 	return &mission, nil
 }
 
+// ─── Mission Marketplace ─────────────────────────────────────────────────────
+
+// MissionPublicDTO is the marketplace listing shape (omits user_wallet).
+type MissionPublicDTO struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Slug      string    `json:"slug"`
+	Prompt    string    `json:"prompt"`
+	UseCount  int64     `json:"use_count"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ListPublicMissions returns all public missions, optionally filtered by category slug prefix.
+func (s *MissionService) ListPublicMissions(catPrefix string) ([]MissionPublicDTO, error) {
+	query := database.DB.Model(&models.UserMission{}).Where("public = ?", true)
+	if catPrefix != "" {
+		query = query.Where("slug LIKE ?", catPrefix+"%")
+	}
+	var missions []models.UserMission
+	if err := query.Order("use_count DESC, created_at DESC").Limit(100).Find(&missions).Error; err != nil {
+		return nil, err
+	}
+	result := make([]MissionPublicDTO, 0, len(missions))
+	for _, m := range missions {
+		result = append(result, MissionPublicDTO{
+			ID:        m.ClientID,
+			Title:     m.Title,
+			Slug:      m.Slug,
+			Prompt:    m.Prompt,
+			UseCount:  m.UseCount,
+			CreatedAt: m.CreatedAt,
+		})
+	}
+	return result, nil
+}
+
+// ImportPublicMission copies a public mission (by client_id) into the requesting user's library.
+func (s *MissionService) ImportPublicMission(wallet, clientID string) (*models.UserMission, error) {
+	wallet = strings.ToLower(wallet)
+
+	var src models.UserMission
+	if err := database.DB.Where("client_id = ? AND public = ?", clientID, true).First(&src).Error; err != nil {
+		return nil, fmt.Errorf("public mission not found")
+	}
+
+	// Generate a new client_id and ensure slug uniqueness for the importer.
+	newID := fmt.Sprintf("imported_%s_%d", clientID, time.Now().UnixNano())
+	slug := ensureUniqueSlug(wallet, src.Slug)
+
+	imported := &models.UserMission{
+		UserWallet: wallet,
+		ClientID:   newID,
+		Title:      src.Title,
+		Slug:       slug,
+		Prompt:     src.Prompt,
+		CreatedAt:  time.Now(),
+	}
+	if err := database.DB.Create(imported).Error; err != nil {
+		return nil, fmt.Errorf("failed to import mission: %w", err)
+	}
+	return imported, nil
+}
+
+// ensureUniqueSlug returns slug if it doesn't conflict for wallet, otherwise appends _2, _3...
+func ensureUniqueSlug(wallet, slug string) string {
+	candidate := slug
+	for i := 2; i <= 20; i++ {
+		var count int64
+		database.DB.Model(&models.UserMission{}).
+			Where("user_wallet = ? AND slug = ?", wallet, candidate).
+			Count(&count)
+		if count == 0 {
+			return candidate
+		}
+		candidate = fmt.Sprintf("%s_%d", slug, i)
+	}
+	return fmt.Sprintf("%s_%d", slug, time.Now().UnixNano())
+}
+
+// SetMissionPublic toggles the public flag on a mission owned by wallet.
+func (s *MissionService) SetMissionPublic(wallet, clientID string, public bool) error {
+	wallet = strings.ToLower(wallet)
+	result := database.DB.Model(&models.UserMission{}).
+		Where("user_wallet = ? AND client_id = ?", wallet, clientID).
+		UpdateColumn("public", public)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("mission not found")
+	}
+	return nil
+}
+
 // ExpandMissionTags finds #slug references in text, replaces them with the
 // corresponding mission prompt, and increments use_count. Only 1 level deep.
 func (s *MissionService) ExpandMissionTags(wallet, text string) (*ExpandMissionOutput, error) {

@@ -1187,6 +1187,166 @@ class ApiService {
     } catch (e) { debugPrint('teamChat: $e'); }
     return null;
   }
+
+  // ── Legend preflight + versioning (v3.10) ───────────────────────────────
+
+  Future<Map<String, dynamic>?> preflightWorkflow(String workflowId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.userLegendWorkflows}/$workflowId/preflight'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('preflightWorkflow: $e'); }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkflowVersions(String workflowId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.userLegendWorkflows}/$workflowId/versions'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['versions'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => e as Map<String, dynamic>)
+            .toList();
+      }
+    } catch (e) { debugPrint('getWorkflowVersions: $e'); }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> getWorkflowVersion(String workflowId, int versionId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.userLegendWorkflows}/$workflowId/versions/$versionId'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('getWorkflowVersion: $e'); }
+    return null;
+  }
+
+  // ── Mission marketplace (v3.10) ──────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getPublicMissions({String? cat}) async {
+    try {
+      final uri = Uri.parse(ApiConstants.missionsPublic).replace(
+        queryParameters: cat != null && cat.isNotEmpty ? {'cat': cat} : null,
+      );
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['missions'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => e as Map<String, dynamic>)
+            .toList();
+      }
+    } catch (e) { debugPrint('getPublicMissions: $e'); }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> importPublicMission(String missionId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.userMissions}/$missionId/import'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('importPublicMission: $e'); }
+    return null;
+  }
+
+  Future<bool> setMissionPublic(String missionId, {required bool public}) async {
+    try {
+      final res = await http.patch(
+        Uri.parse('${ApiConstants.userMissions}/$missionId/public'),
+        headers: _headers,
+        body: jsonEncode({'public': public}),
+      );
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('setMissionPublic: $e'); return false; }
+  }
+
+  // ── Guild invite + permissions + explainability (v3.10) ──────────────────
+
+  Future<Map<String, dynamic>?> createGuildInvite(
+    String guildId, {
+    int? maxUses,
+    int? expiresInHours,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (maxUses != null) body['max_uses'] = maxUses;
+      if (expiresInHours != null) body['expires_in_hours'] = expiresInHours;
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guilds}/$guildId/invite'),
+        headers: _headers,
+        body: jsonEncode(body),
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('createGuildInvite: $e'); }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getGuildInvite(String token) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.guilds}/invite/$token'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('getGuildInvite: $e'); }
+    return null;
+  }
+
+  Future<bool> acceptGuildInvite(String token) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.guilds}/invite/$token/accept'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('acceptGuildInvite: $e'); return false; }
+  }
+
+  Future<bool> setMemberPermissions(
+    String guildId,
+    String memberId,
+    List<String> permissions,
+  ) async {
+    try {
+      final res = await http.put(
+        Uri.parse('${ApiConstants.guilds}/$guildId/members/$memberId/permissions'),
+        headers: _headers,
+        body: jsonEncode({'permissions': permissions}),
+      );
+      return res.statusCode == 200;
+    } catch (e) { debugPrint('setMemberPermissions: $e'); return false; }
+  }
+
+  Future<Map<String, dynamic>?> explainCompatibility(String guildId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.guilds}/$guildId/explain'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('explainCompatibility: $e'); }
+    return null;
+  }
+
+  // ── Creator analytics (v3.10) ────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> getCreatorInsights({String since = '30d'}) async {
+    try {
+      final uri = Uri.parse(ApiConstants.creatorInsights)
+          .replace(queryParameters: {'since': since});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('getCreatorInsights: $e'); }
+    return null;
+  }
 }
 
 /// Outcome of a [ApiService.saveMissionWithRevision] call (v3.7-13.1).

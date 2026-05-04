@@ -779,6 +779,18 @@ func (h *Handler) GetOGMeta(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(RenderOGHTML(meta)))
 }
 
+// GetCreatorInsights handles GET /api/v1/user/creator/insights
+func (h *Handler) GetCreatorInsights(c *gin.Context) {
+	since := c.DefaultQuery("since", "30d")
+	insights, err := h.agentSvc.GetCreatorInsights(c.GetString("wallet"), since)
+	if err != nil {
+		log.Printf("[AgentHandler.GetCreatorInsights] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, insights)
+}
+
 // RecordPurchase handles POST /api/v1/agents/:id/purchase
 func (h *Handler) RecordPurchase(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

@@ -375,3 +375,104 @@ func (h *Handler) TeamChat(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"responses": responses})
 }
+
+// ─── Guild Invite Handlers ────────────────────────────────────────────────────
+
+// CreateInvite handles POST /api/v1/guilds/:id/invite
+func (h *Handler) CreateInvite(c *gin.Context) {
+	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+		return
+	}
+	var input CreateInviteInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	invite, err := h.guildSvc.CreateInvite(c.GetString("wallet"), uint(guildID), input)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, invite)
+}
+
+// GetInvite handles GET /api/v1/guilds/invite/:token (public — no auth needed for preview)
+func (h *Handler) GetInvite(c *gin.Context) {
+	invite, err := h.guildSvc.GetInvite(c.Param("token"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, invite)
+}
+
+// AcceptInvite handles POST /api/v1/guilds/invite/:token/accept
+func (h *Handler) AcceptInvite(c *gin.Context) {
+	guild, err := h.guildSvc.AcceptInvite(c.GetString("wallet"), c.Param("token"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, guild)
+}
+
+// DeleteInvite handles DELETE /api/v1/guilds/:id/invite
+func (h *Handler) DeleteInvite(c *gin.Context) {
+	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+		return
+	}
+	if err := h.guildSvc.DeleteInvite(c.GetString("wallet"), uint(guildID)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "invite deleted"})
+}
+
+// ─── Guild Permissions Handler ────────────────────────────────────────────────
+
+// SetMemberPermissions handles PUT /api/v1/guilds/:id/members/:memberId/permissions
+func (h *Handler) SetMemberPermissions(c *gin.Context) {
+	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+		return
+	}
+	memberID, err := strconv.ParseUint(c.Param("memberId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid member id"})
+		return
+	}
+	var body struct {
+		Permissions []string `json:"permissions" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.guildSvc.SetMemberPermissions(c.GetString("wallet"), uint(guildID), uint(memberID), body.Permissions); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"permissions": body.Permissions})
+}
+
+// ─── Compatibility Explainability Handler ─────────────────────────────────────
+
+// ExplainCompatibility handles GET /api/v1/guilds/:id/explain
+func (h *Handler) ExplainCompatibility(c *gin.Context) {
+	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+		return
+	}
+	breakdown, err := h.guildSvc.ExplainCompatibility(uint(guildID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, breakdown)
+}

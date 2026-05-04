@@ -237,3 +237,77 @@ func (h *Handler) ListExecutions(c *gin.Context) {
 		"limit":      limit,
 	})
 }
+
+// PreflightWorkflow validates a workflow and estimates credit cost before execution.
+func (h *Handler) PreflightWorkflow(c *gin.Context) {
+	report, err := h.legendSvc.PreflightWorkflow(c.GetString("wallet"), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, report)
+}
+
+// ListWorkflowVersions returns version history for a workflow.
+func (h *Handler) ListWorkflowVersions(c *gin.Context) {
+	versions, err := h.legendSvc.ListWorkflowVersions(c.GetString("wallet"), c.Param("id"))
+	if err != nil {
+		log.Printf("[WorkspaceHandler.ListWorkflowVersions] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"versions": versions})
+}
+
+// GetWorkflowVersion returns a single version snapshot with full nodes/edges.
+func (h *Handler) GetWorkflowVersion(c *gin.Context) {
+	vID, err := strconv.ParseUint(c.Param("versionId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid version ID"})
+		return
+	}
+	v, err := h.legendSvc.GetWorkflowVersion(c.GetString("wallet"), c.Param("id"), uint(vID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, v)
+}
+
+// GetPublicMissions returns the public mission marketplace listing.
+func (h *Handler) GetPublicMissions(c *gin.Context) {
+	cat := c.Query("cat")
+	missions, err := h.missionSvc.ListPublicMissions(cat)
+	if err != nil {
+		log.Printf("[WorkspaceHandler.GetPublicMissions] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"missions": missions})
+}
+
+// ImportPublicMission copies a public mission into the user's library.
+func (h *Handler) ImportPublicMission(c *gin.Context) {
+	mission, err := h.missionSvc.ImportPublicMission(c.GetString("wallet"), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, mission)
+}
+
+// SetMissionPublic toggles the public flag on a mission the user owns.
+func (h *Handler) SetMissionPublic(c *gin.Context) {
+	var body struct {
+		Public bool `json:"public"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.missionSvc.SetMissionPublic(c.GetString("wallet"), c.Param("id"), body.Public); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"public": body.Public})
+}

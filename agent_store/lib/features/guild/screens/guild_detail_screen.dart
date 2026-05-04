@@ -1,11 +1,13 @@
 import 'package:agent_store/features/character/character_types.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/wallet_service.dart';
+import '../../../shared/utils/app_snack_bar.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
 import '../widgets/team_formation_widget.dart';
@@ -256,6 +258,21 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
                   ),
                 ]),
               ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.info,
+                    side: const BorderSide(color: AppTheme.info),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => _showInviteDialog(context, guild.id),
+                  icon: const Icon(Icons.link_rounded, size: 16),
+                  label: const Text('Create Invite Link', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
             ],
           ]),
         ),
@@ -293,6 +310,12 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
               ? const _EmptySection(message: 'No members yet', icon: Icons.group_outlined)
               : Column(children: guild.members.map((m) => _MemberRow(member: m)).toList()),
         ),
+
+        // ---- Compatibility Breakdown ----
+        if (guild.members.length >= 2) ...[
+          SizedBox(height: isMobile ? 16 : 24),
+          _CompatibilitySection(guildId: guild.id),
+        ],
 
         // ---- Guild Master CTA ----
         if (guild.members.isNotEmpty) ...[
@@ -413,6 +436,87 @@ class _GuildDetailScreenState extends State<GuildDetailScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
     }
+  }
+
+  Future<void> _showInviteDialog(BuildContext context, int guildId) async {
+    // Generate an invite link
+    final result = await ApiService.instance.createGuildInvite(
+      '$guildId',
+      maxUses: 10,
+      expiresInHours: 168, // 7 days
+    );
+    if (!context.mounted) return;
+
+    if (result == null) {
+      AppSnackBar.error(context, 'Failed to create invite link');
+      return;
+    }
+
+    final token = result['token'] as String? ?? '';
+    // Build a shareable deep-link using the token (guild join page)
+    final inviteUrl = 'https://agentstore.app/guild/join/$token';
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(children: [
+          Icon(Icons.link_rounded, color: AppTheme.info, size: 20),
+          SizedBox(width: 8),
+          Text('Invite Link', style: TextStyle(color: AppTheme.textH, fontWeight: FontWeight.bold, fontSize: 16)),
+        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Share this link to invite members:',
+                style: TextStyle(color: AppTheme.textM, fontSize: 12)),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.bg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      inviteUrl,
+                      style: const TextStyle(color: AppTheme.textB, fontSize: 11, fontFamily: 'monospace'),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.copy_rounded, size: 16, color: AppTheme.info),
+                    tooltip: 'Copy',
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: inviteUrl));
+                      Navigator.pop(dialogCtx);
+                      AppSnackBar.success(context, 'Invite link copied!');
+                    },
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('Valid for 7 days · Max 10 uses',
+                style: TextStyle(color: AppTheme.textM, fontSize: 10)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Close', style: TextStyle(color: AppTheme.textM)),
+          ),
+        ],
+      ),
+    );
   }
 
   static void _showWalletDialog(BuildContext context) {
@@ -800,6 +904,143 @@ class _MemberRowState extends State<_MemberRow> {
           ])),
         ]),
       ),
+    );
+  }
+}
+
+// ── Compatibility Breakdown Section (v3.10) ───────────────────────────────────
+
+class _CompatibilitySection extends StatefulWidget {
+  final int guildId;
+  const _CompatibilitySection({required this.guildId});
+
+  @override
+  State<_CompatibilitySection> createState() => _CompatibilitySectionState();
+}
+
+class _CompatibilitySectionState extends State<_CompatibilitySection> {
+  bool _loading = true;
+  Map<String, dynamic>? _data;
+  bool _expanded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await ApiService.instance.explainCompatibility('${widget.guildId}');
+    if (mounted) setState(() { _data = result; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SizedBox.shrink();
+    if (_data == null) return const SizedBox.shrink();
+
+    final score = (_data!['score'] as num?)?.toInt() ?? 0;
+    final typeDiversity = (_data!['type_diversity'] as num?)?.toInt() ?? 0;
+    final rarityBalance = (_data!['rarity_balance'] as num?)?.toInt() ?? 0;
+    final roleCompleteness = (_data!['role_completeness'] as num?)?.toInt() ?? 0;
+
+    return _Section(
+      title: 'Compatibility',
+      icon: Icons.hub_outlined,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Score pill + expand
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _scoreColor(score).withValues(alpha:0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _scoreColor(score).withValues(alpha:0.4)),
+                ),
+                child: Row(children: [
+                  Icon(Icons.star_rounded, size: 14, color: _scoreColor(score)),
+                  const SizedBox(width: 4),
+                  Text('$score / 100', style: TextStyle(
+                      color: _scoreColor(score), fontSize: 13, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+              const SizedBox(width: 10),
+              Text(_scoreLabel(score), style: const TextStyle(color: AppTheme.textM, fontSize: 12)),
+              const Spacer(),
+              Icon(_expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 18, color: AppTheme.textM),
+            ]),
+          ),
+          // Breakdown
+          if (_expanded) ...[
+            const SizedBox(height: 12),
+            _ScoreFactor(label: 'Type Diversity', score: typeDiversity, max: 40,
+                color: const Color(0xFF8B5CF6)),
+            const SizedBox(height: 6),
+            _ScoreFactor(label: 'Rarity Balance', score: rarityBalance, max: 30,
+                color: AppTheme.gold),
+            const SizedBox(height: 6),
+            _ScoreFactor(label: 'Role Completeness', score: roleCompleteness, max: 30,
+                color: AppTheme.success),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Color _scoreColor(int s) {
+    if (s >= 80) return AppTheme.success;
+    if (s >= 50) return AppTheme.gold;
+    return AppTheme.error;
+  }
+
+  String _scoreLabel(int s) {
+    if (s >= 80) return 'Excellent synergy';
+    if (s >= 60) return 'Good synergy';
+    if (s >= 40) return 'Average synergy';
+    return 'Needs diversity';
+  }
+}
+
+class _ScoreFactor extends StatelessWidget {
+  final String label;
+  final int score;
+  final int max;
+  final Color color;
+
+  const _ScoreFactor({
+    required this.label,
+    required this.score,
+    required this.max,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = max > 0 ? score / max : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Text(label, style: const TextStyle(color: AppTheme.textM, fontSize: 11)),
+          const Spacer(),
+          Text('$score / $max', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+        ]),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: pct.clamp(0.0, 1.0),
+            backgroundColor: AppTheme.border,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+            minHeight: 5,
+          ),
+        ),
+      ],
     );
   }
 }

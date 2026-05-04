@@ -1092,6 +1092,139 @@ class _LegendScreenState extends State<LegendScreen>
     _showNotice('Duplicated as "${copy.name}"', background: AppTheme.success);
   }
 
+  // ── Preflight check before execution (v3.10) ─────────────────────────────
+
+  Future<void> _showPreflightAndExecute() async {
+    if (_currentWorkflowId == null) {
+      _showExecuteDialog(); // will show "save first" notice
+      return;
+    }
+    // Fetch preflight report from backend
+    final report =
+        await ApiService.instance.preflightWorkflow(_currentWorkflowId!);
+    if (!mounted) return;
+
+    if (report == null) {
+      // Network failure — fall through to regular dialog
+      _showExecuteDialog();
+      return;
+    }
+
+    final valid = report['valid'] as bool? ?? true;
+    final issues = (report['issues'] as List<dynamic>? ?? const <dynamic>[])
+        .map((e) => e.toString())
+        .toList();
+    final credits = (report['estimated_credits'] as num?)?.toInt() ?? 0;
+    final nodeCount = (report['node_count'] as num?)?.toInt() ?? 0;
+    final agentNodes = (report['agent_node_count'] as num?)?.toInt() ?? 0;
+
+    if (valid && issues.isEmpty) {
+      // No issues — show a quick cost notice then open execute dialog
+      if (credits > 0) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: AppTheme.card,
+            title: const Row(children: [
+              Icon(Icons.verified_outlined, color: AppTheme.success, size: 20),
+              SizedBox(width: 8),
+              Text('Ready to Execute',
+                  style: TextStyle(color: AppTheme.textH, fontSize: 16)),
+            ]),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PreflightRow(Icons.hub_outlined,
+                    '$nodeCount nodes · $agentNodes agent nodes'),
+                const SizedBox(height: 6),
+                _PreflightRow(Icons.toll_outlined,
+                    'Estimated cost: $credits credit${credits == 1 ? '' : 's'}',
+                    color: AppTheme.gold),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel',
+                      style: TextStyle(color: AppTheme.textM))),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: FilledButton.styleFrom(backgroundColor: AppTheme.primary),
+                child: const Text('Continue'),
+              ),
+            ],
+          ),
+        );
+        if (proceed == true) _showExecuteDialog();
+      } else {
+        _showExecuteDialog();
+      }
+      return;
+    }
+
+    // There are issues — show them
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        title: Row(children: [
+          Icon(
+              valid ? Icons.warning_amber_rounded : Icons.error_outline_rounded,
+              color: valid ? AppTheme.gold : AppTheme.error,
+              size: 20),
+          const SizedBox(width: 8),
+          Text(valid ? 'Preflight Warnings' : 'Preflight Failed',
+              style: const TextStyle(color: AppTheme.textH, fontSize: 16)),
+        ]),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...issues.map((issue) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.circle, size: 5,
+                            color: valid ? AppTheme.gold : AppTheme.error),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(issue,
+                                style: const TextStyle(
+                                    color: AppTheme.textM, fontSize: 12))),
+                      ],
+                    ),
+                  )),
+              if (credits > 0) ...[
+                const Divider(height: 16, color: AppTheme.border),
+                _PreflightRow(Icons.toll_outlined,
+                    'Estimated cost: $credits credit${credits == 1 ? '' : 's'}',
+                    color: AppTheme.gold),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel',
+                  style: TextStyle(color: AppTheme.textM))),
+          if (valid)
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.gold.withValues(alpha: 0.8)),
+              child: const Text('Continue Anyway'),
+            ),
+        ],
+      ),
+    );
+    if (proceed == true) _showExecuteDialog();
+  }
+
   // ── Execute workflow ──────────────────────────────────────────────────────
 
   void _showExecuteDialog() {
@@ -2098,7 +2231,7 @@ class _LegendScreenState extends State<LegendScreen>
           const SizedBox(width: 6),
           _ExecuteButton(
             executing: _executing,
-            onTap: _executing ? null : _showExecuteDialog,
+            onTap: _executing ? null : _showPreflightAndExecute,
             pulseAnimation: _pulseAnim,
           ),
           if (_nodes.any((n) => n.type == WorkflowNodeType.agent)) ...[
@@ -5217,6 +5350,28 @@ class _ExecutionOutputDialog extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Preflight row helper ──────────────────────────────────────────────────────
+
+class _PreflightRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  const _PreflightRow(this.icon, this.label, {this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? AppTheme.textM;
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: c),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(color: c, fontSize: 12)),
+      ],
     );
   }
 }

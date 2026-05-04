@@ -91,6 +91,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		v1.GET("/users/:wallet/follow-status", auth, handler.GetFollowStatus)
 		v1.GET("/leaderboard", handler.GetLeaderboard)
 		v1.GET("/og/agent/:id", handler.GetOGMeta)
+
+		// v3.10: creator analytics
+		user.GET("/creator/insights", handler.GetCreatorInsights)
 	}
 
 	// Internal endpoints for cross-service communication

@@ -19,6 +19,7 @@ import '../features/settings/screens/settings_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
 import '../features/guild_master/screens/guild_master_screen.dart';
 import '../features/missions/screens/missions_screen.dart';
+import '../features/missions/screens/mission_marketplace_screen.dart';
 import '../features/legend/screens/legend_screen.dart';
 import '../features/card_editor/screens/card_editor_screen.dart';
 import '../controllers/auth_controller.dart';
@@ -119,6 +120,7 @@ class AppRouter {
           GoRoute(path: '/credits/history', builder: (_, __) => const CreditHistoryScreen()),
           GoRoute(path: '/leaderboard', builder: (_, __) => const LeaderboardScreen()),
           GoRoute(path: '/missions', builder: (_, __) => const MissionsScreen()),
+          GoRoute(path: '/missions/marketplace', builder: (_, __) => const MissionMarketplaceScreen()),
           GoRoute(path: '/legend', builder: (_, __) => const LegendScreen()),
           GoRoute(path: '/creator', builder: (_, __) => const CreatorDashboardScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
@@ -555,6 +557,7 @@ class _Sidebar extends StatelessWidget {
                     // ── Missions ──
                     _SectionLabel(label: 'MISSIONS', colorScheme: colorScheme),
                     _NavItem(icon: Icons.flag_outlined, label: 'Missions', path: '/missions', loc: loc, isDrawer: isDrawer),
+                    _NavItem(icon: Icons.storefront_outlined, label: 'Marketplace', path: '/missions/marketplace', loc: loc, isDrawer: isDrawer),
                     _NavItem(
                         icon: Icons.account_tree_outlined,
                         label: 'Legend',

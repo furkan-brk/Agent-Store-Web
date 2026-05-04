@@ -26,4 +26,6 @@ class ApiConstants {
   static const String agentCategories  = '$agents/categories';
   static const String agentsForYou     = '$agents/for-you';
   static const String users            = '$apiV1/users';
+  static const String missionsPublic   = '$apiV1/missions/public';
+  static const String creatorInsights  = '$apiV1/user/creator/insights';
 }

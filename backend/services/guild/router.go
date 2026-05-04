@@ -41,6 +41,14 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		guilds.POST("/:id/join", auth, handler.JoinGuild)
 		guilds.DELETE("/:id/join", auth, handler.LeaveGuild)
 		guilds.GET("/:id/compatibility", handler.GetCompatibility)
+		// v3.10: invite links, permissions, compatibility explainability
+		guilds.POST("/:id/invite", auth, handler.CreateInvite)
+		guilds.DELETE("/:id/invite", auth, handler.DeleteInvite)
+		guilds.PUT("/:id/members/:memberId/permissions", auth, handler.SetMemberPermissions)
+		guilds.GET("/:id/explain", handler.ExplainCompatibility)
+		// invite token routes (no guild-id in path — token is the key)
+		guilds.GET("/invite/:token", handler.GetInvite)
+		guilds.POST("/invite/:token/accept", auth, handler.AcceptInvite)
 
 		gm := v1.Group("/guild-master", auth, gmRL.WalletMiddleware())
 		gm.POST("/suggest", handler.Suggest)
