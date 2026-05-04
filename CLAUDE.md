@@ -523,6 +523,50 @@ Split-view canlı kart editörü — lor-card-maker'dan UX ilhamı, tema vintage
 - **Yeni rota**: `/agent/:id/edit` → `CardEditorScreen`, binding GetX `Get.put` tag-scoped.
 - **Yeni dosyalar**: `lib/features/card_editor/{controllers/card_editor_controller.dart, bindings/card_editor_binding.dart, screens/card_editor_screen.dart, services/card_export_service.dart, widgets/{editor_preview_panel.dart, editor_toolbar.dart, sections/editor_sections.dart, fields/editor_fields.dart}}` + `agent_model.dart`'a `toJson()`/`toUpdatePayload()`.
 
+## OpenClaw Compatibility Sprint (2026-05-04)
+Drop-in compatibility between Agent Store agents/workflows and OpenClaw workspace.
+Round-trip: export → drop into `~/.openclaw/workspace/skills/` → re-import recovers prompt.
+
+**Backend** (3 files):
+- **`services/agent/skill_export.go`**: `SkillSlug()` (mirrors Flutter `_slugify` exactly —
+  lowercase → strip non-alnum/space/dash → collapse spaces→dash → max 50 → trim trailing dash)
+  + `BuildSkillMd()` (hand-rolled YAML frontmatter with `name/description/version/when_to_use/
+  model/metadata.openclaw/agent_store` blocks + prompt body). No external YAML dep.
+- **`services/agent/handler.go`**: `GetAgentSkillMd` — owner OR purchaser gate (403 else),
+  `Content-Disposition: attachment` download as `<slug>-SKILL.md`.
+- **`services/agent/router.go`**: `GET /api/v1/agents/:id/skill.md` (auth-gated).
+- **`skill_export_test.go`**: 13 tests — slug edge cases, frontmatter completeness, prompt
+  preservation, description truncation, empty tags, `---` inside prompt.
+
+**Frontend** (7 files):
+- **`claude_export_service.dart`**: `generateOpenclawSkill(AgentModel)` — mirrors Go BuildSkillMd;
+  `isOpenclawSkill(String)` — detects by `metadata:\n  openclaw:` presence;
+  `parseOpenclawSkill(String)` — line-scanner for flat + agent_store sub-block, strips `# Title`
+  heading from body; `generateOpenclawWorkspace(wf, agents)` — virtual JSON file map with per-agent
+  SKILL.md + team.json (same pattern as existing CLI package — no zip).
+- **`legend_export_dialog.dart`**: New "OpenClaw Compatible" section after context row — "OpenClaw
+  Skills" (SKILL.md per agent, preview first agent) + "OpenClaw Workspace" (bundle JSON).
+- **`legend_screen.dart`**: Tab 4 "SKILL.md" in import dialog — `_tabLabels` + `_tabHints` +
+  `_tabHints` extended; `_validate` case 4 via `isOpenclawSkill`; `_buildImportResult` case 4
+  creates single-node workflow from parsed SKILL.md (same pattern as case 2 Agent .md).
+- **`api_service.dart`**: `fetchAgentSkillMd(int id)` returns raw Markdown text (not JSON).
+- **`agent_detail_screen.dart`**: `_downloadSkillMd()` + red extension icon button (owner +
+  purchaser, uses `hasAccess`); `import 'api_service.dart'` added.
+- **`editor_toolbar.dart`**: `onExportSkillMd` callback + "Export as SKILL.md" popup menu entry
+  (red extension icon).
+- **`card_editor_screen.dart`**: `_onExportSkillMd()` + `dart:js_interop` + `package:web` import;
+  wired into `_Editor` widget constructor and `EditorToolbar`.
+
+**Tests**:
+- `skill_export_test.go`: 13 backend unit tests — all pass.
+- `test/unit/openclaw_export_test.dart`: 30 Flutter unit tests — generate/parse/isOpenclawSkill/
+  workspace round-trips — all pass. Total Flutter suite: 113/113.
+
+**Karar**: `generateOpenclawWorkspace` returns combined JSON (no zip/tarball) — consistent with
+v3.0 decision to avoid JSZip dependency (`_downloadCliPackage` pattern). Import tab uses explicit
+tab 4 (not auto-detect in tab 2) for clearer UX — user explicitly selects SKILL.md format.
+Prompt-access gate mirrors backend: `hasAccess` (owner OR purchaser) for download button.
+
 ## Sprint Takip Dosyalari
 - `SPRINT_V2.md` — Detayli plan ve teknik kararlar
 - `SPRINT_V2_TRACKER.md` — Task bazli ilerleme takibi (Team Leader gunceller)
