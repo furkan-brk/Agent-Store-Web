@@ -53,6 +53,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("/categories", handler.GetCategories)
 		agents.POST("/batch", optionalAuth, handler.BatchGetAgents)
 		agents.GET("/:id", optionalAuth, handler.GetAgent)
+		agents.GET("/:id/skill.md", auth, handler.GetAgentSkillMd)
 		agents.POST("", auth, createRL.WalletMiddleware(), handler.CreateAgent)
 		agents.PUT("/:id", auth, handler.UpdateAgent)
 		agents.POST("/:id/regenerate-image", auth, createRL.WalletMiddleware(), handler.RegenerateImage)

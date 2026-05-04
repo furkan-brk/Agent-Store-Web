@@ -1347,6 +1347,22 @@ class ApiService {
     } catch (e) { debugPrint('getCreatorInsights: $e'); }
     return null;
   }
+
+  /// Downloads the OpenClaw-compatible SKILL.md for [agentId].
+  /// Returns the raw Markdown text, or null on error / 403 (not purchased).
+  Future<String?> fetchAgentSkillMd(int agentId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.agents}/$agentId/skill.md'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return res.body;
+      debugPrint('fetchAgentSkillMd: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('fetchAgentSkillMd: $e');
+    }
+    return null;
+  }
 }
 
 /// Outcome of a [ApiService.saveMissionWithRevision] call (v3.7-13.1).

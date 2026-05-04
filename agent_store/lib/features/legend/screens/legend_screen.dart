@@ -4965,14 +4965,15 @@ class _ImportJsonDialog extends StatefulWidget {
 class _ImportJsonDialogState extends State<_ImportJsonDialog> {
   final _controller = TextEditingController();
   String? _error;
-  int _selectedTab = 0; // 0=Workflow JSON, 1=Claude Team Config, 2=Claude Agent .md, 3=Claude Context
+  int _selectedTab = 0; // 0=Workflow JSON, 1=Claude Team Config, 2=Claude Agent .md, 3=Claude Context, 4=OpenClaw SKILL.md
 
-  static const _tabLabels = ['Workflow JSON', 'Team Config', 'Agent .md', 'Context'];
+  static const _tabLabels = ['Workflow JSON', 'Team Config', 'Agent .md', 'Context', 'SKILL.md'];
   static const _tabHints = [
     '{\n  "id": "...",\n  "name": "...",\n  "nodes": [...],\n  "edges": [...]\n}',
     '{\n  "team_name": "...",\n  "agents": [\n    {"name": "...", "system_prompt": "..."}\n  ]\n}',
     '---\nname: my-agent\nmodel: sonnet\ncolor: blue\n---\n\nYour agent prompt here...',
     '# Workflow Execution Context: ...\n\n### Step 1: Agent Name (type)\n**Output:**\n...',
+    '---\nname: my-skill\nversion: 1.0.0\nmodel: opus\nmetadata:\n  openclaw:\n    requires:\n      env: []\n---\n\n# My Skill\n\nYour prompt here...',
   ];
 
   @override
@@ -5040,6 +5041,13 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
         }
         setState(() => _error = null);
         break;
+      case 4: // OpenClaw SKILL.md
+        if (!ClaudeExportService.isOpenclawSkill(text)) {
+          setState(() => _error = 'Not a valid OpenClaw SKILL.md. Must start with --- and contain metadata/openclaw block.');
+          return;
+        }
+        setState(() => _error = null);
+        break;
     }
   }
 
@@ -5075,6 +5083,24 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
         final wf = ClaudeExportService.parseClaudeContext(text);
         if (wf == null) return null;
         return jsonEncode(wf.toJson());
+      case 4: // OpenClaw SKILL.md — parse and create single-node workflow
+        final result = ClaudeExportService.parseOpenclawSkill(text);
+        if (result == null) return null;
+        final wf4 = LegendWorkflow(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: result.node.label,
+          nodes: [
+            WorkflowNode(id: 'start_0', type: WorkflowNodeType.start, label: 'START', x: 50, y: 200),
+            result.node,
+            WorkflowNode(id: 'end_0', type: WorkflowNodeType.end, label: 'END', x: 550, y: 200),
+          ],
+          edges: [
+            WorkflowEdge(id: 'e_start_agent', fromId: 'start_0', toId: result.node.id),
+            WorkflowEdge(id: 'e_agent_end', fromId: result.node.id, toId: 'end_0'),
+          ],
+          updatedAt: DateTime.now(),
+        );
+        return jsonEncode(wf4.toJson());
       default:
         return null;
     }
@@ -5155,7 +5181,9 @@ class _ImportJsonDialogState extends State<_ImportJsonDialog> {
                             ? 'Paste a Claude team config.json.'
                             : _selectedTab == 2
                                 ? 'Paste a Claude agent .md file content.'
-                                : 'Paste an execution context markdown.',
+                                : _selectedTab == 3
+                                    ? 'Paste an execution context markdown.'
+                                    : 'Paste an OpenClaw SKILL.md file.',
                     style: const TextStyle(color: AppTheme.textM, fontSize: 12),
                   ),
                 ),

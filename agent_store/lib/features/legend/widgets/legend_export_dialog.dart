@@ -397,6 +397,80 @@ class _LegendExportDialogState extends State<LegendExportDialog> {
                           },
                         ),
 
+                      // ===== OPENCLAW DIVIDER =====
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Divider(color: AppTheme.border, height: 1),
+                      ),
+
+                      // ===== OPENCLAW SECTION =====
+                      const _SectionHeader(
+                        icon: Icons.extension,
+                        label: 'OpenClaw Compatible',
+                      ),
+                      const SizedBox(height: 4),
+                      _ExportRow(
+                        icon: Icons.extension,
+                        color: const Color(0xFFEF4444),
+                        label: 'OpenClaw Skills',
+                        subtitle: 'SKILL.md per agent',
+                        actionIcon: Icons.download_rounded,
+                        onPreview: _agents.isNotEmpty
+                            ? () {
+                                final first = _agents.firstWhere(
+                                  (a) => a.prompt.isNotEmpty,
+                                  orElse: () => _agents.first,
+                                );
+                                final content =
+                                    ClaudeExportService.generateOpenclawSkill(
+                                        first);
+                                final skillSlug = first.title
+                                    .toLowerCase()
+                                    .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+                                _showPreviewDialog(
+                                    context, '$skillSlug-SKILL.md', content);
+                              }
+                            : null,
+                        onTap: () {
+                          int count = 0;
+                          for (final agent in _agents) {
+                            if (agent.prompt.isEmpty) continue;
+                            final content =
+                                ClaudeExportService.generateOpenclawSkill(agent);
+                            final skillSlug = agent.title
+                                .toLowerCase()
+                                .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
+                            _downloadFile(content, '$skillSlug-SKILL.md');
+                            count++;
+                          }
+                          _showSnack(count == 0
+                              ? 'No accessible agent prompts'
+                              : '$count SKILL.md file${count == 1 ? '' : 's'} downloaded');
+                        },
+                      ),
+                      _ExportRow(
+                        icon: Icons.folder_zip_outlined,
+                        color: const Color(0xFFF97316),
+                        label: 'OpenClaw Workspace',
+                        subtitle: 'workspace bundle JSON',
+                        actionIcon: Icons.download_rounded,
+                        onPreview: () {
+                          final content =
+                              ClaudeExportService.generateOpenclawWorkspace(
+                                  widget.workflow, _agents);
+                          _showPreviewDialog(
+                              context, '$slug-openclaw-workspace.json', content);
+                        },
+                        onTap: () {
+                          final content =
+                              ClaudeExportService.generateOpenclawWorkspace(
+                                  widget.workflow, _agents);
+                          _downloadFile(content, '$slug-openclaw-workspace.json',
+                              mimeType: 'application/json');
+                          _showSnack('OpenClaw workspace bundle downloaded');
+                        },
+                      ),
+
                       // ===== DIVIDER =====
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),

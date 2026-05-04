@@ -17,6 +17,7 @@ class EditorToolbar extends StatelessWidget {
     required this.onClone,
     required this.onExportJson,
     required this.onExportPng,
+    required this.onExportSkillMd,
     required this.onClose,
   });
 
@@ -25,6 +26,7 @@ class EditorToolbar extends StatelessWidget {
   final VoidCallback onClone;
   final VoidCallback onExportJson;
   final VoidCallback onExportPng;
+  final VoidCallback onExportSkillMd;
   final VoidCallback onClose;
 
   @override
@@ -52,7 +54,7 @@ class EditorToolbar extends StatelessWidget {
           const SizedBox(width: 8),
           _IconAction(icon: Icons.content_copy, tooltip: 'Clone agent', onPressed: onClone),
           const SizedBox(width: 4),
-          _ExportMenu(onExportJson: onExportJson, onExportPng: onExportPng),
+          _ExportMenu(onExportJson: onExportJson, onExportPng: onExportPng, onExportSkillMd: onExportSkillMd),
           const SizedBox(width: 4),
           _IconAction(icon: Icons.close, tooltip: 'Close (Esc)', onPressed: onClose),
         ],
@@ -120,9 +122,14 @@ class _SaveButton extends StatelessWidget {
 }
 
 class _ExportMenu extends StatelessWidget {
-  const _ExportMenu({required this.onExportJson, required this.onExportPng});
+  const _ExportMenu({
+    required this.onExportJson,
+    required this.onExportPng,
+    required this.onExportSkillMd,
+  });
   final VoidCallback onExportJson;
   final VoidCallback onExportPng;
+  final VoidCallback onExportSkillMd;
 
   @override
   Widget build(BuildContext context) {
@@ -133,6 +140,7 @@ class _ExportMenu extends StatelessWidget {
       onSelected: (v) {
         if (v == 'json') onExportJson();
         if (v == 'png') onExportPng();
+        if (v == 'skill_md') onExportSkillMd();
       },
       itemBuilder: (_) => const [
         PopupMenuItem(
@@ -149,6 +157,14 @@ class _ExportMenu extends StatelessWidget {
             Icon(Icons.image_outlined, color: AppTheme.gold, size: 16),
             SizedBox(width: 8),
             Text('Export as PNG (3×)'),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'skill_md',
+          child: Row(children: [
+            Icon(Icons.extension_outlined, color: Color(0xFFEF4444), size: 16),
+            SizedBox(width: 8),
+            Text('Export as SKILL.md'),
           ]),
         ),
       ],

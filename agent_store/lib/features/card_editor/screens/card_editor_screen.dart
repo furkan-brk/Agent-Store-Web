@@ -1,7 +1,9 @@
+import 'dart:js_interop';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import 'package:web/web.dart' as web;
 
 import '../../../app/theme.dart';
 import '../../../controllers/auth_controller.dart';
@@ -113,6 +115,37 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
     ));
   }
 
+  Future<void> _onExportSkillMd(BuildContext context, AgentModel agent) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final content = await ApiService.instance.fetchAgentSkillMd(agent.id);
+    if (!context.mounted) return;
+    if (content == null) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Could not download SKILL.md — not authorised or network error'),
+        backgroundColor: AppTheme.error,
+      ));
+      return;
+    }
+    final slug = agent.title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+$'), '');
+    final blob = web.Blob(
+      [content.toJS].toJS,
+      web.BlobPropertyBag(type: 'text/markdown'),
+    );
+    final url = web.URL.createObjectURL(blob);
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = url;
+    anchor.download = '$slug-SKILL.md';
+    anchor.click();
+    web.URL.revokeObjectURL(url);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('SKILL.md downloaded'),
+      backgroundColor: AppTheme.olive,
+    ));
+  }
+
   // ── Build ───────────────────────────────────────────────────────────────
 
   @override
@@ -134,6 +167,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
           onClose: _onClose,
           onClone: _onClone,
           onExportPng: _onExportPng,
+          onExportSkillMd: _onExportSkillMd,
         );
       },
     );
@@ -148,6 +182,7 @@ class _Editor extends StatefulWidget {
     required this.onClose,
     required this.onClone,
     required this.onExportPng,
+    required this.onExportSkillMd,
   });
 
   final AgentModel agent;
@@ -156,6 +191,7 @@ class _Editor extends StatefulWidget {
   final Future<void> Function(BuildContext, CardEditorController) onClose;
   final Future<void> Function(BuildContext, CardEditorController) onClone;
   final Future<void> Function(BuildContext, AgentModel) onExportPng;
+  final Future<void> Function(BuildContext, AgentModel) onExportSkillMd;
 
   @override
   State<_Editor> createState() => _EditorState();
@@ -171,6 +207,7 @@ class _EditorState extends State<_Editor> {
   Future<void> Function(BuildContext, CardEditorController) get onClose => widget.onClose;
   Future<void> Function(BuildContext, CardEditorController) get onClone => widget.onClone;
   Future<void> Function(BuildContext, AgentModel) get onExportPng => widget.onExportPng;
+  Future<void> Function(BuildContext, AgentModel) get onExportSkillMd => widget.onExportSkillMd;
 
   @override
   void initState() {
@@ -261,6 +298,7 @@ class _EditorState extends State<_Editor> {
                     onClone: () => onClone(context, controller),
                     onExportJson: () => CardExportService.exportJson(controller.draft.value),
                     onExportPng: () => onExportPng(context, controller.draft.value),
+                    onExportSkillMd: () => onExportSkillMd(context, controller.draft.value),
                     onClose: () => onClose(context, controller),
                   ),
                   Expanded(

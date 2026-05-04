@@ -353,6 +353,186 @@ class ClaudeExportService {
     }
   }
 
+  // ── OpenClaw SKILL.md ─────────────────────────────────────────────────────
+
+  /// Generates a SKILL.md string for a single agent.
+  /// Mirrors Go BuildSkillMd exactly — round-trip compatible.
+  static String generateOpenclawSkill(AgentModel agent) {
+    final slug = _slugify(agent.title);
+
+    // Single-line description, max 200 chars, escape YAML double-quotes
+    var desc = agent.description.replaceAll('\n', ' ').trim();
+    if (desc.length > 200) desc = '${desc.substring(0, 197)}...';
+    desc = desc.replaceAll('"', '\\"');
+
+    // when_to_use: prefer serviceDescription, fall back to one-liner
+    final raw = (agent.serviceDescription ?? '').trim();
+    final whenToUse = raw.isNotEmpty
+        ? raw
+        : 'Use for ${agent.category.toLowerCase()} tasks'
+            ' (${agent.characterType.name}, ${agent.rarity.name}).';
+
+    // Indent each line with 2 spaces for YAML block scalar body
+    final indented =
+        whenToUse.split('\n').map((l) => '  $l').join('\n');
+
+    // Tags as YAML inline list
+    final tagList = agent.tags.isEmpty
+        ? '[]'
+        : '[${agent.tags.map((t) => '"$t"').join(', ')}]';
+
+    final buf = StringBuffer();
+    buf.write('---\n');
+    buf.write('name: $slug\n');
+    buf.write('description: "$desc"\n');
+    buf.write('version: 1.0.0\n');
+    buf.write('when_to_use: |\n');
+    buf.write('$indented\n');
+    buf.write('model: opus\n');
+    buf.write('metadata:\n');
+    buf.write('  openclaw:\n');
+    buf.write('    requires:\n');
+    buf.write('      env: []\n');
+    buf.write('      bins: []\n');
+    buf.write('agent_store:\n');
+    buf.write('  id: ${agent.id}\n');
+    buf.write('  url: https://agentstore.xyz/agent/${agent.id}\n');
+    buf.write('  character_type: ${agent.characterType.name}\n');
+    buf.write('  subclass: ${agent.subclass.name}\n');
+    buf.write('  rarity: ${agent.rarity.name}\n');
+    buf.write('  category: ${agent.category}\n');
+    buf.write('  tags: $tagList\n');
+    buf.write('---\n');
+    buf.write('\n');
+    buf.write('# ${agent.title}\n');
+    buf.write('\n');
+    buf.write(agent.prompt);
+    if (!agent.prompt.endsWith('\n')) buf.write('\n');
+
+    return buf.toString();
+  }
+
+  /// Returns true when content looks like an OpenClaw SKILL.md.
+  static bool isOpenclawSkill(String content) =>
+      content.trimLeft().startsWith('---') &&
+      content.contains('metadata:') &&
+      content.contains('  openclaw:');
+
+  /// Parses an OpenClaw SKILL.md string into a WorkflowNode + prompt.
+  /// Detects the `agent_store:` sub-block for enriched metadata.
+  static ({WorkflowNode node, String prompt})? parseOpenclawSkill(
+      String content) {
+    try {
+      final parts = content.split('---');
+      if (parts.length < 3) return null;
+
+      final frontmatter = parts[1].trim();
+      // Body: rejoin to preserve any --- inside the prompt
+      final body = parts.sublist(2).join('---').trim();
+
+      // Line-scanner: collect top-level and agent_store sub-fields
+      final meta = <String, String>{};
+      final agentStoreMeta = <String, String>{};
+      String? currentBlock;
+
+      for (final line in frontmatter.split('\n')) {
+        if (line.startsWith('  ') && !line.startsWith('   ')) {
+          // 2-space indented line — sub-field of current top-level block
+          if (currentBlock == 'agent_store') {
+            final ci = line.indexOf(':');
+            if (ci > 0) {
+              final k = line.substring(0, ci).trim();
+              final v =
+                  line.substring(ci + 1).trim().replaceAll('"', '');
+              agentStoreMeta[k] = v;
+            }
+          }
+          // Else skip (when_to_use body, metadata/openclaw nesting, etc.)
+        } else if (!line.startsWith(' ') && line.contains(':')) {
+          // Top-level key
+          final ci = line.indexOf(':');
+          final k = line.substring(0, ci).trim();
+          final v = line.substring(ci + 1).trim().replaceAll('"', '');
+          currentBlock = k;
+          // Only store scalar top-level values (not block headings)
+          if (k != 'agent_store' && k != 'metadata' &&
+              k != 'when_to_use') {
+            meta[k] = v;
+          }
+        }
+      }
+
+      final name = meta['name'] ?? 'imported-agent';
+      final model = meta['model'] ?? 'sonnet';
+
+      // Strip leading `# Title\n` from body if present
+      var prompt = body;
+      if (prompt.startsWith('# ')) {
+        final nl = prompt.indexOf('\n');
+        prompt = nl >= 0 ? prompt.substring(nl + 1).trim() : '';
+      }
+
+      final node = WorkflowNode(
+        id: 'agent_${DateTime.now().millisecondsSinceEpoch}',
+        type: WorkflowNodeType.agent,
+        label: name,
+        x: 300,
+        y: 200,
+        metadata: {
+          'engine': 'claude',
+          'model': model,
+          'prompt': prompt,
+          if (agentStoreMeta['character_type'] != null)
+            'character_type': agentStoreMeta['character_type']!,
+          if (agentStoreMeta['category'] != null)
+            'category': agentStoreMeta['category']!,
+        },
+      );
+
+      return (node: node, prompt: prompt);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Generates a JSON package representing an OpenClaw workspace bundle.
+  /// Structure: ~/.openclaw/workspace/skills/<slug>/SKILL.md per agent,
+  /// plus team.json referencing all skill slugs.
+  /// Returns combined JSON string (no zip — mirrors CLI package pattern).
+  static String generateOpenclawWorkspace(
+      LegendWorkflow wf, List<AgentModel> agents) {
+    final workflowSlug = _slugify(wf.name);
+    final agentNodes = getOrderedAgentNodes(wf.nodes, wf.edges);
+    final agentMap = {for (final a in agents) a.id.toString(): a};
+
+    final files = <String, String>{};
+    final skillSlugs = <String>[];
+
+    for (final node in agentNodes) {
+      final agent = agentMap[node.refId];
+      if (agent == null || agent.prompt.isEmpty) continue;
+      final skillSlug = _slugify(agent.title);
+      skillSlugs.add(skillSlug);
+      files['~/.openclaw/workspace/skills/$skillSlug/SKILL.md'] =
+          generateOpenclawSkill(agent);
+    }
+
+    final teamJson =
+        const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
+      'name': workflowSlug,
+      'description': '${wf.name} — Agent Store Legend Workflow',
+      'skills': skillSlugs,
+    });
+    files['~/.openclaw/workspace/team.json'] = teamJson;
+
+    return const JsonEncoder.withIndent('  ').convert(<String, dynamic>{
+      'name': wf.name,
+      'slug': workflowSlug,
+      'format': 'openclaw-workspace',
+      'files': files,
+    });
+  }
+
   /// Parse execution context markdown -> LegendWorkflow
   static LegendWorkflow? parseClaudeContext(String markdown) {
     try {

@@ -11,6 +11,7 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
+import '../../../shared/services/api_service.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
@@ -129,6 +130,35 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         AppSnackBar.error(context, 'Could not fork agent. Try again.');
       }
     }
+  }
+
+  Future<void> _downloadSkillMd() async {
+    final agent = _ctrl.agent.value;
+    if (agent == null) return;
+    final content =
+        await ApiService.instance.fetchAgentSkillMd(agent.id);
+    if (!mounted) return;
+    if (content == null) {
+      AppSnackBar.error(
+          context, 'Could not download SKILL.md — purchase required or network error.');
+      return;
+    }
+    // Trigger browser download
+    final slug = agent.title
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+$'), '');
+    final blob = web.Blob(
+      [content.toJS].toJS,
+      web.BlobPropertyBag(type: 'text/markdown'),
+    );
+    final url = web.URL.createObjectURL(blob);
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = url;
+    anchor.download = '$slug-SKILL.md';
+    anchor.click();
+    web.URL.revokeObjectURL(url);
+    AppSnackBar.success(context, 'SKILL.md downloaded');
   }
 
   Future<void> _buyAgent() async {
@@ -694,6 +724,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
     final screenWidth = MediaQuery.of(context).size.width;
     final hPad = isMobile ? 16.0 : (screenWidth < 900 ? 16.0 : 24.0);
     final titleSize = isMobile ? 20.0 : (screenWidth < 900 ? 22.0 : 26.0);
+    final hasAccess = _ctrl.hasAccess;
 
     // Build action buttons
     final actionButtons = [
@@ -746,6 +777,13 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         color: _ctrl.inLibrary.value ? AppTheme.primary : AppTheme.textM,
         onPressed: _toggleLibrary,
       )),
+      if (hasAccess)
+        _HoverIconButton(
+          icon: Icons.extension_outlined,
+          tooltip: 'Download SKILL.md (OpenClaw)',
+          color: const Color(0xFFEF4444),
+          onPressed: _downloadSkillMd,
+        ),
       if (_ctrl.isOwnAgent)
         _HoverIconButton(
           icon: Icons.edit_outlined,

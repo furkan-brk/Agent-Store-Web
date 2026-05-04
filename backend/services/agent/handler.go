@@ -112,6 +112,39 @@ func (h *Handler) GetAgent(c *gin.Context) {
 	})
 }
 
+// GetAgentSkillMd handles GET /api/v1/agents/:id/skill.md
+// Returns the agent as an OpenClaw-compatible SKILL.md file.
+// Requires auth; only the owner or a purchaser receives the full prompt.
+func (h *Handler) GetAgentSkillMd(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	agent, err := h.agentSvc.GetAgent(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+
+	// Same prompt-access gate as GetAgent: owner OR purchaser.
+	wallet := c.GetString("wallet")
+	owned := wallet != "" && (strings.EqualFold(agent.CreatorWallet, wallet) ||
+		h.agentSvc.IsPurchased(wallet, uint(id)))
+
+	if !owned {
+		c.JSON(http.StatusForbidden, gin.H{"error": "purchase required to download SKILL.md"})
+		return
+	}
+
+	slug := SkillSlug(agent.Title)
+	content := BuildSkillMd(agent)
+
+	c.Header("Content-Type", "text/markdown; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-SKILL.md"`, slug))
+	c.String(http.StatusOK, "%s", content)
+}
+
 // CreateAgent handles POST /api/v1/agents
 func (h *Handler) CreateAgent(c *gin.Context) {
 	var input CreateAgentInput
