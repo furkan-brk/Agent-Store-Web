@@ -10,15 +10,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// MissionLegendBridge is the cross-package contract the workspace handler
+// uses to translate a mission into a Legend workflow draft. The concrete
+// implementation lives in services/guild (BridgeService) — workspace stays
+// independent of the guild package by speaking through this interface.
+type MissionLegendBridge interface {
+	MissionToLegend(wallet string, missionID uint) (*LegendDraftResult, error)
+}
+
+// LegendDraftResult mirrors guild.LegendDraftResult so workspace callers
+// don't have to import the guild package. The two structs are kept
+// field-compatible and are JSON-marshalled identically.
+type LegendDraftResult struct {
+	WorkflowID   string `json:"workflow_id"`
+	WorkflowName string `json:"workflow_name"`
+	NodeCount    int    `json:"node_count"`
+	EdgeCount    int    `json:"edge_count"`
+	Source       string `json:"source"`
+}
+
 // Handler exposes HTTP endpoints for the Workspace Service.
 type Handler struct {
 	missionSvc *MissionService
 	legendSvc  *LegendService
+	// missionBridge is optional — when nil, the Mission→Legend endpoint
+	// returns 503. The monolith wires guild.BridgeService here via a thin
+	// adapter; the standalone workspacesvc binary leaves it nil because
+	// the bridge needs cross-service state that only the monolith owns.
+	missionBridge MissionLegendBridge
 }
 
-// NewHandler creates a Workspace handler.
+// NewHandler creates a Workspace handler. `bridge` is optional — pass nil
+// from binaries that don't surface the Mission→Legend feature.
 func NewHandler(missionSvc *MissionService, legendSvc *LegendService) *Handler {
 	return &Handler{missionSvc: missionSvc, legendSvc: legendSvc}
+}
+
+// SetMissionBridge installs the cross-package adapter that powers the
+// /missions/:id/to-legend endpoint. Call this once at boot from the
+// monolith after both workspace and guild services are constructed.
+func (h *Handler) SetMissionBridge(bridge MissionLegendBridge) {
+	h.missionBridge = bridge
 }
 
 // GetMissions returns all missions for the authenticated user.
@@ -294,6 +326,52 @@ func (h *Handler) ImportPublicMission(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, mission)
+}
+
+// ToLegend handles POST /api/v1/user/missions/:id/to-legend.
+//
+// Bridges a stored mission into a freshly-created UserLegendWorkflow draft
+// (START → MISSION_AGENT → END). Returns the new workflow's client ID +
+// display name so the frontend can navigate straight into Legend.
+//
+// Status codes:
+//   - 201: workflow created, body = {workflow_id, workflow_name, ...}
+//   - 404: mission not found for this wallet
+//   - 422: mission has empty/whitespace prompt (nothing to bridge)
+//   - 503: bridge wiring is missing (e.g. running standalone workspacesvc)
+func (h *Handler) ToLegend(c *gin.Context) {
+	if h.missionBridge == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "mission bridge not configured for this service",
+		})
+		return
+	}
+	missionID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mission id"})
+		return
+	}
+	result, err := h.missionBridge.MissionToLegend(c.GetString("wallet"), uint(missionID))
+	if err != nil {
+		// Mission lookup failures map to 404 — the bridge returns gorm.ErrRecordNotFound
+		// when the (mission_id, wallet) pair has no row. Empty-prompt errors map to 422
+		// so the UI can show "this mission has no prompt yet" rather than a generic 4xx.
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "no prompt"):
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": msg})
+		case strings.Contains(msg, "record not found"):
+			c.JSON(http.StatusNotFound, gin.H{"error": "mission not found"})
+		default:
+			log.Printf("[WorkspaceHandler.ToLegend] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"id":   result.WorkflowID,
+		"name": result.WorkflowName,
+	})
 }
 
 // SetMissionPublic toggles the public flag on a mission the user owns.

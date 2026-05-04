@@ -210,3 +210,64 @@ func TestBuildSkillMd_ServiceDescriptionFallback(t *testing.T) {
 		t.Error("when_to_use block should not be blank when ServiceDescription is empty")
 	}
 }
+
+// ── BuildPublicSkillMd tests ─────────────────────────────────────────────────
+
+func TestBuildPublicSkillMd_PromptRedacted(t *testing.T) {
+	a := makeTestAgent()
+	pub := BuildPublicSkillMd(a)
+
+	// The original (secret) prompt must NOT appear anywhere in the public output.
+	if strings.Contains(pub, a.Prompt) {
+		t.Errorf("public SKILL.md leaked the real prompt:\n%s", pub)
+	}
+	// And a purchase-required notice MUST be present in the body.
+	if !strings.Contains(pub, "Purchase this agent on Agent Store") {
+		t.Errorf("public SKILL.md missing purchase placeholder:\n%s", pub)
+	}
+	// Caller's input agent should not be mutated by the redacted build.
+	if a.Prompt == publicPromptPlaceholder {
+		t.Error("BuildPublicSkillMd mutated caller's agent.Prompt — must operate on a copy")
+	}
+}
+
+func TestBuildPublicSkillMd_FrontmatterPreserved(t *testing.T) {
+	a := makeTestAgent()
+	full := BuildSkillMd(a)
+	pub := BuildPublicSkillMd(a)
+
+	// Both versions must share the same YAML frontmatter (delimited by --- ... ---).
+	splitFrontmatter := func(md string) string {
+		parts := strings.SplitN(md, "---\n", 3)
+		if len(parts) < 3 {
+			t.Fatalf("could not split frontmatter from:\n%s", md)
+		}
+		return parts[1]
+	}
+	if splitFrontmatter(full) != splitFrontmatter(pub) {
+		t.Errorf("frontmatter differs between full and public SKILL.md\nFULL:\n%s\nPUBLIC:\n%s",
+			splitFrontmatter(full), splitFrontmatter(pub))
+	}
+
+	// Spot-check that critical OpenClaw discovery fields are present in the public version.
+	for _, want := range []string{
+		"name: my-test-agent",
+		"description:",
+		"when_to_use:",
+		"agent_store:",
+		"  character_type: Wizard",
+	} {
+		if !strings.Contains(pub, want) {
+			t.Errorf("public SKILL.md missing %q", want)
+		}
+	}
+}
+
+func TestBuildPublicSkillMd_EndsWithNewline(t *testing.T) {
+	a := makeTestAgent()
+	a.Prompt = "ignored — will be replaced anyway"
+	pub := BuildPublicSkillMd(a)
+	if !strings.HasSuffix(pub, "\n") {
+		t.Errorf("public SKILL.md must end with a newline, got tail %q", pub[len(pub)-5:])
+	}
+}

@@ -194,6 +194,28 @@ class ApiService {
     return null;
   }
 
+  /// v3.11.1 — Returns up to [limit] agents that share the source agent's
+  /// character_type, ranked by save_count DESC. The source agent itself is
+  /// always excluded server-side. Empty list on any failure (silent fail —
+  /// the UI hides the ribbon when the result is empty).
+  Future<List<AgentModel>> getSimilarAgents(int id, {int limit = 5}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.agents}/$id/similar')
+          .replace(queryParameters: {'limit': '$limit'});
+      final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['agents'] as List<dynamic>? ?? const <dynamic>[])
+            .map((e) => AgentModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+      debugPrint('getSimilarAgents: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getSimilarAgents: $e');
+    }
+    return const [];
+  }
+
   Future<List<AgentModel>> batchGetAgents(List<int> ids) async {
     if (ids.isEmpty) return [];
     try {
@@ -1269,6 +1291,26 @@ class ApiService {
     return null;
   }
 
+  /// v3.11.1 — Bridges a UserMission into a new LegendWorkflow draft.
+  /// Returns the new workflow's numeric id, or 0 on failure.
+  /// Backend: POST /api/v1/user/missions/:id/to-legend.
+  Future<int> missionToLegend(String missionId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.userMissions}/$missionId/to-legend'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return (body['id'] as num?)?.toInt() ?? 0;
+      }
+      debugPrint('missionToLegend: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('missionToLegend: $e');
+    }
+    return 0;
+  }
+
   Future<bool> setMissionPublic(String missionId, {required bool public}) async {
     try {
       final res = await http.patch(
@@ -1358,6 +1400,166 @@ class ApiService {
       if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) { debugPrint('getCreatorInsights: $e'); }
     return null;
+  }
+
+  // ── Notification Center (v3.11.2) ────────────────────────────────────────
+
+  /// Lists the per-(channel, type) notification preferences for the
+  /// authenticated wallet. Each row contains `channel`, `type`, `enabled`.
+  /// Returns an empty list on transport failure so the UI can render the
+  /// default-allow matrix instead of a hard error.
+  Future<List<Map<String, dynamic>>> getNotificationPrefs() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.apiV1}/user/notifications/prefs'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return ((body['prefs'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+      debugPrint('getNotificationPrefs: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getNotificationPrefs: $e');
+    }
+    return const [];
+  }
+
+  /// Upserts a single (channel, type) preference. Returns true when the
+  /// server acknowledged the change so the UI can roll back optimistic
+  /// state on failure.
+  Future<bool> updateNotificationPref(
+    String channel,
+    String type,
+    bool enabled,
+  ) async {
+    try {
+      final res = await http.patch(
+        Uri.parse('${ApiConstants.apiV1}/user/notifications/prefs'),
+        headers: _headers,
+        body: jsonEncode({
+          'channel': channel,
+          'type': type,
+          'enabled': enabled,
+        }),
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateNotificationPref: $e');
+      return false;
+    }
+  }
+
+  /// Returns inbox events, newest first. Pass [beforeId] for cursor
+  /// pagination (the id of the last visible row).
+  Future<List<Map<String, dynamic>>> getNotificationInbox({
+    int? beforeId,
+    int limit = 20,
+  }) async {
+    try {
+      final uri = Uri.parse(
+        '${ApiConstants.apiV1}/user/notifications/inbox',
+      ).replace(queryParameters: {
+        if (beforeId != null && beforeId > 0) 'before': '$beforeId',
+        'limit': '$limit',
+      });
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return ((body['events'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+      debugPrint('getNotificationInbox: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getNotificationInbox: $e');
+    }
+    return const [];
+  }
+
+  Future<bool> markNotificationRead(int id) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.apiV1}/user/notifications/inbox/$id/read'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('markNotificationRead: $e');
+      return false;
+    }
+  }
+
+  Future<bool> markAllNotificationsRead() async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.apiV1}/user/notifications/inbox/mark-all-read'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('markAllNotificationsRead: $e');
+      return false;
+    }
+  }
+
+  // ── Developer / API Keys (v3.11.2) ───────────────────────────────────────
+
+  /// Creates a new API key. Server returns the plaintext value ONCE in the
+  /// response body — callers must surface it to the user immediately. Subsequent
+  /// list calls return only the masked prefix.
+  Future<Map<String, dynamic>?> createApiKey(
+    String name,
+    List<String> scopes,
+  ) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.apiV1}/user/api-keys'),
+        headers: _headers,
+        body: jsonEncode({'name': name, 'scopes': scopes}),
+      );
+      if (res.statusCode == 201 || res.statusCode == 200) {
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      debugPrint('createApiKey: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('createApiKey: $e');
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> listApiKeys() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.apiV1}/user/api-keys'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        return ((body['keys'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+      debugPrint('listApiKeys: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('listApiKeys: $e');
+    }
+    return const [];
+  }
+
+  Future<bool> revokeApiKey(int id) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConstants.apiV1}/user/api-keys/$id'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('revokeApiKey: $e');
+      return false;
+    }
   }
 
   /// Downloads the OpenClaw-compatible SKILL.md for [agentId].

@@ -53,7 +53,11 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("/categories", handler.GetCategories)
 		agents.POST("/batch", optionalAuth, handler.BatchGetAgents)
 		agents.GET("/:id", optionalAuth, handler.GetAgent)
-		agents.GET("/:id/skill.md", auth, handler.GetAgentSkillMd)
+		agents.GET("/:id/similar", optionalAuth, handler.GetSimilar)
+		// Public endpoint: unauth callers get redacted SKILL.md so the
+		// `openclaw://install-skill?url=...` deeplink can be opened from
+		// anywhere. Full prompt is served only to owner/purchaser.
+		agents.GET("/:id/skill.md", optionalAuth, handler.GetAgentSkillMd)
 		agents.POST("", auth, createRL.WalletMiddleware(), handler.CreateAgent)
 		agents.PUT("/:id", auth, handler.UpdateAgent)
 		agents.POST("/:id/regenerate-image", auth, createRL.WalletMiddleware(), handler.RegenerateImage)
@@ -66,6 +70,7 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.POST("/:id/rate", auth, handler.RateAgent)
 		agents.GET("/:id/ratings", handler.GetRatings)
 		agents.POST("/:id/ratings/:ratingID/helpful", auth, handler.MarkRatingHelpful)
+		agents.POST("/:id/ratings/:ratingID/flag", auth, handler.FlagRating)
 
 		user := v1.Group("/user", auth)
 		user.GET("/library", handler.GetLibrary)
@@ -95,6 +100,20 @@ func SetupRouter(handler *Handler) *gin.Engine {
 
 		// v3.10: creator analytics
 		user.GET("/creator/insights", handler.GetCreatorInsights)
+
+		// v3.11.2: notification center
+		notif := user.Group("/notifications")
+		notif.GET("/prefs", handler.GetNotificationPrefs)
+		notif.PATCH("/prefs", handler.UpdateNotificationPref)
+		notif.GET("/inbox", handler.GetNotificationInbox)
+		notif.POST("/inbox/:id/read", handler.MarkNotificationRead)
+		notif.POST("/inbox/mark-all-read", handler.MarkAllNotificationsRead)
+
+		// v3.11.2: developer/API key management
+		keys := user.Group("/api-keys")
+		keys.POST("", handler.CreateAPIKey)
+		keys.GET("", handler.ListAPIKeys)
+		keys.DELETE("/:id", handler.RevokeAPIKey)
 	}
 
 	// Internal endpoints for cross-service communication

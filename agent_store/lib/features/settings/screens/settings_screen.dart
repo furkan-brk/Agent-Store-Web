@@ -1,12 +1,20 @@
 // lib/features/settings/screens/settings_screen.dart
+//
+// Profile section for the Settings hub. v3.11.2 split the original
+// monolithic Settings page into 4 sub-routes; this file owns the
+// /settings index route (profile + network + about + danger zone).
+// Notifications, appearance, and developer surfaces live in their
+// own files under this directory.
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../app/theme.dart';
+import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../shared/services/local_kv_store.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/page_header.dart';
+import '../widgets/settings_sidebar.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -14,15 +22,15 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = AuthController.to;
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+    final l = AppLocalizations.of(context);
+    return SettingsLayout(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const PageHeader(
-            icon: Icons.settings_rounded,
-            title: 'Settings',
-            subtitle: 'Customize your experience',
+          PageHeader(
+            icon: Icons.person_outline,
+            title: l.profileSection,
+            subtitle: l.settingsSubtitle,
           ),
           const SizedBox(height: 28),
 
@@ -142,31 +150,7 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // ── Appearance ─────────────────────────────────────────────────
-          const _SectionHeader(icon: Icons.palette_outlined, title: 'APPEARANCE'),
-          const SizedBox(height: 8),
-          const _SettingsCard(children: [
-            _ToggleTile(
-              icon: Icons.dark_mode_outlined,
-              title: 'Dark Mode',
-              subtitle: 'Always on',
-              value: true,
-              onChanged: null,
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-
-          // ── Notifications ──────────────────────────────────────────────
-          const _SectionHeader(icon: Icons.notifications_outlined, title: 'NOTIFICATIONS'),
-          const SizedBox(height: 8),
-          const _NotificationToggles(),
-
-          const SizedBox(height: 24),
-
-          // ── Privacy ───────────────────────────────────────────────────
-          // Sprint v3.7-14.1 stub: profile visibility skeleton. Full
-          // permission matrix lands in v3.11-14.2.
+          // ── Privacy (stub) ─────────────────────────────────────────────
           const _SectionHeader(icon: Icons.lock_outline, title: 'PRIVACY'),
           const SizedBox(height: 8),
           const _SettingsCard(children: [
@@ -176,24 +160,6 @@ class SettingsScreen extends StatelessWidget {
               subtitle: 'Coming soon — others can find you by username',
               value: true,
               onChanged: null,
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-
-          // ── Developer ─────────────────────────────────────────────────
-          // Sprint v3.7-14.1 stub: developer surface placeholder. API
-          // tokens + dev mode toggles land in v3.11.
-          const _SectionHeader(icon: Icons.code_rounded, title: 'DEVELOPER'),
-          const SizedBox(height: 8),
-          const _SettingsCard(children: [
-            _InfoTile(
-              icon: Icons.api_rounded,
-              title: 'API Tokens',
-              trailing: Text(
-                'Coming soon',
-                style: TextStyle(color: AppTheme.textM, fontSize: 13),
-              ),
             ),
           ]),
 
@@ -274,76 +240,10 @@ class SettingsScreen extends StatelessWidget {
     if (!context.mounted) return;
 
     await LocalKvStore.instance.clear();
-    // Disconnect auth to keep UI in sync after clearing local data
     AuthController.to.disconnect();
 
     if (!context.mounted) return;
     AppSnackBar.success(context, 'All local data cleared');
-  }
-}
-
-// ── Notification toggles with LocalKvStore persistence ──────────────────────
-
-class _NotificationToggles extends StatefulWidget {
-  const _NotificationToggles();
-
-  @override
-  State<_NotificationToggles> createState() => _NotificationTogglesState();
-}
-
-class _NotificationTogglesState extends State<_NotificationToggles> {
-  static const _kCreditAlerts = 'settings.credit_alerts';
-  static const _kAgentUpdates = 'settings.agent_updates';
-
-  bool _creditAlerts = true;
-  bool _agentUpdates = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadPrefs();
-  }
-
-  Future<void> _loadPrefs() async {
-    final kv = LocalKvStore.instance;
-    final ca = await kv.getString(_kCreditAlerts);
-    final au = await kv.getString(_kAgentUpdates);
-    if (!mounted) return;
-    setState(() {
-      _creditAlerts = ca != 'false';
-      _agentUpdates = au != 'false';
-    });
-  }
-
-  Future<void> _setCreditAlerts(bool v) async {
-    setState(() => _creditAlerts = v);
-    await LocalKvStore.instance.setString(_kCreditAlerts, v.toString());
-  }
-
-  Future<void> _setAgentUpdates(bool v) async {
-    setState(() => _agentUpdates = v);
-    await LocalKvStore.instance.setString(_kAgentUpdates, v.toString());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _SettingsCard(children: [
-      _ToggleTile(
-        icon: Icons.credit_card_outlined,
-        title: 'Credit Alerts',
-        subtitle: 'Show notification when credits change',
-        value: _creditAlerts,
-        onChanged: _setCreditAlerts,
-      ),
-      const _TileDivider(),
-      _ToggleTile(
-        icon: Icons.auto_awesome_outlined,
-        title: 'Agent Updates',
-        subtitle: 'Notify when saved agents are updated',
-        value: _agentUpdates,
-        onChanged: _setAgentUpdates,
-      ),
-    ]);
   }
 }
 

@@ -595,17 +595,25 @@ class _TxCardState extends State<_TxCard> {
   /// Maps both new (action_type) and legacy (type) values to a display
   /// label + icon + colour. Falls back to a humanised version of the raw
   /// string so future server-side action types still render reasonably.
+  ///
+  /// v3.11.2: also recognises the shorter v3.11.2 backend keys
+  /// (agent_purchase, legend_node, image_regen) on top of the v3.7-8.1
+  /// `*_node`/`*_agent` variants. Older keys remain mapped to keep the
+  /// historical ledger readable.
   ({IconData icon, Color color, String label}) _classifyAction(String action) {
     switch (action) {
       // v3.7-8.1 action_type values
       case 'create_agent':
         return (icon: Icons.add_box_outlined, color: AppTheme.primary, label: 'Agent Created');
       case 'regen_image':
-        return (icon: Icons.image_outlined, color: AppTheme.gold, label: 'Image Regenerated');
+      case 'image_regen':
+        return (icon: Icons.image, color: AppTheme.gold, label: 'Image Regenerated');
       case 'legend_run_node':
-        return (icon: Icons.account_tree_outlined, color: AppTheme.gold, label: 'Legend Node Run');
+      case 'legend_node':
+        return (icon: Icons.flash_on, color: AppTheme.gold, label: 'Legend Node Run');
       case 'purchase':
-        return (icon: Icons.shopping_bag_outlined, color: AppTheme.primary, label: 'Agent Purchased');
+      case 'agent_purchase':
+        return (icon: Icons.shopping_cart, color: AppTheme.primary, label: 'Agent Purchased');
       case 'dev_grant':
         return (icon: Icons.science_outlined, color: AppTheme.olive, label: 'Dev Grant');
       // Legacy `type` values
@@ -616,7 +624,7 @@ class _TxCardState extends State<_TxCard> {
       case 'initial':
         return (icon: Icons.card_giftcard_rounded, color: AppTheme.olive, label: 'Welcome Bonus');
       case 'topup':
-        return (icon: Icons.add_card_rounded, color: AppTheme.olive, label: 'Credits Purchased');
+        return (icon: Icons.add_circle, color: AppTheme.olive, label: 'Credits Purchased');
       default:
         // Humanise unknown action keys (e.g. "future_thing" -> "Future Thing")
         final words = action.split('_').where((w) => w.isNotEmpty).map(
@@ -683,18 +691,24 @@ class _TxCardState extends State<_TxCard> {
         ),
         child: Column(children: [
           Row(children: [
-          // Icon circle
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: iconColor.withValues(alpha: 0.25),
+          // Icon circle — tooltip surfaces the action label + agent name
+          // so power users can scan the ledger without expanding rows.
+          Tooltip(
+            message: agentTitle != null && agentTitle.isNotEmpty
+                ? '$label · $agentTitle'
+                : label,
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: iconColor.withValues(alpha: 0.25),
+                ),
               ),
+              child: Icon(icon, color: iconColor, size: 18),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(width: 14),
           // Details

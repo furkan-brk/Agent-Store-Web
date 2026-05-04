@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
+import '../../../features/legend/services/legend_service.dart';
+import '../../../shared/services/api_service.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/mission_service.dart';
@@ -147,6 +150,24 @@ class _MissionsScreenState extends State<MissionsScreen> {
     if (mounted) {
       setState(() {});
       AppSnackBar.success(context, 'Mission duplicated');
+    }
+  }
+
+  Future<void> _openInLegend(MissionModel m) async {
+    try {
+      final wfId = await ApiService.instance.missionToLegend(m.id);
+      if (!mounted) return;
+      if (wfId > 0) {
+        await LegendService.instance.refresh();
+        if (!mounted) return;
+        AppSnackBar.success(context, 'Mission opened in Legend');
+        context.go('/legend?id=$wfId');
+      } else {
+        AppSnackBar.error(context, 'Could not open in Legend — try again');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Could not open in Legend: $e');
     }
   }
 
@@ -505,6 +526,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     onEdit: () => _showEditDialog(m),
                     onDuplicate: () => _duplicateMission(m),
                     onDelete: () => _deleteMission(m),
+                    onOpenInLegend: () => _openInLegend(m),
                   );
                 },
               ),
@@ -555,12 +577,14 @@ class _MissionCard extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onDuplicate;
   final VoidCallback onDelete;
+  final VoidCallback onOpenInLegend;
 
   const _MissionCard({
     required this.mission,
     required this.onEdit,
     required this.onDuplicate,
     required this.onDelete,
+    required this.onOpenInLegend,
   });
 
   @override
@@ -667,6 +691,8 @@ class _MissionCardState extends State<_MissionCard> {
               ),
               onSelected: (v) {
                 switch (v) {
+                  case 'legend':
+                    widget.onOpenInLegend();
                   case 'edit':
                     widget.onEdit();
                   case 'duplicate':
@@ -676,6 +702,11 @@ class _MissionCardState extends State<_MissionCard> {
                 }
               },
               itemBuilder: (_) => [
+                const PopupMenuItem(value: 'legend', child: Row(children: [
+                  Icon(Icons.flash_on, size: 16, color: AppTheme.gold),
+                  SizedBox(width: 8),
+                  Text('Open in Legend', style: TextStyle(color: AppTheme.textH, fontSize: 13)),
+                ])),
                 const PopupMenuItem(value: 'edit', child: Row(children: [
                   Icon(Icons.edit_outlined, size: 16, color: AppTheme.textB),
                   SizedBox(width: 8),
@@ -695,6 +726,13 @@ class _MissionCardState extends State<_MissionCard> {
             )
           else
             Column(mainAxisSize: MainAxisSize.min, children: [
+              _ActionIcon(
+                icon: Icons.flash_on,
+                tooltip: 'Open in Legend',
+                onTap: widget.onOpenInLegend,
+                hovered: _hovered,
+                color: AppTheme.gold,
+              ),
               _ActionIcon(
                 icon: Icons.edit_outlined,
                 tooltip: 'Edit',

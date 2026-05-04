@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
+import '../../../features/legend/services/legend_service.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/mission_service.dart';
 import '../../../shared/utils/app_snack_bar.dart';
@@ -45,6 +47,7 @@ class _MissionMarketplaceScreenState extends State<MissionMarketplaceScreen> {
   String _category = 'All';
   String _query = '';
   final Set<String> _importing = {};
+  final Set<String> _openingInLegend = {};
 
   @override
   void initState() {
@@ -92,6 +95,29 @@ class _MissionMarketplaceScreenState extends State<MissionMarketplaceScreen> {
       AppSnackBar.success(context, 'Mission imported to your workspace ✓');
     } else {
       AppSnackBar.error(context, 'Import failed — try again');
+    }
+  }
+
+  Future<void> _openInLegend(Map<String, dynamic> mission) async {
+    final id = mission['client_id'] as String? ?? '';
+    if (id.isEmpty || _openingInLegend.contains(id)) return;
+    setState(() => _openingInLegend.add(id));
+    try {
+      final wfId = await ApiService.instance.missionToLegend(id);
+      if (!mounted) return;
+      if (wfId > 0) {
+        await LegendService.instance.refresh();
+        if (!mounted) return;
+        AppSnackBar.success(context, 'Mission opened in Legend');
+        context.go('/legend?id=$wfId');
+      } else {
+        AppSnackBar.error(context, 'Could not open in Legend — try again');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Could not open in Legend: $e');
+    } finally {
+      if (mounted) setState(() => _openingInLegend.remove(id));
     }
   }
 
@@ -240,7 +266,9 @@ class _MissionMarketplaceScreenState extends State<MissionMarketplaceScreen> {
         itemBuilder: (ctx, i) => _MissionCard(
           data: list[i],
           importing: _importing.contains(list[i]['client_id']),
+          openingInLegend: _openingInLegend.contains(list[i]['client_id']),
           onImport: () => _import(list[i]),
+          onOpenInLegend: () => _openInLegend(list[i]),
         ),
       ),
     );
@@ -270,12 +298,16 @@ class _MissionMarketplaceScreenState extends State<MissionMarketplaceScreen> {
 class _MissionCard extends StatefulWidget {
   final Map<String, dynamic> data;
   final bool importing;
+  final bool openingInLegend;
   final VoidCallback onImport;
+  final VoidCallback onOpenInLegend;
 
   const _MissionCard({
     required this.data,
     required this.importing,
+    required this.openingInLegend,
     required this.onImport,
+    required this.onOpenInLegend,
   });
 
   @override
@@ -379,6 +411,30 @@ class _MissionCardState extends State<_MissionCard> {
                 ),
               ),
               const SizedBox(width: 12),
+              // v3.11.1 — "Open in Legend" quick-action.
+              SizedBox(
+                width: 34,
+                height: 34,
+                child: widget.openingInLegend
+                    ? const Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: AppTheme.gold),
+                        ),
+                      )
+                    : IconButton(
+                        tooltip: 'Open in Legend',
+                        icon: const Icon(Icons.flash_on, color: AppTheme.gold),
+                        iconSize: 18,
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 34, minHeight: 34),
+                        onPressed: widget.onOpenInLegend,
+                      ),
+              ),
+              const SizedBox(width: 6),
               // Import button
               SizedBox(
                 height: 34,

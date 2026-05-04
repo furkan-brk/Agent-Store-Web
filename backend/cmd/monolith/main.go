@@ -87,6 +87,10 @@ func main() {
 	missionSvc := workspace.NewMissionService()
 	legendSvc := workspace.NewLegendService(wsAIClient, wsAgentClient, missionSvc, claudeClient)
 	workspaceHandler := workspace.NewHandler(missionSvc, legendSvc)
+	// v3.11.1: wire the Mission→Legend bridge. The guild bridge returns
+	// guild.LegendDraftResult; adapt to workspace.LegendDraftResult so the
+	// workspace package doesn't have to import guild.
+	workspaceHandler.SetMissionBridge(missionBridgeAdapter{guild.NewBridgeService(guild.NewSessionService())})
 
 	// --- Single Gin Engine ---
 	r := gin.Default()
@@ -302,4 +306,27 @@ func main() {
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Monolith error: %v", err)
 	}
+}
+
+// missionBridgeAdapter implements workspace.MissionLegendBridge by
+// delegating to guild.BridgeService and converting the returned struct.
+// Lives in main so neither workspace nor guild has to import the other.
+type missionBridgeAdapter struct {
+	inner *guild.BridgeService
+}
+
+// MissionToLegend translates the guild bridge result shape into the
+// workspace shape (identical fields, separate types to avoid an import cycle).
+func (a missionBridgeAdapter) MissionToLegend(wallet string, missionID uint) (*workspace.LegendDraftResult, error) {
+	res, err := a.inner.MissionToLegend(wallet, missionID)
+	if err != nil {
+		return nil, err
+	}
+	return &workspace.LegendDraftResult{
+		WorkflowID:   res.WorkflowID,
+		WorkflowName: res.WorkflowName,
+		NodeCount:    res.NodeCount,
+		EdgeCount:    res.EdgeCount,
+		Source:       res.Source,
+	}, nil
 }

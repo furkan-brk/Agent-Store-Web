@@ -13,6 +13,9 @@ import '../../../shared/widgets/wallet_guard.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/widgets/pixel_character_widget.dart';
 import '../../wallet/screens/wallet_connect_screen.dart';
+import '../data/prompt_templates.dart';
+import '../data/quality_score.dart';
+import '../widgets/prompt_templates_dialog.dart';
 
 class CreateAgentScreen extends StatefulWidget {
   const CreateAgentScreen({super.key});
@@ -37,6 +40,12 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
   final _descLen = ValueNotifier<int>(0);
   final _promptLen = ValueNotifier<int>(0);
   final _promptLineCount = ValueNotifier<int>(1);
+
+  // Tag suggestions appended by the prompt template dialog. Currently the
+  // backend doesn't accept tags from CreateAgent (analysis pipeline owns
+  // them), but we surface them here so the user can see what taxonomy the
+  // chosen template implies. Local-only.
+  final _tags = ValueNotifier<List<String>>(const []);
 
   static const int _titleMaxLen = 80;
   static const int _promptMinLen = 20;
@@ -208,7 +217,30 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
     _descLen.dispose();
     _promptLen.dispose();
     _promptLineCount.dispose();
+    _tags.dispose();
     super.dispose();
+  }
+
+  // ── Prompt templates ──────────────────────────────────────────────────────
+
+  /// Opens the template gallery, then injects the chosen template's body
+  /// into the prompt field and merges its tag suggestions.
+  void _showTemplatesDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (_) => PromptTemplatesDialog(
+        onTemplateSelected: _applyTemplate,
+      ),
+    );
+  }
+
+  void _applyTemplate(PromptTemplate template) {
+    _promptCtrl.text = template.promptBody;
+    // Merge tag suggestions: keep existing, append new, dedupe.
+    final next = <String>{..._tags.value, ...template.tagSuggestions}.toList();
+    _tags.value = next;
+    // Re-detect character type so the live preview updates immediately.
+    _ctrl.detectCharacterType(template.promptBody);
   }
 
   // ── Submission ────────────────────────────────────────────────────────────
@@ -868,6 +900,18 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // v3.11.1 — Pre-publish credit warning. Reactive to userCredits;
+        // hidden when the wallet has enough.
+        if (_ctrl.hasInsufficientCredits)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _CreditWarningBanner(
+              currentCredits: _ctrl.credits.value,
+              cost: CreateAgentController.kAgentCost,
+              onTopUp: () => context.go('/wallet'),
+            ),
+          ),
+
         // Section label
         _buildSectionLabel(
           icon: Icons.edit_rounded,
@@ -984,7 +1028,102 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           label: 'Agent Prompt',
           hint: 'This is the core instruction your agent follows',
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
+
+        // ── Template gallery launcher ─────────────────────────────────────
+        Row(children: [
+          _HoverButton(
+            onPressed: _showTemplatesDialog,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.gold.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(8),
+                border:
+                    Border.all(color: AppTheme.gold.withValues(alpha: 0.35)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.auto_awesome_mosaic_rounded,
+                      size: 14, color: AppTheme.gold),
+                  SizedBox(width: 6),
+                  Text(
+                    'Use template',
+                    style: TextStyle(
+                      color: AppTheme.gold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Start from a curated prompt — easy to customize after.',
+              style: TextStyle(color: AppTheme.textM, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ]),
+        const SizedBox(height: 14),
+
+        // Tag chip strip — only when the user has applied a template that
+        // surfaced tag suggestions. Lets them remove individual chips.
+        ValueListenableBuilder<List<String>>(
+          valueListenable: _tags,
+          builder: (_, tags, __) {
+            if (tags.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: tags
+                    .map((t) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.surface,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '#$t',
+                                style: const TextStyle(
+                                  color: AppTheme.textB,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              GestureDetector(
+                                onTap: () {
+                                  final next =
+                                      List<String>.from(_tags.value)..remove(t);
+                                  _tags.value = next;
+                                },
+                                child: const Icon(
+                                  Icons.close_rounded,
+                                  size: 12,
+                                  color: AppTheme.textM,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+              ),
+            );
+          },
+        ),
 
         _buildFieldLabel('System Prompt', required: true),
         const SizedBox(height: 8),
@@ -1265,10 +1404,59 @@ class _CreateAgentScreenState extends State<CreateAgentScreen> {
           ),
         ),
 
+        const SizedBox(height: 20),
+
+        // v3.11.1 — Composite quality score card. Considers prompt length,
+        // tag count, and character-match confidence. Suggestions list
+        // appears below the score band when total < 80.
+        ValueListenableBuilder<int>(
+          valueListenable: _promptLen,
+          builder: (_, promptLen, __) {
+            return ValueListenableBuilder<List<String>>(
+              valueListenable: _tags,
+              builder: (_, tags, __) {
+                // promptScore comes back from the backend after publish; for
+                // pre-publish UI we approximate from the live preview's
+                // character match strength using a simple heuristic.
+                final score = computeQualityScore(
+                  promptCharCount: promptLen,
+                  tagCount: tags.length,
+                  characterPromptScore: _approximatePromptMatchScore(),
+                );
+                return _QualityScoreCard(score: score);
+              },
+            );
+          },
+        ),
+
         const SizedBox(height: 36),
         _buildNavButtons(showNext: false, showBack: true, showSubmit: true),
       ],
     );
+  }
+
+  /// Heuristic pre-publish character-match score. The real `promptScore`
+  /// is assigned by the backend analysis pipeline; here we approximate
+  /// from the existing keyword detector by counting how many of the
+  /// detected character's keywords fire in the prompt. Capped at 100.
+  int _approximatePromptMatchScore() {
+    final p = _promptCtrl.text.toLowerCase();
+    if (p.isEmpty) return 0;
+    final type = _ctrl.preview.value;
+    final keywords = CreateAgentController.keywordsFor(type);
+    if (keywords.isEmpty) return 0;
+    var hits = 0;
+    for (final kw in keywords) {
+      if (p.contains(kw)) hits++;
+    }
+    // 1 hit = 15, 2 = 30, 3 = 50, 4 = 70, 5+ = 90, 8+ = 100.
+    if (hits == 0) return 0;
+    if (hits == 1) return 15;
+    if (hits == 2) return 30;
+    if (hits == 3) return 50;
+    if (hits == 4) return 70;
+    if (hits <= 7) return 90;
+    return 100;
   }
 
   Widget _buildSummaryRow({
@@ -1757,6 +1945,268 @@ class _PromptQualityBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// v3.11.1 — Composite quality score card for Step 2 (Review).
+/// Sits above the publish button so the user gets a final readiness
+/// signal before spending 10 credits.
+class _QualityScoreCard extends StatelessWidget {
+  final QualityScore score;
+  const _QualityScoreCard({required this.score});
+
+  Color get _bandColor {
+    switch (score.band) {
+      case QualityBand.excellent:
+        return AppTheme.olive;
+      case QualityBand.good:
+        return AppTheme.gold;
+      case QualityBand.needsWork:
+        return AppTheme.primary;
+    }
+  }
+
+  String get _bandLabel {
+    switch (score.band) {
+      case QualityBand.excellent:
+        return 'Excellent';
+      case QualityBand.good:
+        return 'Good';
+      case QualityBand.needsWork:
+        return 'Needs work';
+    }
+  }
+
+  IconData get _bandIcon {
+    switch (score.band) {
+      case QualityBand.excellent:
+        return Icons.star_rounded;
+      case QualityBand.good:
+        return Icons.thumb_up_rounded;
+      case QualityBand.needsWork:
+        return Icons.warning_amber_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _bandColor;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row: band + total
+          Row(children: [
+            Icon(_bandIcon, size: 18, color: color),
+            const SizedBox(width: 8),
+            Text(
+              'Quality Score · $_bandLabel',
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${score.total}/100',
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          // Sub-score progress bars
+          _SubScoreRow(label: 'Prompt detail', value: score.lengthScore, max: 40, color: color),
+          const SizedBox(height: 6),
+          _SubScoreRow(label: 'Tags', value: score.tagsScore, max: 30, color: color),
+          const SizedBox(height: 6),
+          _SubScoreRow(label: 'Character match', value: score.characterMatchScore, max: 30, color: color),
+          if (score.suggestions.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            const Divider(color: AppTheme.border, height: 1),
+            const SizedBox(height: 12),
+            const Row(children: [
+              Icon(Icons.lightbulb_outline_rounded, size: 14, color: AppTheme.textM),
+              SizedBox(width: 6),
+              Text(
+                'Suggestions',
+                style: TextStyle(
+                  color: AppTheme.textM,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            ...score.suggestions.map((s) => Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Icon(Icons.fiber_manual_record,
+                          size: 6, color: AppTheme.textM),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        s,
+                        style: const TextStyle(
+                          color: AppTheme.textB,
+                          fontSize: 11,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ]),
+                )),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SubScoreRow extends StatelessWidget {
+  final String label;
+  final int value;
+  final int max;
+  final Color color;
+  const _SubScoreRow({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (value / max).clamp(0.0, 1.0);
+    return Row(children: [
+      SizedBox(
+        width: 110,
+        child: Text(
+          label,
+          style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+        ),
+      ),
+      Expanded(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: LinearProgressIndicator(
+            value: pct,
+            backgroundColor: AppTheme.border,
+            valueColor: AlwaysStoppedAnimation(color.withValues(alpha: 0.85)),
+            minHeight: 6,
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      SizedBox(
+        width: 40,
+        child: Text(
+          '$value/$max',
+          textAlign: TextAlign.right,
+          style: const TextStyle(
+            color: AppTheme.textM,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// v3.11.1 — Insufficient-credit banner shown at Step 0 of Create Agent
+/// when the wallet doesn't have enough to publish. CTA navigates to /wallet.
+class _CreditWarningBanner extends StatelessWidget {
+  final int currentCredits;
+  final int cost;
+  final VoidCallback onTopUp;
+
+  const _CreditWarningBanner({
+    required this.currentCredits,
+    required this.cost,
+    required this.onTopUp,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.gold.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppTheme.gold.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.account_balance_wallet_rounded,
+              color: AppTheme.gold, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Insufficient credits',
+                style: TextStyle(
+                  color: AppTheme.gold,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                'You need $cost credits to publish — you have $currentCredits. Top up to continue.',
+                style: const TextStyle(
+                  color: AppTheme.textB,
+                  fontSize: 11,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        FilledButton.icon(
+          onPressed: onTopUp,
+          icon: const Icon(Icons.add_rounded, size: 16),
+          label: const Text('Top up', style: TextStyle(fontSize: 12)),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.gold,
+            foregroundColor: AppTheme.bg,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 }

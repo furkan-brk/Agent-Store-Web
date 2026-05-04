@@ -52,6 +52,10 @@ func NewTestDB(t *testing.T) *gorm.DB {
 		&models.GuildInvite{},
 		&models.UserFollow{},
 		&models.UserActivity{},
+		&models.NotificationPref{},
+		&models.NotificationEvent{},
+		&models.APIKey{},
+		&models.RatingFlag{},
 	); err != nil {
 		t.Fatalf("testutil: migrate: %v", err)
 	}

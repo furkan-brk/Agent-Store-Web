@@ -11,7 +11,6 @@ import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme.dart';
-import '../../../shared/services/api_service.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/agent_detail_controller.dart';
 import '../../../shared/models/agent_model.dart';
@@ -23,8 +22,12 @@ import '../../store/data/background_data.dart';
 import '../widgets/compare_modal.dart';
 import '../widgets/export_agent_widget.dart';
 import '../widgets/mini_chat_widget.dart';
+import '../widgets/openclaw_install_modal.dart';
+import '../widgets/prompt_redaction.dart';
 import '../widgets/radar_chart_widget.dart';
 import '../widgets/rating_widget.dart';
+import '../widgets/similar_agents_ribbon.dart';
+import '../widgets/tx_timeline.dart';
 
 /// Outer StatelessWidget — registers the controller keyed by agentId.
 class AgentDetailScreen extends StatelessWidget {
@@ -132,33 +135,21 @@ class _AgentDetailViewState extends State<_AgentDetailView>
     }
   }
 
-  Future<void> _downloadSkillMd() async {
+  /// Opens the OpenClaw install modal — replaces the legacy direct-download
+  /// flow. Modal handles deeplink, manual curl install, and (when [hasAccess])
+  /// the full SKILL.md download in one place.
+  void _showOpenClawModal(bool hasAccess) {
     final agent = _ctrl.agent.value;
     if (agent == null) return;
-    final content =
-        await ApiService.instance.fetchAgentSkillMd(agent.id);
-    if (!mounted) return;
-    if (content == null) {
-      AppSnackBar.error(
-          context, 'Could not download SKILL.md — purchase required or network error.');
-      return;
-    }
-    // Trigger browser download
-    final slug = agent.title
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-        .replaceAll(RegExp(r'-+$'), '');
-    final blob = web.Blob(
-      [content.toJS].toJS,
-      web.BlobPropertyBag(type: 'text/markdown'),
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      builder: (_) => OpenClawInstallModal(
+        agentId: agent.id,
+        agentTitle: agent.title,
+        hasAccess: hasAccess,
+      ),
     );
-    final url = web.URL.createObjectURL(blob);
-    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
-    anchor.href = url;
-    anchor.download = '$slug-SKILL.md';
-    anchor.click();
-    web.URL.revokeObjectURL(url);
-    AppSnackBar.success(context, 'SKILL.md downloaded');
   }
 
   Future<void> _buyAgent() async {
@@ -233,6 +224,13 @@ class _AgentDetailViewState extends State<_AgentDetailView>
 
     if (confirmed != true || !mounted) return;
 
+    // v3.11.2 — surface the 4-step Signed → Broadcast → Mined → Confirmed
+    // timeline in a modal bottom sheet so the user can watch the legs
+    // progress without staring at a single spinner. The sheet stays
+    // open until a terminal state (confirmed / failed) is reached, then
+    // the user dismisses manually so they have time to read the result.
+    _showPurchaseTimeline(context);
+
     // v3.7 tx state machine: every leg of the purchase (sign → mempool →
     // reconcile → confirmed) lights up a distinct pill in PurchaseStatusButton
     // and surfaces the on-chain hash with an explorer deep-link. The Snackbar
@@ -248,6 +246,53 @@ class _AgentDetailViewState extends State<_AgentDetailView>
       final reason = _ctrl.txFailureReason.value ?? 'Purchase failed. Try again.';
       AppSnackBar.error(context, reason);
     }
+  }
+
+  /// Pops a non-dismissable bottom sheet rendering the live tx timeline.
+  /// Auto-dismisses (the user closes the sheet manually) once a terminal
+  /// state is reached — the sheet itself just observes Rx state.
+  void _showPurchaseTimeline(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (sheetCtx) {
+        return Obx(() {
+          final state = _ctrl.txState.value;
+          final terminal = state == TxState.confirmed || state == TxState.failed;
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TxTimeline(
+                  state: state,
+                  txHash: _ctrl.txHash.value,
+                  failureReason: _ctrl.txFailureReason.value,
+                ),
+                if (terminal)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    color: AppTheme.surface,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.of(sheetCtx).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 
   // _handleTrial removed — trial now runs server-side via _buildTrialTab chat UI
@@ -777,13 +822,17 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         color: _ctrl.inLibrary.value ? AppTheme.primary : AppTheme.textM,
         onPressed: _toggleLibrary,
       )),
-      if (hasAccess)
-        _HoverIconButton(
-          icon: Icons.extension_outlined,
-          tooltip: 'Download SKILL.md (OpenClaw)',
-          color: const Color(0xFFEF4444),
-          onPressed: _downloadSkillMd,
-        ),
+      // OpenClaw "Install" entry-point — *always* visible. The modal serves
+      // both the deeplink/curl flow (works for anonymous visitors via the
+      // public redacted SKILL.md) and the "Download Full" flow (gated on
+      // hasAccess inside the modal). Keeping this button unconditional makes
+      // the entry-point discoverable regardless of purchase state.
+      _HoverIconButton(
+        icon: Icons.extension_outlined,
+        tooltip: 'Install in OpenClaw',
+        color: const Color(0xFFEF4444),
+        onPressed: () => _showOpenClawModal(hasAccess),
+      ),
       if (_ctrl.isOwnAgent)
         _HoverIconButton(
           icon: Icons.edit_outlined,
@@ -990,15 +1039,52 @@ class _AgentDetailViewState extends State<_AgentDetailView>
             ),
           ])),
           const SizedBox(height: 12),
-          Container(
-            width: double.infinity, padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppTheme.bg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppTheme.border2)),
-            child: SelectableText(a.prompt,
-              style: TextStyle(color: AppTheme.success.withValues(alpha: 0.85), fontSize: 13, height: 1.7, fontFamily: 'monospace')),
-          ),
+          // v3.11.1 — Long prompts (>500 chars) collapse to a preview with
+          // a toggle so the page stays scannable. Toggle row is hidden
+          // entirely for shorter prompts.
+          Obx(() {
+            final showFull = _ctrl.promptShowFull.value;
+            final isLong = shouldOfferPromptToggle(a.prompt);
+            final body = displayedPromptBody(a.prompt, showFull: showFull);
+            return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (isLong)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    TextButton.icon(
+                      icon: Icon(
+                        showFull ? Icons.unfold_less : Icons.unfold_more,
+                        size: 16,
+                      ),
+                      label: Text(
+                        showFull
+                            ? 'Show preview'
+                            : 'Show full (${a.prompt.length} chars)',
+                      ),
+                      onPressed: () => _ctrl.promptShowFull.toggle(),
+                    ),
+                  ]),
+                ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.bg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.border2),
+                ),
+                child: SelectableText(
+                  body,
+                  style: TextStyle(
+                    color: AppTheme.success.withValues(alpha: 0.85),
+                    fontSize: 13,
+                    height: 1.7,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+            ]);
+          }),
           const SizedBox(height: 24),
           ExportAgentWidget(agent: a),
         ] else if (!hasAccess) ...[
@@ -1050,6 +1136,9 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         const _SectionHeader(icon: Icons.star_outline_rounded, title: 'Ratings'),
         const SizedBox(height: 14),
         RatingWidget(agentId: widget.ctrl.agentId),
+
+        // v3.11.1 — Similar agents (silently hides on empty/error)
+        SimilarAgentsRibbon(agentId: a.id),
 
         // Bottom breathing room
         const SizedBox(height: 32),

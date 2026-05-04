@@ -16,6 +16,9 @@ import '../features/creator/screens/creator_dashboard_screen.dart';
 import '../shared/services/network_guard.dart';
 import '../shared/widgets/notification_panel.dart';
 import '../features/settings/screens/settings_screen.dart';
+import '../features/settings/screens/notifications_screen.dart';
+import '../features/settings/screens/appearance_screen.dart';
+import '../features/settings/screens/developer_screen.dart';
 import '../features/profile/screens/public_profile_screen.dart';
 import '../features/guild_master/screens/guild_master_screen.dart';
 import '../features/missions/screens/missions_screen.dart';
@@ -124,6 +127,18 @@ class AppRouter {
           GoRoute(path: '/legend', builder: (_, __) => const LegendScreen()),
           GoRoute(path: '/creator', builder: (_, __) => const CreatorDashboardScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+          GoRoute(
+            path: '/settings/notifications',
+            builder: (_, __) => const NotificationsScreen(),
+          ),
+          GoRoute(
+            path: '/settings/appearance',
+            builder: (_, __) => const AppearanceScreen(),
+          ),
+          GoRoute(
+            path: '/settings/developer',
+            builder: (_, __) => const DeveloperScreen(),
+          ),
           GoRoute(
             path: '/profile/:wallet',
             builder: (ctx, s) {

@@ -13,6 +13,7 @@ import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/mission_service.dart';
 import '../../../shared/widgets/monaco_editor_widget.dart';
 import 'mention_filter.dart';
+import 'mention_preview_card.dart';
 
 class MentionComposer extends StatefulWidget {
   final double height;
@@ -292,6 +293,7 @@ class MentionComposerState extends State<MentionComposer> {
           isSelected: idx == _selected,
           accent: AppTheme.primary,
           isOwned: true,
+          previewAgent: a,
           onTap: () => _pickAgent(a),
           title: Text('@${a.title}',
               maxLines: 1,
@@ -318,6 +320,7 @@ class MentionComposerState extends State<MentionComposer> {
           isSelected: idx == _selected,
           accent: AppTheme.textM,
           isOwned: false,
+          previewAgent: a,
           onTap: () => _pickAgent(a),
           title: Text('@${a.title}',
               maxLines: 1,
@@ -370,13 +373,17 @@ class _SectionLabel extends StatelessWidget {
 
 // ── Mention dropdown item ─────────────────────────────────────────────────────
 
-class _MentionItem extends StatelessWidget {
+class _MentionItem extends StatefulWidget {
   final bool isSelected;
   final bool isOwned;
   final Color accent;
   final VoidCallback onTap;
   final Widget title;
   final Widget? subtitle;
+
+  /// When non-null, hovering the item surfaces a [MentionPreviewCard]
+  /// overlay positioned to the right.
+  final AgentModel? previewAgent;
 
   const _MentionItem({
     required this.isSelected,
@@ -385,30 +392,94 @@ class _MentionItem extends StatelessWidget {
     required this.title,
     this.isOwned = false,
     this.subtitle,
+    this.previewAgent,
   });
 
   @override
+  State<_MentionItem> createState() => _MentionItemState();
+}
+
+class _MentionItemState extends State<_MentionItem> {
+  final _itemKey = GlobalKey();
+  OverlayEntry? _overlayEntry;
+
+  @override
+  void dispose() {
+    _removeOverlay();
+    super.dispose();
+  }
+
+  void _showOverlay() {
+    final agent = widget.previewAgent;
+    if (agent == null) return;
+    if (_overlayEntry != null) return;
+    final renderBox =
+        _itemKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final offset = renderBox.localToGlobal(Offset.zero);
+    final size = renderBox.size;
+
+    _overlayEntry = OverlayEntry(
+      builder: (ctx) {
+        final screen = MediaQuery.of(ctx).size;
+        // Default: position to the right of the dropdown item.
+        var left = offset.dx + size.width + 8;
+        // Flip to the left when the card would overflow the viewport.
+        if (left + MentionPreviewCard.width > screen.width - 8) {
+          left = (offset.dx - MentionPreviewCard.width - 8).clamp(8.0, screen.width);
+        }
+        // Clamp the top so it doesn't escape the bottom of the viewport.
+        var top = offset.dy;
+        const previewMaxH = 220.0;
+        if (top + previewMaxH > screen.height - 8) {
+          top = (screen.height - previewMaxH - 8).clamp(8.0, screen.height);
+        }
+        return Positioned(
+          left: left,
+          top: top,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 100),
+            builder: (_, t, child) => Opacity(opacity: t, child: child),
+            child: MentionPreviewCard(agent: agent),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
+    final body = InkWell(
+      key: _itemKey,
+      onTap: widget.onTap,
       borderRadius: BorderRadius.circular(6),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
-          color: isSelected ? accent.withValues(alpha: 0.18) : Colors.transparent,
+          color: widget.isSelected ? widget.accent.withValues(alpha: 0.18) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border(
             left: BorderSide(
-              color: isSelected ? accent : Colors.transparent,
+              color: widget.isSelected ? widget.accent : Colors.transparent,
               width: 3,
             ),
           ),
         ),
         padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
         child: Row(children: [
-          if (isOwned) ...[
-            Icon(Icons.bookmark_rounded, size: 12, color: AppTheme.primary.withValues(alpha: isSelected ? 1.0 : 0.6)),
+          if (widget.isOwned) ...[
+            Icon(Icons.bookmark_rounded,
+                size: 12,
+                color: AppTheme.primary
+                    .withValues(alpha: widget.isSelected ? 1.0 : 0.6)),
             const SizedBox(width: 5),
           ],
           Expanded(
@@ -416,16 +487,25 @@ class _MentionItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                title,
-                if (subtitle != null) ...[
+                widget.title,
+                if (widget.subtitle != null) ...[
                   const SizedBox(height: 2),
-                  subtitle!,
+                  widget.subtitle!,
                 ],
               ],
             ),
           ),
         ]),
       ),
+    );
+
+    // Only mount MouseRegion when we have an agent to preview — keeps
+    // mission rows pure StatelessWidget overhead.
+    if (widget.previewAgent == null) return body;
+    return MouseRegion(
+      onEnter: (_) => _showOverlay(),
+      onExit: (_) => _removeOverlay(),
+      child: body,
     );
   }
 }

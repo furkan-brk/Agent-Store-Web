@@ -1,8 +1,89 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Agent Store — CLAUDE.md
 > Team Leader tarafından tutulur. Her sprint sonrası güncellenir.
 
 ## Proje Özeti
 AI Agent prompt paylaşım platformu. Kullanıcılar agent promptlarını keşfeder, kütüphanesine ekler, kendi promptunu yükler. Her prompt analiz edilerek benzersiz pixel-art karakter üretilir. Giriş Monad testnet cüzdanı ile yapılır; kredi sistemi on-chain yönetilir.
+
+---
+
+## Development Commands
+
+### Backend (Go) — from `backend/`
+```bash
+# Run all tests (race detector + coverage)
+go test ./... -race -coverprofile=coverage.out -covermode=atomic
+
+# Run a single package's tests
+go test ./services/agent/... -v
+go test ./services/auth/... -v
+
+# Run a single test by name
+go test ./services/agent/... -run TestListAgents -v
+
+# Vet
+go vet ./...
+
+# Run monolith locally (single binary, connects to local postgres)
+go run ./cmd/monolith
+
+# Run individual microservice (example: agent service on port 8082)
+PORT=8082 go run ./cmd/agentsvc
+
+# Run API gateway (routes to microservices)
+go run ./cmd/gateway
+
+# Seed database
+go run ./cmd/seed
+```
+
+### Frontend (Flutter) — from `agent_store/`
+```bash
+flutter pub get
+flutter analyze --no-fatal-infos
+flutter test --reporter expanded
+
+# Run a specific test file
+flutter test test/unit/card_editor_controller_test.dart
+
+# Build for web
+flutter build web
+```
+
+### Docker (full stack)
+```bash
+# Copy .env.example → .env and fill in API keys first
+cp .env.example .env
+
+# Start all services
+docker-compose up --build
+
+# Start only DB + backend (monolith mode)
+docker-compose up postgres backend
+```
+
+### Contracts (Hardhat) — from `contracts/`
+```bash
+npm install
+npm run compile
+npm test
+npm run deploy:local    # local hardhat node
+npm run deploy          # Monad testnet
+```
+
+### Writing Backend Tests
+Tests use an in-memory SQLite DB via `internal/testutil`:
+```go
+func TestMyFeature(t *testing.T) {
+    db := testutil.NewTestDB(t)  // migrates all tables, cleans up via t.Cleanup
+    _ = db
+    // call service functions directly — they read database.DB global
+}
+```
+New models added to `pkg/models/` must also be added to the `AutoMigrate` list in `internal/testutil/db.go`.
 
 
 ---
@@ -25,28 +106,51 @@ AI Agent prompt paylaşım platformu. Kullanıcılar agent promptlarını keşfe
 ```
 Agent_Store_Full/
 ├── agent_store/          # Flutter Web frontend
-│   ├── lib/c
+│   ├── lib/
 │   │   ├── app/          # Router, Theme
 │   │   ├── features/     # store | agent_detail | library | create_agent | wallet | character
+│   │   │                 # card_editor | guild_master | missions | legend | leaderboard
 │   │   ├── shared/       # models | services | widgets
 │   │   └── core/         # constants | utils
-│   ├── Dockerfile
+│   ├── test/unit/        # Dart unit tests (mocktail + fake_async)
 │   └── nginx.conf
-├── backend/              # Go REST API
-│   ├── cmd/server/
-│   ├── internal/
-│   │   ├── api/          # handlers | middleware | router
-│   │   ├── models/
-│   │   ├── services/     # agent | auth | ai | character
-│   │   ├── database/
-│   │   └── config/
-│   └── Dockerfile
+├── backend/              # Go microservices
+│   ├── cmd/
+│   │   ├── monolith/     # ← PRIMARY: single binary (all services in-process)
+│   │   ├── gateway/      # API gateway (reverse proxy, JWT extraction, CORS)
+│   │   ├── authsvc/      # Auth service          :8081
+│   │   ├── agentsvc/     # Agent service         :8082
+│   │   ├── aipipelinesvc/# AI pipeline service   :8083 (stateless)
+│   │   ├── guildsvc/     # Guild service         :8084
+│   │   ├── workspacesvc/ # Workspace service     :8085
+│   │   └── seed/         # DB seeder
+│   ├── pkg/
+│   │   ├── config/       # Shared env config (all services)
+│   │   ├── database/     # GORM connect + SetForTest hook
+│   │   ├── models/       # All GORM models (shared across services)
+│   │   ├── middleware/    # JWT auth, CORS, rate limiter
+│   │   ├── cache/        # In-process cache store
+│   │   └── claude/       # Claude API client
+│   ├── services/
+│   │   ├── agent/        # CRUD, library, social, use-log, skill export
+│   │   ├── auth/         # Nonce, ECDSA verify, JWT issue
+│   │   ├── aipipeline/   # Gemini/Claude analyze, score, avatar, chat
+│   │   ├── guild/        # Guild CRUD, GuildMaster AI, sessions, bridge
+│   │   ├── workspace/    # Missions, Legend workflows, execution
+│   │   └── gateway/      # JWT extractor, proxy, health
+│   └── internal/testutil/# SQLite in-memory test helpers
 ├── contracts/            # Solidity (Hardhat)
 │   ├── contracts/        # AgentStoreCredits.sol | AgentRegistry.sol
 │   └── scripts/          # deploy.js
-├── docker-compose.yml
+├── docker-compose.yml    # Full microservices stack
 └── CLAUDE.md             # ← bu dosya
 ```
+
+### Backend Deployment Modes
+- **Monolith** (`cmd/monolith`): All services run in-process. Used for Railway deploy and simple setups. Internal service calls are direct function calls (no HTTP between services).
+- **Microservices** (`cmd/gateway` + individual `*svc` binaries): Each service runs in its own container. The gateway proxies by URL prefix. Used in full docker-compose.
+- **Internal endpoints** (`/internal/*`): Used for cross-service calls in microservices mode — not exposed publicly. The gateway does NOT proxy `/internal/` routes.
+- **Inter-service URL resolution**: `pkg/config/config.go:svcDefault()` — Railway uses `.railway.internal` hostnames; docker-compose uses `*svc` container names.
 
 ---
 
@@ -126,22 +230,20 @@ services:
 
 ## Dosya Haritası (Team Leader tarafından oluşturuldu)
 
-### Backend (Go) — 14 dosya ✅
+### Backend (Go) — key entry points
 | Dosya                                    | Açıklama                                     |
 | ---------------------------------------- | -------------------------------------------- |
-| `cmd/server/main.go`                     | Giriş noktası, config + DB + router başlatır |
-| `config/config.go`                       | Env değişkenlerinden yapılandırma yükler     |
-| `internal/database/db.go`                | GORM bağlantısı + AutoMigrate                |
-| `internal/models/user.go`                | User modeli (wallet_address PK, credits)     |
-| `internal/models/agent.go`               | Agent + LibraryEntry modelleri               |
-| `internal/services/auth_service.go`      | Nonce üret, imza doğrula, JWT                |
-| `internal/services/agent_service.go`     | Agent CRUD, kütüphane, kredi                 |
-| `internal/services/character_service.go` | Prompt analiz → karakter tipi + nadir derece |
-| `internal/api/router.go`                 | Gin router + CORS kurulumu                   |
-| `internal/api/handlers/auth_handler.go`  | GET /auth/nonce, POST /auth/verify           |
-| `internal/api/handlers/agent_handler.go` | CRUD + library endpoints                     |
-| `internal/api/middleware/auth.go`        | JWT doğrulama middleware                     |
-| `Dockerfile`                             | Multi-stage Go build                         |
+| `cmd/monolith/main.go`                   | PRIMARY entry: all services in-process       |
+| `cmd/gateway/main.go`                    | API gateway (proxy mode, mock auth in dev)   |
+| `pkg/config/config.go`                   | Shared env config for all services           |
+| `pkg/database/db.go`                     | GORM connect + `SetForTest` hook             |
+| `pkg/models/`                            | All GORM models (shared)                     |
+| `services/auth/service.go`               | Nonce üret, ECDSA doğrula, JWT               |
+| `services/agent/service.go`              | Agent CRUD, kütüphane, kredi                 |
+| `services/aipipeline/service.go`         | Gemini/Claude pipeline (stateless)           |
+| `services/guild/guildmaster.go`          | GuildMaster AI suggest + chat                |
+| `services/workspace/legend_service.go`   | Legend workflow save/execute                 |
+| `internal/testutil/db.go`               | SQLite in-memory test DB (no CGO)            |
 
 ### Frontend (Flutter Web) — 17 dosya ✅
 | Dosya                                            | Açıklama                                  |
@@ -200,6 +302,8 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [x] **v3.11.2 — Cross-Cutting Polish** (Backend + Frontend) ✅ notification center, API keys (bcrypt + scopes), per-action credit breakdown, rating moderation, settings sectioning, i18n iskelet, theme toggle (light parchment), notification UI, developer UI, wallet error dictionary + tx timeline + per-action history icons
+- [x] **v3.11.1 — User-Facing High-Impact Polish** (Backend + Frontend) ✅ fuzzy search, similar agents, mission→legend bridge, prompt template gallery, mention preview, redaction toggle, quality score, credit early-check
 - [x] **v3.10 — Pro Tools** (Backend + Frontend) ✅ preflight, workflow versioning, mission marketplace, guild invite/permissions, compatibility explainability, creator analytics
 - [x] **v3.9 — Discovery + Engagement** (Backend + Frontend) ✅ social follow, For You, leaderboard time windows, OG meta, activity feed
 - [x] **v3.8 — Explainability + Action Bridge** (Backend + Frontend) ✅ 9 task
@@ -209,6 +313,216 @@ services:
   - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
   - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
   - ⏳ 2-day bug bash — pending
+
+## v3.11.2 Cross-Cutting Polish (2026-05-05)
+10 task; settings sectioning + i18n iskelet + theme toggle + notification center +
+API keys + wallet UX trio + rating moderation. Backend +28 unit (services/agent
+126/126 passing), Frontend +24 test (174/174 passing). `go vet ./...` clean,
+`flutter analyze` 0 issue.
+
+**Backend** (4 task):
+- **Notification Center**: `NotificationPref` + `NotificationEvent` models
+  (`pkg/models/notification.go`) — composite uniqueness on (wallet, channel, type),
+  cursor index on (wallet, id DESC). Service `services/agent/notification.go`:
+  `ListPrefs` (default seed: 3 type × 2 channel = 6 entries via `Create(map)` to
+  bypass GORM `default:true` stomp), `UpdatePref` upsert, `ListInbox` cursor
+  pagination (v3.9 GetActivityFeed pattern), `MarkRead`, `MarkAllRead`,
+  `CreateNotification` helper. 7 unit test (default seed, upsert validation,
+  cursor, mark-read idempotency, wallet isolation, mark-all bulk, disabled-pref drop).
+- **API Keys**: `APIKey` model (Wallet, Name, KeyHash bcrypt, Prefix size:32,
+  Scopes CSV, LastUsedAt/RevokedAt nullable). Service `api_keys.go`: `CreateKey`
+  generates `agst_` + 32 hex (crypto/rand), bcrypt hash, returns plaintext **once**;
+  `ListKeys` returns masked (KeyHash JSON `-`); `RevokeKey` tombstones.
+  3 sabit scope: `read:agents`, `write:agents`, `execute:legend`.
+  **Karar**: `SetAPIKeyBcryptCostForTest(bcrypt.MinCost)` testlerde — production
+  `bcrypt.DefaultCost` (10) kullanır. 5 unit test.
+- **Per-Action Credit Breakdown**: `CreditTransaction.Action` + `Metadata` field'ları
+  eklendi. **Karar**: yeni ledger tablosu yerine `normaliseLedgerAction` helper
+  legacy `Type` değerlerini map ediyor (`create`→`agent_create`, `fork`→`agent_fork`,
+  `workflow_execute`/`legend_run_node`→`legend_node`, `purchase`→`agent_purchase`,
+  `regenerate_image`→`image_regen`). `RecordPurchase`, `RegenerateImage`,
+  `TopUpCredits` artık Action+Metadata yazıyor. Backward compat: empty Action OK.
+  4 unit test.
+- **Rating Moderation**: `RatingFlag` model (composite unique
+  `idx_rating_flag_unique` on rating_id+reporter_wallet) + `AgentRating.Hidden`
+  field. `FlagRating` transaction ile FOR UPDATE lock + `clause.OnConflict{DoNothing}`
+  insert + count + auto-hide at ≥3 flags. Rate-limit: 3 flag / wallet / 5dk.
+  **Karar**: `isAbusive(rating.Comment)` kullanılarak 3-vote threshold by-pass —
+  abusive content olan bir rating tek flag'le anında hidden olur (profanity word
+  list + URL count >2 heuristic). `GetRatings` artık `WHERE hidden=false` filtreliyor.
+  5 unit test.
+
+**Frontend** (6 task):
+- **Settings Sectioning + Routing**: `lib/features/settings/widgets/settings_sidebar.dart`
+  (SettingsSidebar + SettingsLayout). 4 alt route (`/settings`, `/settings/notifications`,
+  `/settings/appearance`, `/settings/developer`). PageHeader (v3.2) + GoRouter nested.
+  **Karar**: SettingsLayout drives via `MaterialApp.router` — widget testler real
+  GoRouter config gerekir (plain MaterialApp `GoRouterState.of` errors).
+- **i18n iskelet**: `flutter_localizations` + `intl` + `l10n.yaml` config
+  (`synthetic-package: false` + `output-dir: lib/l10n/gen` — default synthetic
+  Flutter SDK build'inde dosya materialise olmuyor). `lib/l10n/{app_en,app_tr}.arb`
+  ~30 string sadece yeni Settings ekranları için. `LocaleController` GetX +
+  SharedPreferences `locale_v1`. 3 unit test.
+- **Theme Toggle**: `AppTheme.lightTheme` (parchment palette: `bgLight=0xFFF5F1E8`,
+  `cardLight=0xFFEDE6D3`, `card2Light=0xFFE3DABF`, `textHLight=0xFF2A1F0E`,
+  `textMLight=0xFF5C4A2E`). Shared `_build()` helper iki variant'ı senkron tutar.
+  `ThemeController` (mode obs: dark/light/system, SharedPreferences `theme_mode_v1`).
+  `main.dart` MaterialApp.router Obx-wrap, `theme: lightTheme`, `darkTheme: darkTheme`.
+  Appearance UI: theme radio + language dropdown. 3 unit test.
+- **Notification UI**: `notifications_screen.dart` + `NotificationPrefsController`.
+  ApiService 5 yeni metod (getNotificationPrefs/updateNotificationPref/
+  getNotificationInbox cursor/markNotificationRead/markAllNotificationsRead).
+  3×2 SwitchListTile.adaptive matrix + cursor inbox + mark-all-read CTA. 4 test.
+- **Developer/API Key UI**: `developer_screen.dart`. ApiService 3 metod
+  (createApiKey/listApiKeys/revokeApiKey). Create modal: name + 3 scope checkbox →
+  plaintext key one-time-show + Clipboard.setData + warning. List: masked prefix +
+  scopes chip + last-used relative + revoke ConfirmDialog. 3 widget test.
+- **Wallet UX trio (T10)**:
+  - `wallet_errors.dart`: `WalletError` class + Map (kodlar: `-32603`, `4001`,
+    `4100`, `4901`, `4902`, `-32002`, `network_error`, `insufficient_funds`).
+    `friendlyError(e)` helper. `WalletService` catch'leri buna bağlandı.
+  - `tx_timeline.dart`: 4-step linear stepper (Signed→Broadcast→Mined→Confirmed),
+    TxState enum (v3.7) sync. `_showPurchaseTimeline()` modal bottom sheet
+    `purchaseAgentFlow` öncesi. `tx_timeline.dart` `TxState`/`TxStateX` re-export
+    eder — caller tek import.
+  - `credit_history_screen.dart` per-action ikon (shopping_cart/flash_on/image/
+    add_circle/history fallback) + tooltip (action+metadata).
+  - 6 wallet error test + 5 timeline widget test.
+
+**Yeni dosyalar**:
+- `backend/pkg/models/{notification,api_key,rating_flag}.go`
+- `backend/services/agent/{notification,api_keys,rating_moderation}.go` + 3 test
+- `backend/services/agent/credits_history_test.go`
+- `agent_store/lib/controllers/{locale_controller,theme_controller}.dart`
+- `agent_store/{l10n.yaml, lib/l10n/{app_en,app_tr}.arb}` + auto-gen
+- `agent_store/lib/features/settings/widgets/settings_sidebar.dart`
+- `agent_store/lib/features/settings/screens/{appearance,notifications,developer}_screen.dart`
+- `agent_store/lib/shared/services/wallet_errors.dart`
+- `agent_store/lib/features/agent_detail/widgets/tx_timeline.dart`
+- `agent_store/test/unit/{locale_controller,theme_controller,wallet_errors,notification_prefs}_test.dart`
+- `agent_store/test/widget/{tx_timeline,developer_screen}_test.dart`
+
+**Genişletilen modeller/dosyalar**:
+- `pkg/models/{agent_rating.go (Hidden bool), credit_transaction.go (Action+Metadata)}`
+- `internal/testutil/db.go` + `services/agent/migrate.go` (4 yeni model AutoMigrate)
+- `services/agent/{service.go (normaliseLedgerAction, appendLedger, GetRatings filter),
+  handler.go (9 yeni handler), router.go (9 yeni route)}`
+- `agent_store/pubspec.yaml` (flutter_localizations + intl + generate:true)
+- `agent_store/lib/main.dart` (locale + theme + l10n delegates wired)
+- `agent_store/lib/app/{theme.dart (lightTheme variant), router.dart (3 yeni route)}`
+- `agent_store/lib/shared/services/api_service.dart` (8 yeni metod)
+- `agent_store/lib/shared/services/wallet_service.dart` (friendlyError catch'leri)
+- `agent_store/lib/features/wallet/screens/credit_history_screen.dart` (action ikon)
+- `agent_store/lib/features/agent_detail/screens/agent_detail_screen.dart` (timeline modal)
+
+**Yeni endpoint'ler** (10):
+- `GET/PATCH /api/v1/user/notifications/prefs`
+- `GET /api/v1/user/notifications/inbox?before=&limit=`
+- `POST /api/v1/user/notifications/inbox/:id/read`
+- `POST /api/v1/user/notifications/inbox/mark-all-read`
+- `POST/GET /api/v1/user/api-keys` + `DELETE /api/v1/user/api-keys/:id`
+- `POST /api/v1/agents/:id/ratings/:ratingID/flag`
+
+**Açık tasklar (v3.11.3'e defer)**: API key scope-based middleware enforcement,
+notification event auto-creation hooks (CreateAgent/LibraryAdd/LegendExecute push),
+mevcut tüm ekranların i18n string sweep'i, WebSocket/SSE notification, Legend node
+checkpoint/resume, workflow diff UI, observability paneli, agent versioning, bulk
+operations, KPI panosu.
+
+## v3.11.1 User-Facing Polish (2026-05-05)
+8 task; user'ın ilk gün gördüğü iyileştirmeler — `eksiklikleri-könçürleme.md`
+backlog'unun v3.11 fazlarına bölünmüş ilk halkası. Backend +17 unit, Frontend +37 test.
+`go vet ./...` clean, `flutter analyze` 0 issue, 150 frontend test yeşil (113 pre-existing + 37 new).
+
+**Backend** (3 task):
+- **Fuzzy + weighted search**: `ListAgents` (`services/agent/service.go`) artık dolu
+  `search` parametresinde GORM'dan **limit 200 aday seti** çekip Go-side weighted
+  (title 3×, tag 2×, desc 1×) + Levenshtein fuzzy re-rank uyguluyor. Boş query path
+  ve cache anahtarı değişmedi (deterministik re-rank). Yeni helper:
+  `services/agent/search_rank.go` (`scoreAgent`, `levenshteinSimilarity`,
+  `tokenize`, `rankAgentsByQuery`, `rankBySimilarity`). `pg_trgm` extension
+  bağımlılığı yok — SQLite test + PostgreSQL prod aynı kod path. **Karar**:
+  fuzzyThreshold 0.7→0.6 ("wziard"≈"wizard" Lev=0.667 sınırın üstü olsun).
+- **Similar agents endpoint**: `GET /api/v1/agents/:id/similar?limit=5`. Aynı
+  character_type, save_count desc, source agent excluded, 5dk cache (key:
+  `similar|<id>|<limit>`). `AddToLibrary`/`RemoveFromLibrary` cache bust'larına
+  `s.cache.DeletePrefix("similar|")` eklendi.
+- **Mission→Legend bridge**: `POST /api/v1/user/missions/:id/to-legend`.
+  `BridgeService.MissionToLegend(wallet, missionID)` yeni metod +
+  `buildSingleNodeWorkflow(title, prompt)` helper (START→MISSION_AGENT→END,
+  3 nodes / 2 edges). Empty/whitespace prompt → 422. **Karar**: workspace
+  package guild package'ı import etmesin diye **interface + adapter pattern** —
+  `workspace.MissionLegendBridge` interface, `cmd/monolith/main.go`'da
+  `missionBridgeAdapter` ile guild→workspace LegendDraftResult dönüşümü.
+  Standalone `cmd/workspacesvc` binary 503 döner (cross-service wiring
+  monolith-only).
+
+**Frontend** (5 task + 1 bridge UI):
+- **Prompt template galerisi**: `lib/features/create_agent/data/prompt_templates.dart`
+  (10 hazır template, 8 karakter tipine dengeli) +
+  `widgets/prompt_templates_dialog.dart` modal (legend_templates_dialog pattern,
+  MouseRegion + AnimatedContainer 150ms gold 0.08 alpha). Step 1 header'da
+  "Use template" butonu, seçim → `_promptCtrl.text` + tag chip append.
+- **Similar agents ribbon**: yeni
+  `lib/features/agent_detail/widgets/similar_agents_ribbon.dart`. Loading 3×
+  ShimmerBox(180×220, radius 14), error/empty silent fail. **Test hook**:
+  `fetchOverride` + `cardBuilder` parametreleri (AgentCard hover animasyonları
+  + 4.4px overflow widget test'i kırıyordu — production caller'lar null geçer).
+- **Mention preview hover kartı**: yeni
+  `lib/features/guild_master/widgets/mention_preview_card.dart` (width 280,
+  description 2 line + characterType + rarity border + mini avatar). Composer
+  `_MentionItem` StatefulWidget'a dönüştü, `OverlayEntry` ile float, sağ kenar
+  taşarsa otomatik flip-left (`MediaQuery.size.width` check).
+- **Prompt redaction toggle**: yeni
+  `lib/features/agent_detail/widgets/prompt_redaction.dart` pure helper'lar
+  (`shouldOfferPromptToggle`, `displayedPromptBody`).
+  `agent_detail_controller.dart` `promptShowFull` Rx. >500 char prompt'larda
+  toggle row (Icons.unfold_more/less + char count).
+- **Pre-publish quality score**: mevcut `_PromptQualityBadge` (Step 1, charCount-only)
+  korundu; yeni `_QualityScoreCard` Step 2'de (length 40 + tags 30 + character
+  match 30). ≥80 yeşil "Excellent", 50-79 sarı "Good", <50 kırmızı + öneri.
+  **Karar**: backend `promptScore` post-publish döndüğü için Step 2'de
+  `_approximatePromptMatchScore()` heuristik (`CreateAgentController.keywordsFor()`
+  ile keyword hit count) — live preview character detection ile aynı map.
+  Pure-Dart scorer extract: `lib/features/create_agent/data/quality_score.dart`
+  (16 unit test).
+- **Credit early-check banner**: `kAgentCost = 10` constant +
+  `hasInsufficientCredits` getter. Step 0 üstünde `_CreditWarningBanner`
+  (Obx-driven), turuncu, "10 credits needed, you have X" + Top-up CTA →
+  `/wallet`. **Karar**: test pure getter contract'ı izliyor (private widget mount
+  yerine), v3.6 mention_filter pattern'i.
+- **Open in Legend** ikonu (T3.5): `api_service.dart` `missionToLegend(id)` →
+  POST endpoint, dönen workflow ID. Mission Marketplace `_MissionCard`'a
+  Icons.flash_on (gold) + `_openInLegend()` spinner state. Missions ana ekranı
+  hem desktop icon column hem mobile PopupMenu varyantı. Success: snackbar +
+  `context.go('/legend?id=$wfId')`.
+
+**Yeni dosyalar**:
+- `backend/services/agent/{search_rank.go, search_rank_test.go, similar_test.go}`
+- `backend/services/guild/bridge_mission_test.go`
+- `agent_store/lib/features/create_agent/data/{prompt_templates.dart, quality_score.dart}`
+- `agent_store/lib/features/create_agent/widgets/prompt_templates_dialog.dart`
+- `agent_store/lib/features/agent_detail/widgets/{similar_agents_ribbon.dart, prompt_redaction.dart}`
+- `agent_store/lib/features/guild_master/widgets/mention_preview_card.dart`
+- `agent_store/test/{unit/{prompt_templates,similar_ribbon,prompt_redaction,quality_score}_test.dart, widget/{mention_preview,credit_banner}_test.dart}`
+
+**Genişletilen dosyalar**: `backend/services/agent/{service,handler,router}.go`,
+`backend/services/guild/bridge.go`, `backend/services/workspace/{handler,router}.go`,
+`backend/cmd/monolith/main.go`, `agent_store/lib/shared/services/api_service.dart` (2
+yeni metod), `agent_store/lib/controllers/{create_agent_controller,agent_detail_controller}.dart`,
+`agent_store/lib/features/create_agent/screens/create_agent_screen.dart`,
+`agent_store/lib/features/agent_detail/screens/agent_detail_screen.dart`,
+`agent_store/lib/features/guild_master/widgets/mention_composer.dart`,
+`agent_store/lib/features/missions/screens/{mission_marketplace,missions}_screen.dart`.
+
+**Yeni endpoint'ler**:
+- `GET /api/v1/agents/:id/similar?limit=5` (optionalAuth)
+- `POST /api/v1/user/missions/:id/to-legend` (auth)
+
+**Açık tasklar (v3.11.2/.3'e defer)**: i18n iskeleti, theme toggle, notification
+center, API keys, wallet error dictionary, per-action credit breakdown, Legend node
+checkpoint/resume, workflow diff UI, observability paneli, agent versioning, bulk
+operations, KPI panosu. `könçürleme.md` 7 UX şikayeti ayrı "UX Bug Bash" sprint'ine.
 
 ## v3.10 Pro Tools (2026-05-04)
 21 files changed (3 new backend + 1 new frontend screen), `go build ./... && flutter analyze` both clean.
@@ -511,7 +825,7 @@ v3.10 Pro Tools → v3.11 Polish + Cross-Cutting.
 - **Shared infra**: `lib/shared/widgets/responsive_layout.dart` — `ResponsiveLayout(mobile, tablet?, desktop)` LayoutBuilder helper using existing `AppBreakpoints`. `isNarrow(BuildContext)` helper for the AppShell-aligned 768px split.
 
 ## v3.4 Card Editor (2026-04-26)
-Split-view canlı kart editörü — lor-card-maker'dan UX ilhamı, tema vintage koyu (LoR görselleri YOK):
+Split-view canlı kart editörü — vintage koyu tema:
 - **Backend genişletme**: `PUT /api/v1/agents/:id` whitelist'i artık prompt, category, subclass, price, card_version, service_description, profile_mood/role_purpose, traits, stats kabul ediyor. character_data JSON merge ile stats/traits/profile içeriği güvenle güncelleniyor; owner check değişmedi. (`backend/services/agent/{handler,service}.go`)
 - **CardEditorController**: `_original` + `draft` AgentModel, debounced save (600ms), undo/redo history stack (max 50, v3.3 Legend pattern'i), SyncStatus enum (idle/dirty/saving/saved/error), exponential backoff retry, `reDetectFromPrompt()` keyword scoring re-run.
 - **Split-view ekran**: sol form panel (6 accordion section: Identity, Prompt, Taxonomy, Stats, Narrative, Visuals) + sağ canlı `AgentCard` preview (`RepaintBoundary` + S/M/L boyut toggle). Mobile fallback stacked layout.
@@ -522,50 +836,6 @@ Split-view canlı kart editörü — lor-card-maker'dan UX ilhamı, tema vintage
 - **Export**: `dart:js_interop` + `package:web` ile Blob+AnchorElement download; JSON `toJson()` (character_data nested), PNG `RepaintBoundary.toImage(pixelRatio: 3.0)`.
 - **Yeni rota**: `/agent/:id/edit` → `CardEditorScreen`, binding GetX `Get.put` tag-scoped.
 - **Yeni dosyalar**: `lib/features/card_editor/{controllers/card_editor_controller.dart, bindings/card_editor_binding.dart, screens/card_editor_screen.dart, services/card_export_service.dart, widgets/{editor_preview_panel.dart, editor_toolbar.dart, sections/editor_sections.dart, fields/editor_fields.dart}}` + `agent_model.dart`'a `toJson()`/`toUpdatePayload()`.
-
-## OpenClaw Compatibility Sprint (2026-05-04)
-Drop-in compatibility between Agent Store agents/workflows and OpenClaw workspace.
-Round-trip: export → drop into `~/.openclaw/workspace/skills/` → re-import recovers prompt.
-
-**Backend** (3 files):
-- **`services/agent/skill_export.go`**: `SkillSlug()` (mirrors Flutter `_slugify` exactly —
-  lowercase → strip non-alnum/space/dash → collapse spaces→dash → max 50 → trim trailing dash)
-  + `BuildSkillMd()` (hand-rolled YAML frontmatter with `name/description/version/when_to_use/
-  model/metadata.openclaw/agent_store` blocks + prompt body). No external YAML dep.
-- **`services/agent/handler.go`**: `GetAgentSkillMd` — owner OR purchaser gate (403 else),
-  `Content-Disposition: attachment` download as `<slug>-SKILL.md`.
-- **`services/agent/router.go`**: `GET /api/v1/agents/:id/skill.md` (auth-gated).
-- **`skill_export_test.go`**: 13 tests — slug edge cases, frontmatter completeness, prompt
-  preservation, description truncation, empty tags, `---` inside prompt.
-
-**Frontend** (7 files):
-- **`claude_export_service.dart`**: `generateOpenclawSkill(AgentModel)` — mirrors Go BuildSkillMd;
-  `isOpenclawSkill(String)` — detects by `metadata:\n  openclaw:` presence;
-  `parseOpenclawSkill(String)` — line-scanner for flat + agent_store sub-block, strips `# Title`
-  heading from body; `generateOpenclawWorkspace(wf, agents)` — virtual JSON file map with per-agent
-  SKILL.md + team.json (same pattern as existing CLI package — no zip).
-- **`legend_export_dialog.dart`**: New "OpenClaw Compatible" section after context row — "OpenClaw
-  Skills" (SKILL.md per agent, preview first agent) + "OpenClaw Workspace" (bundle JSON).
-- **`legend_screen.dart`**: Tab 4 "SKILL.md" in import dialog — `_tabLabels` + `_tabHints` +
-  `_tabHints` extended; `_validate` case 4 via `isOpenclawSkill`; `_buildImportResult` case 4
-  creates single-node workflow from parsed SKILL.md (same pattern as case 2 Agent .md).
-- **`api_service.dart`**: `fetchAgentSkillMd(int id)` returns raw Markdown text (not JSON).
-- **`agent_detail_screen.dart`**: `_downloadSkillMd()` + red extension icon button (owner +
-  purchaser, uses `hasAccess`); `import 'api_service.dart'` added.
-- **`editor_toolbar.dart`**: `onExportSkillMd` callback + "Export as SKILL.md" popup menu entry
-  (red extension icon).
-- **`card_editor_screen.dart`**: `_onExportSkillMd()` + `dart:js_interop` + `package:web` import;
-  wired into `_Editor` widget constructor and `EditorToolbar`.
-
-**Tests**:
-- `skill_export_test.go`: 13 backend unit tests — all pass.
-- `test/unit/openclaw_export_test.dart`: 30 Flutter unit tests — generate/parse/isOpenclawSkill/
-  workspace round-trips — all pass. Total Flutter suite: 113/113.
-
-**Karar**: `generateOpenclawWorkspace` returns combined JSON (no zip/tarball) — consistent with
-v3.0 decision to avoid JSZip dependency (`_downloadCliPackage` pattern). Import tab uses explicit
-tab 4 (not auto-detect in tab 2) for clearer UX — user explicitly selects SKILL.md format.
-Prompt-access gate mirrors backend: `hasAccess` (owner OR purchaser) for download button.
 
 ## Sprint Takip Dosyalari
 - `SPRINT_V2.md` — Detayli plan ve teknik kararlar

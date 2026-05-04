@@ -87,6 +87,12 @@ func NewAgentService(aiClient *client.AIClient, imageSvc *ImageService, c *cache
 }
 
 // ListAgents returns a page of agents with optional filtering and sorting.
+//
+// Search behaviour (v3.11.1): when `search` is non-empty, the SQL filter
+// widens to `title ILIKE OR description ILIKE OR tags ILIKE` and pulls
+// up to 200 candidates, then re-ranks them in-process with weighted
+// fuzzy matching (title 3×, tags 2×, description 1× — see scoreAgent).
+// The cache key is unchanged because re-ranking is deterministic.
 func (s *AgentService) ListAgents(category, search, sort, creatorWallet string, page, limit int) ([]models.Agent, int64, error) {
 	type cachedResult struct {
 		Agents []models.Agent `json:"agents"`
@@ -106,8 +112,18 @@ func (s *AgentService) ListAgents(category, search, sort, creatorWallet string, 
 	if category != "" {
 		query = query.Where("category = ?", category)
 	}
-	if search != "" {
-		query = query.Where("title ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
+	searched := strings.TrimSpace(search) != ""
+	if searched {
+		// Widen the candidate set so the in-process ranker has something to work with.
+		// `tags` is a Postgres text[] in prod / TEXT in sqlite tests — we cast it to
+		// text via `array_to_string` on Postgres (still LIKE-able) but the simple
+		// pattern below works on both dialects because GORM's Where bind param is
+		// applied as a text comparison.
+		like := "%" + search + "%"
+		query = query.Where(
+			"title ILIKE ? OR description ILIKE ? OR CAST(tags AS TEXT) ILIKE ?",
+			like, like, like,
+		)
 	}
 	if creatorWallet != "" {
 		query = query.Where("creator_wallet = ?", creatorWallet)
@@ -127,8 +143,40 @@ func (s *AgentService) ListAgents(category, search, sort, creatorWallet string, 
 	case "oldest":
 		orderClause = "created_at ASC"
 	}
+
+	selectCols := "id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, generated_image, price, prompt_score, card_version, created_at"
+
+	if searched {
+		// Pull a wider candidate slice (up to 200) so the Go-side weighted ranker
+		// has room to surface fuzzy hits that the SQL LIKE filter accepts. Then
+		// re-rank, page in-process, and return total = len(unfiltered candidates)
+		// so the caller's pagination matches what they actually see.
+		const candidateCap = 200
+		var candidates []models.Agent
+		if err := query.
+			Select(selectCols).
+			Order(orderClause).
+			Limit(candidateCap).
+			Find(&candidates).Error; err != nil {
+			return nil, 0, err
+		}
+		ranked := rankAgentsByQuery(candidates, search)
+		// Re-set total to the post-rank count — for fuzzy queries this equals
+		// candidate count (we don't drop zero-score rows when total < candidateCap),
+		// so the UI's "X results" stays honest.
+		total = int64(len(ranked))
+		// Apply page/limit in memory.
+		start := min(offset, len(ranked))
+		end := min(start+limit, len(ranked))
+		agents = ranked[start:end]
+		if b, jerr := json.Marshal(cachedResult{Agents: agents, Total: total}); jerr == nil {
+			s.cache.Set(cacheKey, b, 60*time.Second)
+		}
+		return agents, total, nil
+	}
+
 	err := query.
-		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, generated_image, price, prompt_score, card_version, created_at").
+		Select(selectCols).
 		Offset(offset).Limit(limit).Order(orderClause).Find(&agents).Error
 	if err == nil {
 		if b, jerr := json.Marshal(cachedResult{Agents: agents, Total: total}); jerr == nil {
@@ -136,6 +184,35 @@ func (s *AgentService) ListAgents(category, search, sort, creatorWallet string, 
 		}
 	}
 	return agents, total, err
+}
+
+// rankAgentsByQuery applies scoreAgent to every candidate and returns the
+// list ordered by descending score. Zero-score rows are kept (they passed
+// the SQL LIKE filter) but sorted last so the user still sees something
+// when only fuzzy hits exist. Stable sort — original DB order tie-breaks.
+func rankAgentsByQuery(candidates []models.Agent, query string) []models.Agent {
+	if len(candidates) == 0 {
+		return candidates
+	}
+	type scored struct {
+		a models.Agent
+		s float64
+	}
+	out := make([]scored, len(candidates))
+	for i, c := range candidates {
+		out[i] = scored{a: c, s: scoreAgent(c, query)}
+	}
+	// Insertion sort — candidate caps at 200, simple and stable.
+	for i := 1; i < len(out); i++ {
+		for j := i; j > 0 && out[j].s > out[j-1].s; j-- {
+			out[j], out[j-1] = out[j-1], out[j]
+		}
+	}
+	res := make([]models.Agent, len(out))
+	for i, sc := range out {
+		res[i] = sc.a
+	}
+	return res
 }
 
 // CategoryCount holds the name and agent count for a single category.
@@ -226,10 +303,37 @@ func (s *AgentService) deductCredits(wallet string, amount int64, txType string,
 	return s.appendLedger(wallet, -amount, txType, agentID, nil, nil)
 }
 
+// normaliseLedgerAction maps the legacy free-form txType to the canonical
+// Action label the v3.11.2 UI expects. Unknown values pass through unchanged
+// so future call sites can introduce new actions without a code change here.
+//
+// Canonical labels: agent_purchase | legend_node | image_regen | topup |
+// agent_create | agent_fork | dev_grant | "" (backward-compat for rows
+// written before this normalisation existed).
+func normaliseLedgerAction(txType string) string {
+	switch txType {
+	case "create":
+		return "agent_create"
+	case "fork":
+		return "agent_fork"
+	case "workflow_execute", "legend_run_node":
+		return "legend_node"
+	case "purchase":
+		return "agent_purchase"
+	case "regenerate_image":
+		return "image_regen"
+	}
+	return txType
+}
+
 // appendLedger is the unified credit mutation primitive. delta is signed
 // (negative=spend, positive=topup/grant). Writes both the legacy
 // CreditTransaction row and the structured CreditLedgerEntry inside one
 // transaction so the two histories never drift.
+//
+// breakdown is serialised into both CreditLedgerEntry.CostBreakdown (existing
+// v3.7+ field) and CreditTransaction.Metadata (v3.11.2 new field) so legacy
+// list endpoints expose per-action metadata without a join.
 func (s *AgentService) appendLedger(wallet string, delta int64, actionType string, agentID *uint, nodeRef *string, breakdown map[string]any) error {
 	return database.DB.Transaction(func(dbTx *gorm.DB) error {
 		var user models.User
@@ -245,16 +349,6 @@ func (s *AgentService) appendLedger(wallet string, delta int64, actionType strin
 			UpdateColumn("credits", gorm.Expr("credits + ?", delta)).Error; err != nil {
 			return fmt.Errorf("failed to apply credit delta: %w", err)
 		}
-		legacyAmount := delta
-		creditTx := models.CreditTransaction{
-			Wallet:  wallet,
-			Type:    actionType,
-			Amount:  legacyAmount,
-			AgentID: agentID,
-		}
-		if err := dbTx.Create(&creditTx).Error; err != nil {
-			return fmt.Errorf("failed to write credit transaction: %w", err)
-		}
 		breakdownStr := ""
 		if breakdown != nil {
 			b, err := json.Marshal(breakdown)
@@ -262,6 +356,19 @@ func (s *AgentService) appendLedger(wallet string, delta int64, actionType strin
 				return fmt.Errorf("failed to marshal cost breakdown: %w", err)
 			}
 			breakdownStr = string(b)
+		}
+		legacyAmount := delta
+		canonicalAction := normaliseLedgerAction(actionType)
+		creditTx := models.CreditTransaction{
+			Wallet:   wallet,
+			Type:     actionType,
+			Amount:   legacyAmount,
+			AgentID:  agentID,
+			Action:   canonicalAction,
+			Metadata: breakdownStr,
+		}
+		if err := dbTx.Create(&creditTx).Error; err != nil {
+			return fmt.Errorf("failed to write credit transaction: %w", err)
 		}
 		entry := models.CreditLedgerEntry{
 			UserWallet:    wallet,
@@ -521,6 +628,7 @@ func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
 	}
 	database.DB.Model(&models.Agent{}).Where("id = ?", agentID).UpdateColumn("save_count", gorm.Expr("save_count + 1"))
 	s.cache.DeletePrefix("agents|")
+	s.cache.DeletePrefix("similar|")
 	s.cache.Delete("trending")
 	s.cache.Delete("for-you|" + wallet)
 	s.RecordActivity(wallet, models.ActivityAgentSaved, agentID, nil)
@@ -549,6 +657,7 @@ func (s *AgentService) RemoveFromLibrary(wallet string, agentID uint) error {
 			Where("id = ?", agentID).
 			UpdateColumn("save_count", gorm.Expr("CASE WHEN save_count > 0 THEN save_count - 1 ELSE 0 END"))
 		s.cache.DeletePrefix("agents|")
+		s.cache.DeletePrefix("similar|")
 		s.cache.Delete("trending")
 		s.cache.Delete("for-you|" + wallet)
 	}
@@ -586,6 +695,54 @@ func (s *AgentService) GetTrending() ([]models.Agent, error) {
 		}
 	}
 	return agents, err
+}
+
+// GetSimilar returns up to `limit` agents that share the source agent's
+// character_type, ordered by a simple in-process similarity score
+// (character type + subclass + rarity proximity + save_count tiebreaker).
+//
+// The source agent itself is excluded. Cached for 5 minutes per (id, limit)
+// pair; AddToLibrary / RemoveFromLibrary bust the `similar|` prefix so
+// save_count changes propagate without waiting for the TTL.
+//
+// Returns an empty slice (never nil) when no agents of that type exist.
+func (s *AgentService) GetSimilar(agentID uint, limit int) ([]models.Agent, error) {
+	if limit <= 0 || limit > 10 {
+		limit = 5
+	}
+	cacheKey := fmt.Sprintf("similar|%d|%d", agentID, limit)
+	if data, ok := s.cache.Get(cacheKey); ok {
+		var cached []models.Agent
+		if err := json.Unmarshal(data, &cached); err == nil {
+			return cached, nil
+		}
+	}
+
+	var src models.Agent
+	if err := database.DB.First(&src, agentID).Error; err != nil {
+		return nil, err
+	}
+
+	// Pull a wider candidate slice (limit*4) so the in-process ranker has
+	// breathing room for subclass/rarity boosts.
+	candidates := make([]models.Agent, 0)
+	if err := database.DB.
+		Select("id, title, description, service_description, category, creator_wallet, character_type, subclass, rarity, tags, save_count, use_count, image_url, generated_image, price, prompt_score, card_version, created_at").
+		Where("character_type = ? AND id <> ?", src.CharacterType, agentID).
+		Order("save_count DESC, use_count DESC").
+		Limit(limit * 4).
+		Find(&candidates).Error; err != nil {
+		return nil, err
+	}
+
+	out := rankBySimilarity(candidates, src, limit)
+	if out == nil {
+		out = []models.Agent{}
+	}
+	if b, jerr := json.Marshal(out); jerr == nil {
+		s.cache.Set(cacheKey, b, 5*time.Minute)
+	}
+	return out, nil
 }
 
 // ForkAgent creates a copy of an existing agent for the authenticated user.
@@ -787,6 +944,15 @@ func (s *AgentService) GetLeaderboard() ([]LeaderboardEntry, error) {
 }
 
 // RecordPurchase records a successful on-chain purchase of an agent.
+//
+// In addition to inserting the PurchasedAgent row, v3.11.2 writes a
+// CreditTransaction with Action="agent_purchase" + metadata so the credit
+// history UI can render a per-action breakdown (which agent, what price)
+// without re-querying the agent table.
+//
+// Note: this MON purchase is on-chain — no credits are deducted from the
+// internal ledger. We persist the transaction row purely for history display
+// (Amount=0, Action=agent_purchase) so users see a complete activity timeline.
 func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash string, amountMon float64) error {
 	var agent models.Agent
 	if err := database.DB.First(&agent, agentID).Error; err != nil {
@@ -800,7 +966,7 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 	return database.DB.Transaction(func(dbTx *gorm.DB) error {
 		var existing models.PurchasedAgent
 		if dbTx.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&existing).Error == nil {
-			return nil // already purchased
+			return nil // already purchased — idempotent
 		}
 		purchase := models.PurchasedAgent{
 			BuyerWallet: buyerWallet,
@@ -808,7 +974,29 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 			TxHash:      txHash,
 			AmountMon:   amountMon,
 		}
-		return dbTx.Create(&purchase).Error
+		if err := dbTx.Create(&purchase).Error; err != nil {
+			return err
+		}
+		// v3.11.2: write a CreditTransaction row purely for the credit history
+		// UI. Best-effort: a failure here does NOT roll back the purchase.
+		txHashPtr := &txHash
+		metadata, _ := json.Marshal(map[string]any{
+			"agent_id":   agentID,
+			"agent_title": agent.Title,
+			"price_mon":  amountMon,
+			"price":      agent.Price,
+			"tx_hash":    txHash,
+		})
+		_ = dbTx.Create(&models.CreditTransaction{
+			Wallet:   strings.ToLower(buyerWallet),
+			Type:     "purchase",
+			Amount:   0, // on-chain spend, not internal credit deduction
+			AgentID:  &agentID,
+			TxHash:   txHashPtr,
+			Action:   "agent_purchase",
+			Metadata: string(metadata),
+		}).Error
+		return nil
 	})
 }
 
@@ -999,6 +1187,21 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 
 	database.DB.First(&agent, agentID)
 
+	// v3.11.2: log image_regen in the credit history UI as a zero-cost action
+	// (free for owners; future v3.11.3 may attach a credit cost).
+	metadata, _ := json.Marshal(map[string]any{
+		"agent_id":    agentID,
+		"agent_title": agent.Title,
+	})
+	_ = database.DB.Create(&models.CreditTransaction{
+		Wallet:   strings.ToLower(wallet),
+		Type:     "regenerate_image",
+		Amount:   0,
+		AgentID:  &agentID,
+		Action:   "image_regen",
+		Metadata: string(metadata),
+	}).Error
+
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")
 	s.cache.Delete("categories")
@@ -1037,19 +1240,24 @@ func (s *AgentService) RateAgent(agentID uint, wallet string, rating int, commen
 	return database.DB.Create(&r).Error
 }
 
-// GetRatings returns ratings, average, and count for an agent.
+// GetRatings returns ratings, average, and count for an agent. Hidden=true
+// rows (auto-hidden by FlagRating) are filtered out of both the list and the
+// average so a flagged spam comment can't drag the visible score down.
 func (s *AgentService) GetRatings(agentID uint) ([]models.AgentRating, float64, int64, error) {
 	var ratings []models.AgentRating
-	err := database.DB.Where("agent_id = ?", agentID).Order("created_at DESC").Limit(20).Find(&ratings).Error
+	err := database.DB.
+		Where("agent_id = ? AND hidden = ?", agentID, false).
+		Order("created_at DESC").Limit(20).Find(&ratings).Error
 	if err != nil {
 		return nil, 0, 0, err
 	}
 	var avg float64
 	var count int64
-	database.DB.Model(&models.AgentRating{}).Where("agent_id = ?", agentID).Count(&count)
+	database.DB.Model(&models.AgentRating{}).
+		Where("agent_id = ? AND hidden = ?", agentID, false).Count(&count)
 	if count > 0 {
 		database.DB.Model(&models.AgentRating{}).
-			Where("agent_id = ?", agentID).
+			Where("agent_id = ? AND hidden = ?", agentID, false).
 			Select("AVG(rating)").Row().Scan(&avg)
 	}
 	return ratings, avg, count, nil
@@ -1145,19 +1353,21 @@ func (s *AgentService) TopUpCredits(wallet, txHash string, amountMon float64) er
 			return fmt.Errorf("failed to add credits: %w", err)
 		}
 		txHashPtr := &txHash
-		creditTx := models.CreditTransaction{
-			Wallet: wallet,
-			Type:   "topup",
-			Amount: credits,
-			TxHash: txHashPtr,
-		}
-		if err := dbTx.Create(&creditTx).Error; err != nil {
-			return fmt.Errorf("write credit transaction: %w", err)
-		}
 		breakdown, _ := json.Marshal(map[string]any{
 			"amount_mon": amountMon,
 			"tx_hash":    txHash,
 		})
+		creditTx := models.CreditTransaction{
+			Wallet:   wallet,
+			Type:     "topup",
+			Amount:   credits,
+			TxHash:   txHashPtr,
+			Action:   "topup",
+			Metadata: string(breakdown),
+		}
+		if err := dbTx.Create(&creditTx).Error; err != nil {
+			return fmt.Errorf("write credit transaction: %w", err)
+		}
 		entry := models.CreditLedgerEntry{
 			UserWallet:    wallet,
 			Delta:         credits,

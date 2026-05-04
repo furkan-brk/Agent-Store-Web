@@ -64,6 +64,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		missions.PATCH("/:id/public", handler.SetMissionPublic)
 		missions.POST("/:id/import", handler.ImportPublicMission)
 
+		// v3.11.1: Mission → Legend bridge — one-tap convert mission to workflow.
+		missions.POST("/:id/to-legend", handler.ToLegend)
+
 		// Public mission marketplace (no auth needed)
 		v1.GET("/missions/public", handler.GetPublicMissions)
 	}

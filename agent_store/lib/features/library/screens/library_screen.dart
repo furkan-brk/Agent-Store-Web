@@ -1,8 +1,10 @@
 // lib/features/library/screens/library_screen.dart
 import 'dart:async';
+import 'dart:js_interop';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
+import 'package:web/web.dart' as web;
 import '../../../app/theme.dart';
 import '../../../shared/utils/app_snack_bar.dart';
 import '../../../controllers/library_controller.dart';
@@ -15,6 +17,8 @@ import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../../controllers/store_controller.dart';
 import '../../character/character_types.dart';
+import '../../legend/models/workflow_models.dart';
+import '../../legend/services/claude_export_service.dart';
 import '../../store/widgets/agent_card.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -127,6 +131,98 @@ class _LibraryScreenState extends State<LibraryScreen>
     return sorted;
   }
 
+  // ── OpenClaw Workspace Export ────────────────────────────────────────────
+  //
+  // Bundles every prompt-bearing agent in the library + created tabs as a
+  // single OpenClaw workspace JSON: `~/.openclaw/workspace/skills/<slug>/SKILL.md`
+  // plus a `team.json` index. Reuses ClaudeExportService.generateOpenclawWorkspace
+  // by synthesising a *sequential* LegendWorkflow (START → agent → … → END)
+  // from the agent list — generateOpenclawWorkspace only cares about agent
+  // ref_ids in DAG order, so a straight chain is the right shape.
+
+  /// Agents eligible for the workspace bundle. Deduped by ID across the
+  /// "Saved" and "Created" tabs; entries without a prompt are skipped (they
+  /// would produce empty SKILL.md bodies).
+  List<AgentModel> _exportableAgents() {
+    final byId = <int, AgentModel>{};
+    for (final a in _ctrl.saved) {
+      if (a.prompt.isNotEmpty) byId[a.id] = a;
+    }
+    for (final a in _ctrl.created) {
+      if (a.prompt.isNotEmpty) byId.putIfAbsent(a.id, () => a);
+    }
+    return byId.values.toList();
+  }
+
+  bool _hasExportableAgents() => _exportableAgents().isNotEmpty;
+
+  Future<void> _exportLibraryAsWorkspace() async {
+    final agents = _exportableAgents();
+    if (agents.isEmpty) {
+      AppSnackBar.error(context,
+          'No agents with prompts to export. Save or create an agent first.');
+      return;
+    }
+
+    final wf = _libraryToWorkflow(agents);
+    final content = ClaudeExportService.generateOpenclawWorkspace(wf, agents);
+    LibraryWorkspaceDownloader.trigger(
+      filename: 'library-openclaw-workspace.json',
+      content: content,
+    );
+
+    if (!mounted) return;
+    AppSnackBar.success(context,
+        'Workspace exported (${agents.length} skill${agents.length == 1 ? '' : 's'})');
+  }
+
+  /// Build a sequential pipeline workflow from the user's library agents:
+  /// START → agent_0 → agent_1 → … → END. Used purely as input to the
+  /// existing OpenClaw exporter — exact node coordinates are cosmetic.
+  LegendWorkflow _libraryToWorkflow(List<AgentModel> agents) {
+    const baseX = 50.0;
+    const stepX = 280.0;
+    const y = 200.0;
+    final nodes = <WorkflowNode>[
+      WorkflowNode(
+          id: 'start_0',
+          type: WorkflowNodeType.start,
+          label: 'START',
+          x: baseX,
+          y: y),
+      for (var i = 0; i < agents.length; i++)
+        WorkflowNode(
+          id: 'agent_$i',
+          type: WorkflowNodeType.agent,
+          label: agents[i].title,
+          refId: agents[i].id.toString(),
+          x: baseX + (i + 1) * stepX,
+          y: y,
+        ),
+      WorkflowNode(
+          id: 'end_0',
+          type: WorkflowNodeType.end,
+          label: 'END',
+          x: baseX + (agents.length + 1) * stepX,
+          y: y),
+    ];
+    final edges = <WorkflowEdge>[
+      for (var i = 0; i < nodes.length - 1; i++)
+        WorkflowEdge(
+          id: 'e_${nodes[i].id}_${nodes[i + 1].id}',
+          fromId: nodes[i].id,
+          toId: nodes[i + 1].id,
+        ),
+    ];
+    return LegendWorkflow(
+      id: 'library-${DateTime.now().millisecondsSinceEpoch}',
+      name: 'My Library',
+      nodes: nodes,
+      edges: edges,
+      updatedAt: DateTime.now(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!ApiService.instance.isAuthenticated) return _loginPrompt(context);
@@ -213,6 +309,14 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ],
                     ),
                   ),
+                  // Export library as OpenClaw workspace bundle (v3.13).
+                  // Hidden until at least one saved or created agent with a
+                  // non-empty prompt exists, since an empty bundle is useless.
+                  if (_hasExportableAgents())
+                    _ExportWorkspaceButton(
+                      onPressed: _exportLibraryAsWorkspace,
+                      compact: isMobile,
+                    ),
                 ],
               ),
               // Stats chips row — scrollable on mobile
@@ -2012,4 +2116,75 @@ class _SetPriceDialogState extends State<_SetPriceDialog> {
           ),
         ],
       );
+}
+
+// ─── OpenClaw workspace export helpers ──────────────────────────────────────
+
+/// Header action button that lives in the Library title row. Compact on mobile
+/// (icon-only with tooltip), labelled on desktop.
+class _ExportWorkspaceButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final bool compact;
+
+  const _ExportWorkspaceButton({
+    required this.onPressed,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (compact) {
+      return IconButton(
+        icon: const Icon(Icons.folder_zip_outlined,
+            color: Color(0xFFEF4444), size: 20),
+        tooltip: 'Export as OpenClaw Workspace',
+        onPressed: onPressed,
+        visualDensity: VisualDensity.compact,
+      );
+    }
+    return Tooltip(
+      message: 'Bundle every saved/created agent into a single OpenClaw '
+          'workspace JSON (~/.openclaw/workspace).',
+      child: TextButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.folder_zip_outlined,
+            size: 16, color: Color(0xFFEF4444)),
+        label: const Text(
+          'Export Workspace',
+          style: TextStyle(color: Color(0xFFEF4444), fontSize: 12),
+        ),
+        style: TextButton.styleFrom(
+          backgroundColor: const Color(0xFFEF4444).withValues(alpha: 0.10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.4)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+      ),
+    );
+  }
+}
+
+/// Browser-side blob/anchor download helper, mirroring the same idiom used
+/// in `agent_detail_screen.dart` and the Card Editor's export service.
+/// Pulled into its own class so the synthesis logic in
+/// `_LibraryScreenState._exportLibraryAsWorkspace` can stay focused on
+/// building the bundle (the side-effect lives here).
+class LibraryWorkspaceDownloader {
+  LibraryWorkspaceDownloader._();
+
+  static void trigger({required String filename, required String content}) {
+    final blob = web.Blob(
+      [content.toJS].toJS,
+      web.BlobPropertyBag(type: 'application/json'),
+    );
+    final url = web.URL.createObjectURL(blob);
+    final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    web.URL.revokeObjectURL(url);
+  }
 }

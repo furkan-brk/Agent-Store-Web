@@ -22,6 +22,21 @@ func SkillSlug(title string) string {
 	return strings.TrimRight(dashed, "-")
 }
 
+// publicPromptPlaceholder is what unauthenticated / non-owner clients receive
+// in place of the real prompt when fetching SKILL.md for OpenClaw discovery.
+const publicPromptPlaceholder = "[Purchase this agent on Agent Store to access the full prompt]\n"
+
+// BuildPublicSkillMd returns a SKILL.md whose YAML frontmatter (name, description,
+// when_to_use, model, metadata, agent_store block) is identical to BuildSkillMd's,
+// but whose body prompt is redacted with a purchase-required notice. This lets
+// OpenClaw deeplink (`openclaw://install-skill?url=...`) discovery work for
+// anonymous visitors while still gating the actual prompt behind purchase.
+func BuildPublicSkillMd(agent *models.Agent) string {
+	redacted := *agent
+	redacted.Prompt = publicPromptPlaceholder
+	return BuildSkillMd(&redacted)
+}
+
 // BuildSkillMd serialises an agent as an OpenClaw-compatible SKILL.md string.
 // The format is:
 //

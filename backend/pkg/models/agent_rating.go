@@ -12,7 +12,12 @@ type AgentRating struct {
 	// upvote a rating once via POST /agents/:id/ratings/:ratingID/helpful.
 	// Anti-spam dedup is enforced at the handler level (atomic check-then-
 	// increment) so the counter cannot drift past the true unique vote count.
-	Helpful   int64     `gorm:"column:helpful;not null;default:0" json:"helpful"`
+	Helpful int64 `gorm:"column:helpful;not null;default:0" json:"helpful"`
+	// Hidden is the soft-delete flag set by rating moderation. When true,
+	// GetRatings filters the row out of public listings; only the rating's
+	// author and the agent creator continue to see it (creator visibility is
+	// future work — v3.11.2 only filters the public list).
+	Hidden    bool      `gorm:"column:hidden;not null;default:false" json:"hidden"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

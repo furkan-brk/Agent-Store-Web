@@ -2,6 +2,7 @@ import 'dart:js_interop';
 
 import 'package:flutter/foundation.dart';
 import 'local_kv_store.dart';
+import 'wallet_errors.dart';
 
 // ── Top-level JS interop declarations ────────────────────────────────────────
 // These map directly to window.agentStoreWallet.* functions defined in
@@ -88,7 +89,10 @@ class WalletService {
       await LocalKvStore.instance.setString(_kWalletKey, _wallet!);
       return _wallet;
     } catch (e) {
-      debugPrint('connectWallet: $e');
+      // v3.11.2 — friendlyError translates MetaMask/Monad RPC error codes
+      // into user-facing copy. Logged here for devtools; the snackbar that
+      // surfaces the failure is owned by the auth flow caller.
+      debugPrint('connectWallet: ${friendlyError(e)} (raw: $e)');
       _wallet = null;
       return null;
     }
@@ -101,7 +105,7 @@ class WalletService {
     try {
       return await _jsPersonalSign(message, _wallet!);
     } catch (e) {
-      debugPrint('signMessage: $e');
+      debugPrint('signMessage: ${friendlyError(e)} (raw: $e)');
       return null;
     }
   }
@@ -126,7 +130,7 @@ class WalletService {
           await _nativeSendTransaction(toAddress.toJS, hexWei.toJS).toDart;
       return result.toDart;
     } catch (e) {
-      debugPrint('sendTransaction: $e');
+      debugPrint('sendTransaction: ${friendlyError(e)} (raw: $e)');
       return null;
     }
   }

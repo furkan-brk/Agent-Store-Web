@@ -13,6 +13,15 @@ class CreateAgentController extends GetxController {
   final createdAgent = Rxn<AgentModel>();
   final credits = 100.obs;
 
+  /// Cost per agent — kept in sync with [checkCredits] and the publish
+  /// button label (10 credits).
+  static const int kAgentCost = 10;
+
+  /// True when [credits] is below [kAgentCost]. Surfaces the v3.11.1
+  /// pre-publish warning banner so the user discovers the requirement
+  /// at Step 0 instead of failing at submit.
+  bool get hasInsufficientCredits => credits.value < kAgentCost;
+
   static const stepLabels = ['Basic Info', 'Prompt', 'Preview'];
 
   @override
@@ -95,6 +104,12 @@ class CreateAgentController extends GetxController {
       'gelir', 'fiyat', 'satış',
     ],
   };
+
+  /// Public accessor for the per-type keyword list. Used by the Create
+  /// Agent screen's quality-score card to approximate prompt match
+  /// strength before the backend pipeline runs.
+  static List<String> keywordsFor(CharacterType type) =>
+      _keywords[type] ?? const <String>[];
 
   void detectCharacterType(String promptText) {
     final p = promptText.toLowerCase();

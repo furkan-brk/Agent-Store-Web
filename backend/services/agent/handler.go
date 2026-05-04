@@ -114,7 +114,16 @@ func (h *Handler) GetAgent(c *gin.Context) {
 
 // GetAgentSkillMd handles GET /api/v1/agents/:id/skill.md
 // Returns the agent as an OpenClaw-compatible SKILL.md file.
-// Requires auth; only the owner or a purchaser receives the full prompt.
+//
+// Public endpoint (optionalAuth): unauthenticated callers receive a *redacted*
+// SKILL.md whose YAML frontmatter is identical to the full version but whose
+// body prompt is replaced with a purchase-required notice. This lets the
+// OpenClaw deeplink (`openclaw://install-skill?url=...`) flow work without a
+// JWT — the user's OpenClaw client surfaces the metadata, and the prompt is
+// unlocked once they own/purchase the agent and re-fetch.
+//
+// Owner OR purchaser → full prompt, private/no-store cache.
+// Anyone else → public placeholder, public cacheable for 5 minutes.
 func (h *Handler) GetAgentSkillMd(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
@@ -132,16 +141,21 @@ func (h *Handler) GetAgentSkillMd(c *gin.Context) {
 	owned := wallet != "" && (strings.EqualFold(agent.CreatorWallet, wallet) ||
 		h.agentSvc.IsPurchased(wallet, uint(id)))
 
-	if !owned {
-		c.JSON(http.StatusForbidden, gin.H{"error": "purchase required to download SKILL.md"})
-		return
+	var content string
+	if owned {
+		content = BuildSkillMd(agent)
+	} else {
+		content = BuildPublicSkillMd(agent)
 	}
 
 	slug := SkillSlug(agent.Title)
-	content := BuildSkillMd(agent)
-
 	c.Header("Content-Type", "text/markdown; charset=utf-8")
-	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s-SKILL.md"`, slug))
+	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s-SKILL.md"`, slug))
+	if owned {
+		c.Header("Cache-Control", "private, no-store")
+	} else {
+		c.Header("Cache-Control", "public, max-age=300")
+	}
 	c.String(http.StatusOK, "%s", content)
 }
 
@@ -224,6 +238,25 @@ func (h *Handler) GetCredits(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"credits": credits, "wallet": c.GetString("wallet")})
+}
+
+// GetSimilar handles GET /api/v1/agents/:id/similar?limit=5
+//
+// Returns up to 10 agents (default 5) sharing the source agent's character_type,
+// excluding the source itself. Public — no auth required.
+func (h *Handler) GetSimilar(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "5"))
+	agents, err := h.agentSvc.GetSimilar(uint(id), limit)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"agents": agents, "count": len(agents)})
 }
 
 // TrendingAgents handles GET /api/v1/agents/trending
@@ -810,6 +843,203 @@ func (h *Handler) GetOGMeta(c *gin.Context) {
 	}
 	c.Header("Cache-Control", "public, max-age=3600")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(RenderOGHTML(meta)))
+}
+
+// --- Developer/API Key handlers ---
+
+// CreateAPIKey handles POST /api/v1/user/api-keys.
+// Body: {name, scopes[]}. Response: {id, key, prefix, name, scopes, created_at}.
+// The plaintext key is returned ONCE; subsequent list calls expose only the prefix.
+func (h *Handler) CreateAPIKey(c *gin.Context) {
+	var body struct {
+		Name   string   `json:"name"`
+		Scopes []string `json:"scopes"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	plaintext, row, err := h.agentSvc.CreateKey(c.GetString("wallet"), body.Name, body.Scopes)
+	if err != nil {
+		if errors.Is(err, ErrInvalidScope) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		log.Printf("[AgentHandler.CreateAPIKey] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{
+		"id":         row.ID,
+		"key":        plaintext, // ONLY shown here, never again
+		"prefix":     row.Prefix,
+		"name":       row.Name,
+		"scopes":     row.Scopes,
+		"created_at": row.CreatedAt,
+	})
+}
+
+// ListAPIKeys handles GET /api/v1/user/api-keys. Returns masked rows (no hash).
+func (h *Handler) ListAPIKeys(c *gin.Context) {
+	rows, err := h.agentSvc.ListKeys(c.GetString("wallet"))
+	if err != nil {
+		log.Printf("[AgentHandler.ListAPIKeys] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"keys": rows, "count": len(rows)})
+}
+
+// RevokeAPIKey handles DELETE /api/v1/user/api-keys/:id.
+func (h *Handler) RevokeAPIKey(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.agentSvc.RevokeKey(c.GetString("wallet"), uint(id)); err != nil {
+		switch {
+		case errors.Is(err, ErrAPIKeyNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrAPIKeyAlreadyRevoked):
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			log.Printf("[AgentHandler.RevokeAPIKey] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// --- Rating moderation handlers ---
+
+// FlagRating handles POST /api/v1/agents/:id/ratings/:ratingID/flag.
+// Body: {reason}. Wallet may submit at most 3 flags / 5 minutes (rate limit);
+// at ≥3 flags total a rating is auto-hidden.
+func (h *Handler) FlagRating(c *gin.Context) {
+	ratingID, err := strconv.ParseUint(c.Param("ratingID"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid rating id"})
+		return
+	}
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(body.Reason) > 500 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "reason too long (max 500)"})
+		return
+	}
+	hidden, err := h.agentSvc.FlagRating(c.GetString("wallet"), uint(ratingID), body.Reason)
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrFlagRateLimited):
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrRatingNotFound):
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case errors.Is(err, ErrSelfFlag):
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		default:
+			log.Printf("[AgentHandler.FlagRating] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "hidden": hidden})
+}
+
+// --- Notification Center handlers ---
+
+// GetNotificationPrefs handles GET /api/v1/user/notifications/prefs.
+// Returns the wallet's preferences, seeding defaults on first call.
+func (h *Handler) GetNotificationPrefs(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	prefs, err := h.agentSvc.ListPrefs(wallet)
+	if err != nil {
+		log.Printf("[AgentHandler.GetNotificationPrefs] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"prefs": prefs})
+}
+
+// UpdateNotificationPref handles PATCH /api/v1/user/notifications/prefs.
+// Body: {channel, type, enabled}.
+func (h *Handler) UpdateNotificationPref(c *gin.Context) {
+	var body struct {
+		Channel string `json:"channel" binding:"required"`
+		Type    string `json:"type" binding:"required"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.agentSvc.UpdatePref(c.GetString("wallet"), body.Channel, body.Type, body.Enabled); err != nil {
+		switch {
+		case errors.Is(err, ErrInvalidNotificationChannel),
+			errors.Is(err, ErrInvalidNotificationType):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		default:
+			log.Printf("[AgentHandler.UpdateNotificationPref] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// GetNotificationInbox handles GET /api/v1/user/notifications/inbox?before=&limit=20.
+// Cursor pagination on id DESC.
+func (h *Handler) GetNotificationInbox(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	before, _ := strconv.ParseUint(c.Query("before"), 10, 64)
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	rows, err := h.agentSvc.ListInbox(wallet, uint(before), limit)
+	if err != nil {
+		log.Printf("[AgentHandler.GetNotificationInbox] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	var nextCursor uint
+	if len(rows) > 0 {
+		nextCursor = rows[len(rows)-1].ID
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"events":      rows,
+		"count":       len(rows),
+		"next_cursor": nextCursor,
+	})
+}
+
+// MarkNotificationRead handles POST /api/v1/user/notifications/inbox/:id/read.
+func (h *Handler) MarkNotificationRead(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	if err := h.agentSvc.MarkRead(c.GetString("wallet"), uint(id)); err != nil {
+		log.Printf("[AgentHandler.MarkNotificationRead] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// MarkAllNotificationsRead handles POST /api/v1/user/notifications/inbox/mark-all-read.
+func (h *Handler) MarkAllNotificationsRead(c *gin.Context) {
+	updated, err := h.agentSvc.MarkAllRead(c.GetString("wallet"))
+	if err != nil {
+		log.Printf("[AgentHandler.MarkAllNotificationsRead] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "updated": updated})
 }
 
 // GetCreatorInsights handles GET /api/v1/user/creator/insights

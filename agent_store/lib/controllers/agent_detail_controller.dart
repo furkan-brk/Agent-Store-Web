@@ -21,6 +21,11 @@ class AgentDetailController extends GetxController {
   final credits = 999.obs;
   final copied = false.obs;
 
+  // v3.11.1 — Prompt is shown in preview form (first 500 chars) when ≥500
+  // chars long. User toggles to expand the full body — telemetry hookup
+  // (RecordActivity prompt_view_full event) is deferred to v3.11.3 KPI sprint.
+  final promptShowFull = false.obs;
+
   // ── Purchase tx state machine (v3.7) ────────────────────────────────────
   // Surfaces the four legs of a purchase (signing, mempool, reconcile,
   // settled) separately so the UI can show distinct copy + an explorer link.

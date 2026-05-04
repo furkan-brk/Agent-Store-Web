@@ -253,6 +253,125 @@ func buildWorkflowGraph(s *GuildSuggestion) (nodes []map[string]any, edges []map
 	return nodes, edges
 }
 
+// MissionToLegend seeds a new UserLegendWorkflow from a stored mission.
+// Layout is the minimal valid DAG: START → MISSION_AGENT → END (3 nodes,
+// 2 edges). The mission's prompt is preserved on the agent node so the
+// user can wire model/credits inside Legend without re-typing.
+//
+// Errors:
+//   - gorm.ErrRecordNotFound when the mission is missing for the wallet.
+//   - "mission has no prompt to bridge" when the mission's prompt is empty
+//     after trim (handler maps to 422).
+func (b *BridgeService) MissionToLegend(wallet string, missionID uint) (*LegendDraftResult, error) {
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return nil, errors.New("wallet required")
+	}
+	var m models.UserMission
+	if err := database.DB.
+		Where("id = ? AND user_wallet = ?", missionID, wallet).
+		First(&m).Error; err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(m.Prompt) == "" {
+		return nil, errors.New("mission has no prompt to bridge")
+	}
+
+	title := strings.TrimSpace(m.Title)
+	if title == "" {
+		title = "Mission"
+	}
+	if len(title) > 120 {
+		title = title[:120]
+	}
+
+	nodes, edges := buildSingleNodeWorkflow(title, m.Prompt)
+	nodesJSON, err := json.Marshal(nodes)
+	if err != nil {
+		return nil, fmt.Errorf("encode nodes: %w", err)
+	}
+	edgesJSON, err := json.Marshal(edges)
+	if err != nil {
+		return nil, fmt.Errorf("encode edges: %w", err)
+	}
+
+	clientID := fmt.Sprintf("mission-%d-%d", missionID, time.Now().UnixMilli())
+	name := fmt.Sprintf("From mission: %s", title)
+	if len(name) > 120 {
+		name = name[:120]
+	}
+
+	wf := &models.UserLegendWorkflow{
+		UserWallet: wallet,
+		ClientID:   clientID,
+		Name:       name,
+		NodesJSON:  string(nodesJSON),
+		EdgesJSON:  string(edgesJSON),
+	}
+	if err := database.DB.Create(wf).Error; err != nil {
+		return nil, fmt.Errorf("save workflow: %w", err)
+	}
+	return &LegendDraftResult{
+		WorkflowID:   clientID,
+		WorkflowName: name,
+		NodeCount:    len(nodes),
+		EdgeCount:    len(edges),
+		Source:       fmt.Sprintf("mission:%d", missionID),
+	}, nil
+}
+
+// buildSingleNodeWorkflow assembles the minimal valid Legend DAG:
+// START → MISSION_AGENT → END. The middle node carries the mission prompt
+// as its label (truncated for visual sanity) and the full prompt in
+// `prompt` so the user sees real content the moment Legend opens.
+func buildSingleNodeWorkflow(title, prompt string) (nodes []map[string]any, edges []map[string]any) {
+	now := time.Now().UnixMilli()
+	startID := fmt.Sprintf("n%d-start", now)
+	agentID := fmt.Sprintf("n%d-mission", now)
+	endID := fmt.Sprintf("n%d-end", now)
+
+	label := title
+	if label == "" {
+		label = "Mission"
+	}
+	if len(label) > 60 {
+		label = label[:60]
+	}
+
+	nodes = []map[string]any{
+		{
+			"id":     startID,
+			"type":   "start",
+			"label":  "START",
+			"x":      0.0,
+			"y":      0.0,
+			"ref_id": "",
+		},
+		{
+			"id":     agentID,
+			"type":   "agent",
+			"label":  label,
+			"prompt": prompt,
+			"x":      220.0,
+			"y":      0.0,
+			"ref_id": "",
+		},
+		{
+			"id":     endID,
+			"type":   "end",
+			"label":  "END",
+			"x":      440.0,
+			"y":      0.0,
+			"ref_id": "",
+		},
+	}
+	edges = []map[string]any{
+		{"id": fmt.Sprintf("e%d-s-m", now), "from": startID, "to": agentID},
+		{"id": fmt.Sprintf("e%d-m-e", now), "from": agentID, "to": endID},
+	}
+	return nodes, edges
+}
+
 // slugify lowercases the title and collapses runs of non-alphanumerics
 // into single hyphens so the result satisfies the Mission slug regex
 // (^[a-z0-9][a-z0-9_-]*$). Strips leading/trailing hyphens. Falls back
