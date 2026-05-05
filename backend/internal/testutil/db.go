@@ -66,6 +66,9 @@ func NewTestDB(t *testing.T) *gorm.DB {
 		&models.WeeklyLeaderReward{},
 		&models.GuildMasterReflection{},
 		&models.MissionSchedule{},
+		// MissionRun is used by services/workspace/scheduler.go (cron-driven
+		// mission re-runs introduced in v3.11.4 T7) and ListMissionRuns in
+		// services/workspace/legend_service.go — keep migrated for tests.
 		&models.MissionRun{},
 	); err != nil {
 		t.Fatalf("testutil: migrate: %v", err)

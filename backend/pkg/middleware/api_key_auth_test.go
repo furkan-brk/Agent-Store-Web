@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/agentstore/backend/internal/testutil"
 	"github.com/agentstore/backend/pkg/database"
@@ -154,7 +153,11 @@ func TestAuthOrAPIKey_JWTContextWalletTakesPrecedence(t *testing.T) {
 	}
 }
 
-func TestAPIKeyAuth_LastUsedAtUpdatedAsync(t *testing.T) {
+// TestAPIKeyAuth_LastUsedAtUpdated verifies the synchronous LastUsedAt bump.
+// v3.12-P1-12: was async + polled; flaked under full-suite runs because
+// t.Cleanup tore down database.DB before the goroutine landed its write. The
+// fix made the update synchronous, so this test no longer needs polling.
+func TestAPIKeyAuth_LastUsedAtUpdated(t *testing.T) {
 	svc := newTestRig(t)
 	plaintext, row, err := svc.CreateKey("0xowner", "test", []string{"read:agents"})
 	require.NoError(t, err)
@@ -165,15 +168,9 @@ func TestAPIKeyAuth_LastUsedAtUpdatedAsync(t *testing.T) {
 	w := do(req)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	// Async update — give the goroutine a beat to land its write.
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		var refreshed models.APIKey
-		if err := database.DB.First(&refreshed, row.ID).Error; err == nil && refreshed.LastUsedAt != nil {
-			assert.NotNil(t, refreshed.LastUsedAt, "LastUsedAt must be stamped after a successful auth")
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("LastUsedAt was never updated within 2s of the request")
+	// Synchronous — the write must already be persisted by the time the
+	// request returns. No polling.
+	var refreshed models.APIKey
+	require.NoError(t, database.DB.First(&refreshed, row.ID).Error)
+	require.NotNil(t, refreshed.LastUsedAt, "LastUsedAt must be stamped after a successful auth")
 }

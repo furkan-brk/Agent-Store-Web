@@ -11,12 +11,20 @@ type Guild struct {
 	CreatedAt     time.Time     `json:"created_at"`
 }
 
+// GuildMember rows are uniquely identified by (guild_id, agent_id). The
+// uniqueIndex:idx_guild_member_pair tag on both fields creates a single
+// composite unique index — required for INSERT ... ON CONFLICT (guild_id,
+// agent_id) DO NOTHING in AcceptInvite.
+//
+// v3.12-P1-13: production DBs may carry duplicate rows from before this
+// constraint existed. services/guild/migrate.go calls dedupeGuildMembers()
+// before AutoMigrate to prune duplicates, otherwise the index creation fails.
 type GuildMember struct {
-	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	GuildID     uint      `gorm:"column:guild_id;not null" json:"guild_id"`
-	AgentID     uint      `gorm:"column:agent_id;not null" json:"agent_id"`
-	Agent       Agent     `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
-	Role        string    `gorm:"column:role" json:"role"`
+	ID      uint  `gorm:"primaryKey;autoIncrement" json:"id"`
+	GuildID uint  `gorm:"column:guild_id;not null;uniqueIndex:idx_guild_member_pair" json:"guild_id"`
+	AgentID uint  `gorm:"column:agent_id;not null;uniqueIndex:idx_guild_member_pair" json:"agent_id"`
+	Agent   Agent `gorm:"foreignKey:AgentID" json:"agent,omitempty"`
+	Role    string `gorm:"column:role" json:"role"`
 	// Permissions is a JSON array of permission keys, e.g. ["edit_agents","invite_members"].
 	// Null/empty means default role permissions apply.
 	Permissions string    `gorm:"column:permissions;type:text;default:'[]'" json:"permissions"`

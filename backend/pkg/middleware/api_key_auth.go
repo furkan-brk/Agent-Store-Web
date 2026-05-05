@@ -123,8 +123,12 @@ var (
 // On success, c.Set("wallet", ...) and c.Set("auth_method", "api_key") fire
 // so downstream handlers behave the same as JWT-authed callers.
 //
-// LastUsedAt is updated asynchronously in a goroutine — best-effort, errors
-// are logged but never block the request.
+// LastUsedAt is updated synchronously — the write is a single-column update on
+// a single row (~1ms), and synchronous writes avoid the t.Cleanup race that
+// async goroutines hit in tests (database.DB is reset before the goroutine
+// lands). Same rule as RecordActivity (see CLAUDE.md "Established Patterns").
+// v3.12-P1-12: was previously async; the optimisation wasn't worth the test
+// flakiness.
 func APIKeyAuth(requiredScope string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := extractAPIKey(c)
@@ -152,22 +156,17 @@ func APIKeyAuth(requiredScope string) gin.HandlerFunc {
 		c.Set("wallet", row.Wallet)
 		c.Set("auth_method", "api_key")
 
-		// Async LastUsedAt bump. Best-effort — a missed timestamp is recoverable;
-		// blocking the request to write it is not. Nil-DB guard mirrors the
-		// RecordActivity pattern in services/agent/social.go: t.Cleanup may
-		// reset database.DB before the goroutine lands its write.
-		go func(id uint) {
-			db := database.DB
-			if db == nil {
-				return
-			}
+		// Synchronous LastUsedAt bump. Best-effort — log on failure but don't
+		// fail the request. Nil-DB guard for safety in tests where t.Cleanup
+		// may have already torn down the DB.
+		if db := database.DB; db != nil {
 			now := time.Now()
 			if err := db.Model(&models.APIKey{}).
-				Where("id = ?", id).
+				Where("id = ?", row.ID).
 				Update("last_used_at", &now).Error; err != nil {
-				log.Printf("[apikey] last_used_at update failed for key %d: %v", id, err)
+				log.Printf("[apikey] last_used_at update failed for key %d: %v", row.ID, err)
 			}
-		}(row.ID)
+		}
 
 		c.Next()
 	}
