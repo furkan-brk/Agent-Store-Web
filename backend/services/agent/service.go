@@ -1209,6 +1209,17 @@ func (s *AgentService) UpdateAgent(agentID uint, wallet string, req *UpdateAgent
 }
 
 // RegenerateImage regenerates the avatar image for a creator's own agent.
+//
+// SECURITY (v3.12-P0-2): now charges 3 credits to align with bulk regen
+// pricing (services/agent/bulk_actions.go:bulkActionCost). The previous
+// implementation wrote a CreditTransaction row with Amount=0 (free) which
+// diverged from bulk regen's 3-credit-per-id cost — same operation, two
+// prices. Aligning at 3 credits each closes the per-action ledger drift
+// from FIX BE-P0-2.
+//
+// Refund-on-failure mirrors bulkRegenerateImage: deduct up front, refund
+// via appendLedger if AI generation fails so the ledger pair (spend +
+// refund) stays balanced.
 func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Agent, error) {
 	var agent models.Agent
 	if err := database.DB.First(&agent, agentID).Error; err != nil {
@@ -1227,6 +1238,26 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 		}
 	}
 
+	// Deduct 3 credits (aligned with bulk regen cost). appendLedger writes
+	// both the legacy CreditTransaction row and the structured ledger entry
+	// inside a single transaction.
+	walletLower := strings.ToLower(wallet)
+	if err := s.deductCredits(walletLower, 3, "regenerate_image", &agentID); err != nil {
+		return nil, fmt.Errorf("credit deduct: %w", err)
+	}
+	regenSucceeded := false
+	defer func() {
+		if regenSucceeded {
+			return
+		}
+		if rerr := s.appendLedger(walletLower, 3, "regenerate_image_refund", &agentID, nil, map[string]any{
+			"agent_id": agentID,
+			"reason":   "regen_failed",
+		}); rerr != nil {
+			log.Printf("[RegenerateImage] refund failed for wallet %s agent %d: %v", walletLower, agentID, rerr)
+		}
+	}()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
@@ -1243,7 +1274,10 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 	}
 
 	imagePrompt := "A " + agent.CharacterType + " character with unique abilities and tools"
-	avatarRes, _ := s.aiClient.Avatar(ctx, profile, imagePrompt, agent.CharacterType)
+	avatarRes, avatarErr := s.aiClient.Avatar(ctx, profile, imagePrompt, agent.CharacterType)
+	if avatarErr != nil {
+		return nil, fmt.Errorf("avatar generate: %w", avatarErr)
+	}
 
 	generatedImage := ""
 	if avatarRes != nil {
@@ -1260,20 +1294,7 @@ func (s *AgentService) RegenerateImage(agentID uint, wallet string) (*models.Age
 
 	database.DB.First(&agent, agentID)
 
-	// v3.11.2: log image_regen in the credit history UI as a zero-cost action
-	// (free for owners; future v3.11.3 may attach a credit cost).
-	metadata, _ := json.Marshal(map[string]any{
-		"agent_id":    agentID,
-		"agent_title": agent.Title,
-	})
-	_ = database.DB.Create(&models.CreditTransaction{
-		Wallet:   strings.ToLower(wallet),
-		Type:     "regenerate_image",
-		Amount:   0,
-		AgentID:  &agentID,
-		Action:   "image_regen",
-		Metadata: string(metadata),
-	}).Error
+	regenSucceeded = true
 
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")

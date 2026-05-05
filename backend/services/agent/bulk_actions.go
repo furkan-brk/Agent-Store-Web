@@ -13,7 +13,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -237,8 +236,23 @@ func (s *AgentService) bulkTagRemove(wallet string, agentID uint, tag string) er
 // stale batch still completes for the eligible agents.
 //
 // When the AI client isn't wired (unit tests with svc.aiClient == nil) we
-// skip the heavy network call and just log the ledger entry, so test code can
-// exercise the dispatch + quota path without real avatar generation.
+// skip the heavy network call and exercise the dispatch + ledger path only.
+//
+// SECURITY (v3.12-P0-2): credits are deducted via deductCredits BEFORE the
+// regen runs. The previous implementation wrote a CreditTransaction row with
+// Amount=3 but never decremented the wallet balance — users got free
+// regenerations and the ledger drifted from `users.credits`.
+//
+// Policy: cost-bearing prework runs in this order:
+//  1. ownership + cooldown check (cheap, fail fast on bad input)
+//  2. deductCredits (atomic — also writes the ledger row)
+//  3. AI call (heavy, may fail)
+//  4. timestamp + image persist
+//
+// If step 3 fails (AI down, network blip, decode error), we refund the
+// 3 credits via appendLedger(+3, "regenerate_image_refund"). Step 4 failures
+// also refund. The ledger then carries a balanced spend/refund pair so
+// audit trails stay accurate.
 func (s *AgentService) bulkRegenerateImage(wallet string, agentID uint) error {
 	var agent models.Agent
 	if err := database.DB.First(&agent, agentID).Error; err != nil {
@@ -254,6 +268,30 @@ func (s *AgentService) bulkRegenerateImage(wallet string, agentID uint) error {
 		}
 	}
 
+	// Deduct 3 credits atomically. This writes both the legacy
+	// CreditTransaction row and the structured CreditLedgerEntry, and
+	// fails fast if the wallet is short on funds (the per-agent guard
+	// that complements the up-front quota check in BulkAction).
+	if err := s.deductCredits(wallet, 3, "regenerate_image", &agentID); err != nil {
+		return fmt.Errorf("credit deduct: %w", err)
+	}
+	// Mark whether the heavy work succeeded so we know whether to refund.
+	regenSucceeded := false
+	defer func() {
+		if regenSucceeded {
+			return
+		}
+		// Best-effort refund. Logged on failure but never surfaced —
+		// callers already see the original error from the caller path.
+		if rerr := s.appendLedger(wallet, 3, "regenerate_image_refund", &agentID, nil, map[string]any{
+			"agent_id": agentID,
+			"reason":   "regen_failed",
+			"bulk":     true,
+		}); rerr != nil {
+			log.Printf("[bulk] refund failed for wallet %s agent %d: %v", wallet, agentID, rerr)
+		}
+	}()
+
 	if s.aiClient != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		defer cancel()
@@ -266,7 +304,10 @@ func (s *AgentService) bulkRegenerateImage(wallet string, agentID uint) error {
 			profile = &client.AgentProfile{Name: concept}
 		}
 		imagePrompt := "A " + agent.CharacterType + " character with unique abilities and tools"
-		avatarRes, _ := s.aiClient.Avatar(ctx, profile, imagePrompt, agent.CharacterType)
+		avatarRes, aerr := s.aiClient.Avatar(ctx, profile, imagePrompt, agent.CharacterType)
+		if aerr != nil {
+			return fmt.Errorf("avatar generate: %w", aerr)
+		}
 		generated := ""
 		if avatarRes != nil {
 			generated = avatarRes.ImageBase64
@@ -280,24 +321,7 @@ func (s *AgentService) bulkRegenerateImage(wallet string, agentID uint) error {
 		return fmt.Errorf("timestamp update: %w", err)
 	}
 
-	// Best-effort ledger entry for the credit history UI. Failures here are
-	// logged but don't fail the bulk item — ledger drift is recoverable, a
-	// failed regen-with-no-record is not.
-	metadata, _ := json.Marshal(map[string]any{
-		"agent_id":    agentID,
-		"agent_title": agent.Title,
-		"bulk":        true,
-	})
-	if err := database.DB.Create(&models.CreditTransaction{
-		Wallet:   wallet,
-		Type:     "regenerate_image",
-		Amount:   3,
-		AgentID:  &agentID,
-		Action:   "image_regen",
-		Metadata: string(metadata),
-	}).Error; err != nil {
-		log.Printf("[bulk] ledger write for agent %d failed: %v", agentID, err)
-	}
+	regenSucceeded = true
 	return nil
 }
 
