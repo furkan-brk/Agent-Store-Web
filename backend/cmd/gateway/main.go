@@ -33,6 +33,12 @@ func main() {
 	// CORS — gateway is the only entry point for the frontend.
 	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
 
+	// SECURITY (v3.12-P0-1): strip any inbound X-Wallet-Address header before
+	// the JWT extractor sets it. This prevents an external caller from forging
+	// the header to bypass auth. The proxy.go handler downstream re-sets the
+	// header from c.Get("wallet") (only populated by a verified JWT).
+	r.Use(middleware.StripInboundWalletHeader())
+
 	// JWT extraction — optional on every request.
 	// Sets "wallet" in Gin context if a valid JWT is present.
 	r.Use(gateway.JWTExtractor(cfg.JWTSecret))

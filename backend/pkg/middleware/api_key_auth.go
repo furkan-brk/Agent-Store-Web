@@ -173,25 +173,42 @@ func APIKeyAuth(requiredScope string) gin.HandlerFunc {
 	}
 }
 
-// AuthOrAPIKey lets a route accept either the gateway's JWT-derived
-// X-Wallet-Address header (preferred) or an API key with the requested scope.
-// Use this on dual-auth endpoints during the v3.11.3 pilot rollout.
+// AuthOrAPIKey lets a route accept either the gateway's JWT-derived wallet
+// (preferred) or an API key with the requested scope. Use this on dual-auth
+// endpoints during the v3.11.3 pilot rollout.
 //
 // Behaviour:
-//   - If X-Wallet-Address is set (gateway already authed the request), trust
-//     it, set wallet + auth_method=jwt, skip the API key path entirely.
+//   - If the gin context already carries a "wallet" key (set by JWTExtractor
+//     after verifying the Authorization Bearer token), trust it: set
+//     auth_method=jwt and pass through.
 //   - Otherwise, fall through to APIKeyAuth(requiredScope).
+//
+// SECURITY (v3.12-P0-1): we used to read c.GetHeader("X-Wallet-Address")
+// directly. That was unsafe because an attacker could set the header on
+// inbound requests and skip both JWT and API key auth entirely. The fix is
+// to trust *only* the gin-context value written by JWTExtractor. The
+// StripInboundWalletHeader middleware (mounted at the top of the chain in
+// monolith + gateway) deletes any forged inbound header so even code that
+// later reads the raw header sees a clean slate.
 //
 // Both branches abort with 401/403 on failure — the caller never sees a
 // half-authed request.
 func AuthOrAPIKey(requiredScope string) gin.HandlerFunc {
 	apiKeyHandler := APIKeyAuth(requiredScope)
 	return func(c *gin.Context) {
-		if wallet := strings.TrimSpace(c.GetHeader("X-Wallet-Address")); wallet != "" {
-			c.Set("wallet", wallet)
-			c.Set("auth_method", "jwt")
-			c.Next()
-			return
+		// Only trust the wallet if the JWT-extractor middleware put it into
+		// the gin context. Reading the raw header is unsafe — see the
+		// SECURITY note above.
+		if v, ok := c.Get("wallet"); ok {
+			if wallet, ok := v.(string); ok {
+				wallet = strings.TrimSpace(wallet)
+				if wallet != "" {
+					c.Set("wallet", wallet)
+					c.Set("auth_method", "jwt")
+					c.Next()
+					return
+				}
+			}
 		}
 		apiKeyHandler(c)
 	}

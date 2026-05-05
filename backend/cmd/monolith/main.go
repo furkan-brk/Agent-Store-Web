@@ -91,6 +91,11 @@ func main() {
 	// guild.LegendDraftResult; adapt to workspace.LegendDraftResult so the
 	// workspace package doesn't have to import guild.
 	workspaceHandler.SetMissionBridge(missionBridgeAdapter{guild.NewBridgeService(guild.NewSessionService())})
+	// v3.11.5: scheduler resolves #slug references via MissionService.
+	// Wiring through the workspace.MissionExpander interface keeps the
+	// scheduler unit-testable and the standalone workspacesvc binary
+	// can ship without this dependency (falls back to raw prompt).
+	legendSvc.SetMissionExpander(missionSvc)
 
 	// --- Single Gin Engine ---
 	r := gin.Default()
@@ -103,6 +108,14 @@ func main() {
 		c.Next()
 	})
 	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
+
+	// SECURITY (v3.12-P0-1): always strip any inbound X-Wallet-Address header
+	// before JWTExtractor runs. The header is an *internal* convention written
+	// by JWTExtractor after a verified JWT — letting an external client send
+	// it would let anyone impersonate any wallet by simply setting the header.
+	// This MUST run before JWTExtractor + the wallet-injection middleware so
+	// the only path that can set the header is a verified JWT.
+	r.Use(middleware.StripInboundWalletHeader())
 
 	// JWT extraction — sets "wallet" in context AND X-Wallet-Address header
 	// so InternalAuth middleware works without changes.

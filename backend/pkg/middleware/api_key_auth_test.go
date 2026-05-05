@@ -109,14 +109,36 @@ func TestAPIKeyAuth_MissingHeaderReturns401(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "missing api key")
 }
 
-func TestAuthOrAPIKey_JWTWalletHeaderTakesPrecedence(t *testing.T) {
-	// JWT path doesn't even need a key — wallet header is enough.
+func TestAuthOrAPIKey_JWTContextWalletTakesPrecedence(t *testing.T) {
+	// JWT path doesn't even need a key — wallet set in the gin context by
+	// the JWT extractor is enough.
+	//
+	// SECURITY (v3.12-P0-1): updated from the original test, which relied on
+	// AuthOrAPIKey reading the raw X-Wallet-Address header. That was an
+	// auth-bypass vector: an attacker could set the header on inbound
+	// requests and skip both JWT and API-key checks. AuthOrAPIKey now trusts
+	// only c.Get("wallet") which is set by the JWT extractor *after*
+	// verifying the Bearer token signature.
 	testutil.NewTestDB(t)
 
-	do := mountTestRoute(middleware.AuthOrAPIKey("write:agents"))
+	r := gin.New()
+	// Stub JWT extractor — emulates gateway.JWTExtractor on a successful
+	// verify. In production the wallet is the parsed claim from a signed
+	// JWT; here we just inject it directly.
+	r.Use(func(c *gin.Context) {
+		c.Set("wallet", "0xjwtwallet")
+		c.Next()
+	})
+	r.GET("/protected", middleware.AuthOrAPIKey("write:agents"), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"wallet":      c.GetString("wallet"),
+			"auth_method": c.GetString("auth_method"),
+		})
+	})
+
 	req, _ := http.NewRequest(http.MethodGet, "/protected", nil)
-	req.Header.Set("X-Wallet-Address", "0xjwtwallet")
-	w := do(req)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "0xjwtwallet")
@@ -128,7 +150,7 @@ func TestAuthOrAPIKey_JWTWalletHeaderTakesPrecedence(t *testing.T) {
 	var keys []models.APIKey
 	require.NoError(t, database.DB.Find(&keys).Error)
 	for _, k := range keys {
-		assert.Nil(t, k.LastUsedAt, "API-key path must be fully bypassed when JWT header is present")
+		assert.Nil(t, k.LastUsedAt, "API-key path must be fully bypassed when JWT context wallet is present")
 	}
 }
 

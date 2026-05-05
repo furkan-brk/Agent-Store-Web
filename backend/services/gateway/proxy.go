@@ -69,9 +69,16 @@ func (p *Proxy) Handler() gin.HandlerFunc {
 			return
 		}
 
-		// Inject wallet address as header for downstream services.
+		// Inject wallet address as header for downstream services. The strip
+		// middleware (cmd/gateway/main.go) has already deleted any inbound
+		// X-Wallet-Address; we always set or delete based on the verified
+		// JWT context, never trust an external value.
 		if wallet, exists := c.Get("wallet"); exists {
 			c.Request.Header.Set("X-Wallet-Address", wallet.(string))
+		} else {
+			// Belt-and-suspenders: defensively delete in case a future code
+			// path forgets to strip. SECURITY (v3.12-P0-1).
+			c.Request.Header.Del("X-Wallet-Address")
 		}
 
 		rp := p.getOrCreateProxy(target)
