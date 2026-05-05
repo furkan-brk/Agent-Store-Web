@@ -70,6 +70,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		gm.POST("/sessions/:id/messages", handler.AppendMessages)
 		gm.POST("/sessions/:id/to-mission", handler.SessionToMission)
 		gm.POST("/sessions/:id/to-legend", handler.SessionToLegend)
+		// v3.11.4: explicit post-execution reflection notes
+		gm.POST("/sessions/:id/reflect-on-execution", handler.ReflectOnExecution)
+		gm.GET("/sessions/:id/reflections", handler.ListReflections)
 	}
 
 	r.GET("/health", func(c *gin.Context) {

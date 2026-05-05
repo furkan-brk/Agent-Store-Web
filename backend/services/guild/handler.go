@@ -410,6 +410,59 @@ func (h *Handler) TeamChat(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"responses": responses})
 }
 
+// ReflectOnExecution handles POST /api/v1/guild-master/sessions/:id/reflect-on-execution
+// Body: {"execution_id": uint, "summary": "..."} — explicit user-driven note.
+func (h *Handler) ReflectOnExecution(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		return
+	}
+	var body struct {
+		ExecutionID uint   `json:"execution_id" binding:"required"`
+		Summary     string `json:"summary" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	row, err := h.sessionSvc.RecordReflection(c.GetString("wallet"), uint(id), body.ExecutionID, body.Summary)
+	if err != nil {
+		if errors.Is(err, ErrSessionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, row)
+}
+
+// ListReflections handles GET /api/v1/guild-master/sessions/:id/reflections?limit=20
+func (h *Handler) ListReflections(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid session id"})
+		return
+	}
+	limit := 20
+	if v := c.Query("limit"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil {
+			limit = n
+		}
+	}
+	rows, err := h.sessionSvc.ListReflections(c.GetString("wallet"), uint(id), limit)
+	if err != nil {
+		if errors.Is(err, ErrSessionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"reflections": rows, "count": len(rows)})
+}
+
 // GetGuildMasterKPI handles GET /api/v1/admin/kpi/guild-master?since=7d|30d|90d|all
 // Returns SuggestAcceptanceRate / ChatToActionRate / RerunRate for the
 // authenticated wallet (creator-scoped — own usage only).

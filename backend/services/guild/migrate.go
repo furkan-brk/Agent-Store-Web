@@ -18,6 +18,7 @@ func Migrate() {
 		&models.GuildInvite{},
 		&models.GuildMasterSession{},
 		&models.GuildMemberEvent{},
+		&models.GuildMasterReflection{},
 	); err != nil {
 		log.Fatalf("Guild Service migration failed: %v", err)
 	}
