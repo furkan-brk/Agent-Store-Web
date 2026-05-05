@@ -11,8 +11,9 @@
 Full codebase audit + fix sprint. 6 independent audit agents (backend, frontend,
 coverage, static analysis, Legend deep-dive, responsive inventory) produced a
 unified triage. PRs landed in 6 worktrees, all merged with conflict resolution
-into `sprint/v3.12-bug-bash`. `go vet` ✅, `flutter analyze` 0 issues ✅,
-189 unit + 95 widget Flutter tests ✅, all backend packages ✅.
+into `sprint/v3.12-bug-bash`. `go vet` ✅, `flutter analyze --fatal-infos` 0
+issues ✅, 333 Flutter tests (284 pre-existing + 49 new) ✅, all backend
+packages ✅ (18 new backend tests: 12 ExecuteWorkflow + 6 money-path).
 
 ### Security
 
@@ -120,13 +121,60 @@ into `sprint/v3.12-bug-bash`. `go vet` ✅, `flutter analyze` 0 issues ✅,
   frontend merged second; PR2 (Legend-touching) merged last after confirming
   user's uncommitted Legend files were already committed in v3.11.5.
 
+### Layout & responsive fixes (Faz 4)
+
+- **Legend L1-3 version_diff responsive** (`version_diff_panel.dart`):
+  `LayoutBuilder` switches From/To `Row` → `Column` when `< AppBreakpoints.narrow`.
+- **Funnel panel narrow** (`funnel_panel_screen.dart`): `LayoutBuilder` stacks
+  `FunnelCard` to single column on narrow viewports (3 sections).
+- **Legend history Resume button** (`legend_screen.dart`): green "Resume" pill next
+  to Rerun; visible only when `exec.isResumable` (`failed` | `partial`); calls
+  `resumeLegendExecution(execId)` added to `api_service.dart`.
+- **dialogMaxWidth helper** (`lib/core/utils/dialog_utils.dart` NEW): `math.min(max,
+  MediaQuery…size.width - 32)` applied to Legend delete/unsaved dialogs.
+- **AppBreakpoints.narrow = 768.0** added to `lib/app/theme.dart`.
+- **Mobile pass — 5 screens** (v3.6 deferred finally closed):
+  - `public_profile_screen.dart`: header stack + Wrap sort row on narrow
+  - `credit_history_screen.dart`: Wrap filter chips
+  - `mission_marketplace_screen.dart`: action buttons below content on narrow
+  - `guild_create_screen.dart`: `ConstrainedBox(maxWidth: 720)` centered form
+  - `card_editor/widgets/editor_toolbar.dart`: horizontal scroll + title hide
+
+### Yeni test suite (Faz 5 — 73 yeni test)
+
+- `backend/services/workspace/execute_workflow_test.go` (12): empty/start-end/
+  unknown/credits/deduction/checkpoint/completed/failed + 4 ResumeExecution tests.
+  Key design: fake httptest.Server mounts both agent-client + AI-pipeline routes;
+  status=failed returns `(dto, nil)` not Go error — documented in test.
+- `backend/services/agent/money_path_test.go` (6): TopUpCredits balance+ledger,
+  RecordPurchase deduct+isPurchased, ForkAgent deduct+insufficient.
+  Constraint: `verifyMonadTransaction` unmockable (hardcoded testnet URL, no injectable
+  client) — post-verify DB paths replayed directly. `RecordPurchase` does NOT deduct
+  internal credits (on-chain MON spend) — test asserts correct contract.
+- `agent_store/test/unit/api_service_test.dart` (19): token state, retry helper,
+  MissionSaveResult, AgentModel.fromJson (5 variants), ApiConstants URL contracts.
+- `agent_store/test/unit/auth_controller_test.dart` (7): `_FakeAuthController` mirrors
+  Rx surface — `package:web` compile blocker prevents direct import (same constraint as
+  `network_guard_pure.dart`); covers initial state, disconnect, markConnected/Failed,
+  shortWallet, isConnected.
+- `agent_store/test/unit/store_controller_test.dart` (12): `_FakeStoreController`
+  reuses real `QueryStatePersistence` mixin; setCategory/setSort/setPriceRange/
+  toggleTag/resetFilters/toggleFilter/clearSearch/submitSearch (MRU+dedup)/
+  clearRecentSearches/debounce.
+- `agent_store/test/unit/create_agent_controller_test.dart` (11): real controller
+  (no web blocker); step clamp/reset/detect characterType/hasInsufficientCredits/
+  refreshCredits no-op/keywordsFor/stepLabels.
+- `wallet_errors_test.dart` pre-existed (6 tests, untouched).
+
 ### Yeni dosyalar
 
 - `backend/pkg/middleware/strip_wallet_header.go` + `_test.go`
 - `backend/services/workspace/mission_slug_test.go`
 - `backend/services/workspace/legend_resume_rate_limit_test.go`
 - `backend/services/workspace/scheduler_test.go`
+- `backend/services/workspace/execute_workflow_test.go`
 - `backend/services/agent/versioning_retry_test.go`
+- `backend/services/agent/money_path_test.go`
 - `backend/services/guild/dedupe_test.go`
 - `agent_store/lib/features/legend/widgets/legend_toolbar_overflow.dart`
 - `agent_store/lib/features/legend/widgets/legend_text_input_dialog.dart`
@@ -135,6 +183,11 @@ into `sprint/v3.12-bug-bash`. `go vet` ✅, `flutter analyze` 0 issues ✅,
 - `agent_store/lib/features/card_editor/widgets/sync_status_banner.dart`
 - `agent_store/lib/app/animations.dart`
 - `agent_store/lib/shared/utils/legend_error_dialog.dart`
+- `agent_store/lib/core/utils/dialog_utils.dart`
+- `agent_store/test/unit/api_service_test.dart`
+- `agent_store/test/unit/auth_controller_test.dart`
+- `agent_store/test/unit/store_controller_test.dart`
+- `agent_store/test/unit/create_agent_controller_test.dart`
 
 ---
 
