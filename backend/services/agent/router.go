@@ -119,6 +119,11 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		v1.GET("/users/:wallet/feed", handler.GetActivityFeed)
 		v1.GET("/users/:wallet/follow-status", auth, handler.GetFollowStatus)
 		v1.GET("/leaderboard", handler.GetLeaderboard)
+		// v3.11.4: leaderboard extensions (category, me, weekly rewards, admin award)
+		v1.GET("/leaderboard/category/:cat", handler.GetLeaderboardByCategory)
+		v1.GET("/leaderboard/me", auth, handler.GetUserRank)
+		v1.GET("/leaderboard/weekly-rewards", handler.GetWeeklyRewards)
+		v1.POST("/admin/leaderboard/award-weekly", handler.AwardWeeklyLeaderboard)
 		v1.GET("/og/agent/:id", handler.GetOGMeta)
 
 		// v3.10: creator analytics

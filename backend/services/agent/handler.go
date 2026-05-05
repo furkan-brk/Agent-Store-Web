@@ -1336,6 +1336,71 @@ func (h *Handler) GetDiscoveryFunnel(c *gin.Context) {
 	c.JSON(http.StatusOK, metrics)
 }
 
+// GetLeaderboardByCategory handles GET /api/v1/leaderboard/category/:cat?window=7d|30d|all
+func (h *Handler) GetLeaderboardByCategory(c *gin.Context) {
+	rows, err := h.agentSvc.GetLeaderboardByCategory(c.Param("cat"), c.Query("window"))
+	if err != nil {
+		log.Printf("[AgentHandler.GetLeaderboardByCategory] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"rows": rows, "category": c.Param("cat")})
+}
+
+// GetUserRank handles GET /api/v1/leaderboard/me?window=7d|30d|all
+// Auth required — returns the authenticated wallet's rank + 4 neighbors.
+func (h *Handler) GetUserRank(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	out, err := h.agentSvc.GetUserRank(wallet, c.Query("window"))
+	if err != nil {
+		log.Printf("[AgentHandler.GetUserRank] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+// AwardWeeklyLeaderboard handles POST /api/v1/admin/leaderboard/award-weekly
+// Requires X-Admin-Token header equal to ADMIN_API_TOKEN env (fail-closed
+// when the env is unset — no accidental open access).
+func (h *Handler) AwardWeeklyLeaderboard(c *gin.Context) {
+	want := strings.TrimSpace(os.Getenv("ADMIN_API_TOKEN"))
+	got := strings.TrimSpace(c.GetHeader("X-Admin-Token"))
+	if want == "" || got == "" || want != got {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin token required"})
+		return
+	}
+	summary, err := h.agentSvc.RecordWeeklyLeaderReward()
+	if err != nil {
+		log.Printf("[AgentHandler.AwardWeeklyLeaderboard] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
+// GetWeeklyRewards handles GET /api/v1/leaderboard/weekly-rewards?weeks=4
+// Public — surfaces the recent weekly reward history for the FE rewards tab.
+func (h *Handler) GetWeeklyRewards(c *gin.Context) {
+	weeks := 4
+	if v := c.Query("weeks"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			weeks = n
+		}
+	}
+	rows, err := h.agentSvc.ListWeeklyRewards(weeks)
+	if err != nil {
+		log.Printf("[AgentHandler.GetWeeklyRewards] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"rewards": rows, "count": len(rows)})
+}
+
 // GetAchievements handles GET /api/v1/users/:wallet/achievements.
 // Public endpoint — anyone can view a wallet's earned badges.
 func (h *Handler) GetAchievements(c *gin.Context) {
