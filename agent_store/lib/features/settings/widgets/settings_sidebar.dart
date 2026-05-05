@@ -48,7 +48,12 @@ final List<_SettingsSection> _sections = [
 ];
 
 class SettingsSidebar extends StatelessWidget {
-  const SettingsSidebar({super.key});
+  /// FE-P1-14: when non-null, used in place of `GoRouterState.of(context)`.
+  /// Lets widget tests mount this without a real GoRouter wrapper.
+  /// Production callers leave it null.
+  final String? currentPath;
+
+  const SettingsSidebar({super.key, this.currentPath});
 
   bool _isSelected(String currentLoc, String path) {
     if (path == '/settings') {
@@ -61,7 +66,7 @@ class SettingsSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = GoRouterState.of(context).uri.toString();
+    final loc = currentPath ?? GoRouterState.of(context).uri.toString();
     final l = AppLocalizations.of(context);
     final narrow = isNarrow(context);
 
@@ -259,7 +264,12 @@ class _NavChipState extends State<_NavChip> {
 /// render their content; padding + scroll are owned by this shell.
 class SettingsLayout extends StatelessWidget {
   final Widget body;
-  const SettingsLayout({super.key, required this.body});
+
+  /// FE-P1-14: forwarded to [SettingsSidebar] so tests can mount this
+  /// without a GoRouter wrapper. Null in production.
+  final String? currentPath;
+
+  const SettingsLayout({super.key, required this.body, this.currentPath});
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +279,7 @@ class SettingsLayout extends StatelessWidget {
         backgroundColor: AppTheme.bg,
         body: Column(
           children: [
-            const SettingsSidebar(),
+            SettingsSidebar(currentPath: currentPath),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -284,7 +294,7 @@ class SettingsLayout extends StatelessWidget {
       backgroundColor: AppTheme.bg,
       body: Row(
         children: [
-          const SettingsSidebar(),
+          SettingsSidebar(currentPath: currentPath),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),

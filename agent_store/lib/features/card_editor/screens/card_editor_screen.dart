@@ -19,6 +19,7 @@ import '../widgets/card_diff_modal.dart';
 import '../widgets/editor_preview_panel.dart';
 import '../widgets/editor_toolbar.dart';
 import '../widgets/sections/editor_sections.dart';
+import '../widgets/sync_status_banner.dart';
 import '../widgets/version_history_dialog.dart';
 
 /// Card Editor — split-view ekranı.
@@ -322,6 +323,13 @@ class _EditorState extends State<_Editor> {
                       agentId: widget.agentId,
                       onRollbackComplete: widget.onReload,
                     ),
+                  ),
+                  // FE-P1-10: status banner mirrors the toolbar pill so users
+                  // on narrow viewports (where the pill scrolls off-screen)
+                  // still get sync feedback.
+                  SyncStatusBanner(
+                    controller: controller,
+                    onRetry: () => controller.forceSyncToBackend(),
                   ),
                   Expanded(
                     child: isWide

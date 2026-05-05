@@ -4,6 +4,8 @@
 // plaintext key ONCE (warning + clipboard). The list view is masked
 // using the prefix from the server.
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -356,7 +358,8 @@ class _CreateApiKeyDialogState extends State<_CreateApiKeyDialog> {
         style: const TextStyle(color: AppTheme.textH),
       ),
       content: SizedBox(
-        width: 420,
+        // FE-P1 cross-screen: clamp dialog width so 375px viewports don't overflow.
+        width: math.min(420, MediaQuery.of(context).size.width - 32),
         child: created == null
             ? _buildForm(context, l)
             : _buildResult(context, l, created),

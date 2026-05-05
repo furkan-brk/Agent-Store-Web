@@ -7,14 +7,36 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../app/theme.dart';
 
-class CreditHistoryScreen extends StatelessWidget {
+class CreditHistoryScreen extends StatefulWidget {
   const CreditHistoryScreen({super.key});
 
   @override
+  State<CreditHistoryScreen> createState() => _CreditHistoryScreenState();
+}
+
+class _CreditHistoryScreenState extends State<CreditHistoryScreen> {
+  late final _CreditHistoryController ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    // FE-P1-6: register in initState (not build) and tear down in dispose
+    // so the controller doesn't leak past the screen's lifetime.
+    if (Get.isRegistered<_CreditHistoryController>()) {
+      ctrl = Get.find<_CreditHistoryController>();
+    } else {
+      ctrl = Get.put(_CreditHistoryController());
+    }
+  }
+
+  @override
+  void dispose() {
+    Get.delete<_CreditHistoryController>();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ctrl = Get.isRegistered<_CreditHistoryController>()
-        ? Get.find<_CreditHistoryController>()
-        : Get.put(_CreditHistoryController());
     return Obx(() => Scaffold(
       backgroundColor: AppTheme.bg,
       body: Column(children: [

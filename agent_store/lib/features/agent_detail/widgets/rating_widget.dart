@@ -91,24 +91,40 @@ class _RatingWidgetState extends State<RatingWidget> {
       return;
     }
     if (_votedHelpful.contains(ratingId)) return;
+    // Capture the original count BEFORE the optimistic update so we can
+    // revert if the API rejects (FE-P1-5: previously the local state stuck
+    // at the increment even when the server returned null/error).
+    final origIdx = _recent.indexWhere((r) => (r['id'] as num?)?.toInt() == ratingId);
+    final originalCount = origIdx >= 0
+        ? ((_recent[origIdx]['helpful'] as num?)?.toInt() ?? 0)
+        : 0;
     // Optimistic update so the user sees immediate feedback; reconcile with
     // server-confirmed count when the request lands.
     setState(() {
       _votedHelpful.add(ratingId);
-      final idx = _recent.indexWhere((r) => (r['id'] as num?)?.toInt() == ratingId);
-      if (idx >= 0) {
-        _recent[idx] = {
-          ..._recent[idx],
-          'helpful': ((_recent[idx]['helpful'] as num?)?.toInt() ?? 0) + 1,
+      if (origIdx >= 0) {
+        _recent[origIdx] = {
+          ..._recent[origIdx],
+          'helpful': originalCount + 1,
         };
       }
     });
     final newCount = await ApiService.instance.markRatingHelpful(widget.agentId, ratingId);
-    if (newCount != null && mounted) {
+    if (!mounted) return;
+    if (newCount != null) {
       setState(() {
         final idx = _recent.indexWhere((r) => (r['id'] as num?)?.toInt() == ratingId);
         if (idx >= 0) {
           _recent[idx] = {..._recent[idx], 'helpful': newCount};
+        }
+      });
+    } else {
+      // Revert: server rejected (null = error or already voted from another tab).
+      setState(() {
+        _votedHelpful.remove(ratingId);
+        final idx = _recent.indexWhere((r) => (r['id'] as num?)?.toInt() == ratingId);
+        if (idx >= 0) {
+          _recent[idx] = {..._recent[idx], 'helpful': originalCount};
         }
       });
     }

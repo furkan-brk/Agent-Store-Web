@@ -1,5 +1,7 @@
 // lib/features/creator/screens/creator_dashboard_screen.dart
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:go_router/go_router.dart';
@@ -434,7 +436,9 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
               Text('Edit Agent', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
             ]),
             content: SizedBox(
-              width: 500,
+              // FE-P1 cross-screen: clamp dialog content width so 375px
+              // viewports don't overflow the screen.
+              width: math.min(500, MediaQuery.of(ctx).size.width - 32),
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,7 +598,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
             Text('Regenerate Avatar', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
           ]),
           content: SizedBox(
-            width: 420,
+            width: math.min(420, MediaQuery.of(ctx).size.width - 32),
             child: isRegenerating
                 ? const Column(
                     mainAxisSize: MainAxisSize.min,
@@ -738,7 +742,7 @@ class _CreatorAgentTableState extends State<_CreatorAgentTable> {
             Text('Set Price', style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
           ]),
           content: SizedBox(
-            width: 380,
+            width: math.min(380, MediaQuery.of(ctx).size.width - 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
