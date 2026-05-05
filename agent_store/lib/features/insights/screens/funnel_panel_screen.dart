@@ -166,6 +166,201 @@ class _FunnelPanelScreenState extends State<FunnelPanelScreen> {
             ),
           ],
         ),
+        // v3.11.4: Discovery + Guild Master sections
+        const SizedBox(height: 24),
+        DiscoveryFunnelSection(window: _window),
+        const SizedBox(height: 24),
+        GuildMasterFunnelSection(window: _window),
+      ],
+    );
+  }
+}
+
+/// v3.11.4: Discovery section (Store impressions → save funnel).
+/// Splits into its own widget so tests can mount it standalone with a
+/// fetchOverride. Fetches independently from the parent funnel data.
+class DiscoveryFunnelSection extends StatefulWidget {
+  final String window;
+  final Future<Map<String, dynamic>?> Function(String window)? fetchOverride;
+
+  const DiscoveryFunnelSection({
+    super.key,
+    required this.window,
+    this.fetchOverride,
+  });
+
+  @override
+  State<DiscoveryFunnelSection> createState() => _DiscoveryFunnelSectionState();
+}
+
+class _DiscoveryFunnelSectionState extends State<DiscoveryFunnelSection> {
+  Map<String, dynamic>? _data;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(DiscoveryFunnelSection old) {
+    super.didUpdateWidget(old);
+    if (old.window != widget.window) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final fn = widget.fetchOverride ??
+        (String w) => ApiService.instance.getDiscoveryFunnel(window: w);
+    final data = await fn(widget.window);
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+      _loading = false;
+    });
+  }
+
+  double _readPct(String key) {
+    final raw = _data?[key];
+    if (raw is num && raw >= 0) {
+      return raw > 1 ? (raw / 100).clamp(0, 1).toDouble() : raw.toDouble().clamp(0, 1);
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Discovery',
+            style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        if (_loading)
+          const SizedBox(
+            height: 60,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FunnelCard(
+                title: 'Search → Save',
+                subtitle: 'Search queries that ended in a library save.',
+                percent: _readPct('search_to_save'),
+                icon: Icons.search,
+              ),
+              FunnelCard(
+                title: 'Impression → Open',
+                subtitle: 'Cards rendered in store that got opened.',
+                percent: _readPct('impression_to_open'),
+                icon: Icons.remove_red_eye_outlined,
+              ),
+              FunnelCard(
+                title: 'Open → Save',
+                subtitle: 'Detail views that converted to a save.',
+                percent: _readPct('open_to_save'),
+                icon: Icons.bookmark_border,
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// v3.11.4: Guild Master conversion section.
+class GuildMasterFunnelSection extends StatefulWidget {
+  final String window;
+  final Future<Map<String, dynamic>?> Function(String window)? fetchOverride;
+
+  const GuildMasterFunnelSection({
+    super.key,
+    required this.window,
+    this.fetchOverride,
+  });
+
+  @override
+  State<GuildMasterFunnelSection> createState() => _GuildMasterFunnelSectionState();
+}
+
+class _GuildMasterFunnelSectionState extends State<GuildMasterFunnelSection> {
+  Map<String, dynamic>? _data;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(GuildMasterFunnelSection old) {
+    super.didUpdateWidget(old);
+    if (old.window != widget.window) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final fn = widget.fetchOverride ??
+        (String w) => ApiService.instance.getGuildMasterKPI(window: w);
+    final data = await fn(widget.window);
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+      _loading = false;
+    });
+  }
+
+  double _readPct(String key) {
+    final raw = _data?[key];
+    if (raw is num && raw >= 0) {
+      return raw > 1 ? (raw / 100).clamp(0, 1).toDouble() : raw.toDouble().clamp(0, 1);
+    }
+    return 0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Guild Master',
+            style: TextStyle(color: AppTheme.textH, fontSize: 16, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        if (_loading)
+          const SizedBox(
+            height: 60,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FunnelCard(
+                title: 'Suggest acceptance',
+                subtitle: 'Suggestions that became Mission/Legend bridges.',
+                percent: _readPct('suggest_acceptance_rate'),
+                icon: Icons.handshake_outlined,
+              ),
+              FunnelCard(
+                title: 'Chat → Action',
+                subtitle: 'Chat messages that ended in a bridge.',
+                percent: _readPct('chat_to_action_rate'),
+                icon: Icons.chat_bubble_outline,
+              ),
+              FunnelCard(
+                title: 'Rerun rate',
+                subtitle: 'Sessions where suggest fired more than once.',
+                percent: _readPct('rerun_rate'),
+                icon: Icons.refresh,
+              ),
+            ],
+          ),
       ],
     );
   }

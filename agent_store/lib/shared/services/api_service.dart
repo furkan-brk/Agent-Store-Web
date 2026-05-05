@@ -1682,6 +1682,208 @@ class ApiService {
     }
     return null;
   }
+
+  // ─── v3.11.4: KPI funnels (Discovery + Guild Master) ─────────────────────
+
+  /// Discovery funnel: search→save / impression→open / open→save ratios.
+  /// [window] is "7d" / "30d" / "90d". Returns null on error.
+  Future<Map<String, dynamic>?> getDiscoveryFunnel({String window = '30d'}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/admin/kpi/discovery')
+          .replace(queryParameters: {'since': window});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('getDiscoveryFunnel: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getDiscoveryFunnel: $e');
+    }
+    return null;
+  }
+
+  /// Guild Master funnel: suggest acceptance / chat-to-action / rerun rates.
+  Future<Map<String, dynamic>?> getGuildMasterKPI({String window = '30d'}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/admin/kpi/guild-master')
+          .replace(queryParameters: {'since': window});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('getGuildMasterKPI: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getGuildMasterKPI: $e');
+    }
+    return null;
+  }
+
+  /// Records a batch of agent-card impressions (store grid scroll).
+  /// Server caps at 100 ids per call; we forward whatever the FE sent.
+  Future<void> recordAgentImpressions(List<int> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      await http.post(
+        Uri.parse('${ApiConstants.agents}/impressions'),
+        headers: _headers,
+        body: jsonEncode({'ids': ids}),
+      );
+    } catch (e) {
+      debugPrint('recordAgentImpressions: $e');
+    }
+  }
+
+  /// Records a "prompt_copy" UserActivity event for the discovery funnel.
+  Future<void> recordPromptCopy(int agentId) async {
+    try {
+      await http.post(
+        Uri.parse('${ApiConstants.agents}/$agentId/copy-analytics'),
+        headers: _headers,
+      );
+    } catch (e) {
+      debugPrint('recordPromptCopy: $e');
+    }
+  }
+
+  // ─── v3.11.4: Achievements ──────────────────────────────────────────────
+
+  /// Public list of badges earned by [wallet]. Returns [] on error.
+  Future<List<Map<String, dynamic>>> getAchievements(String wallet) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/api/v1/users/$wallet/achievements'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final list = body['achievements'] as List? ?? const [];
+        return list.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('getAchievements: $e');
+    }
+    return const [];
+  }
+
+  // ─── v3.11.4: Leaderboard extensions ─────────────────────────────────────
+
+  /// Top 10 creators within a single category. [window] = 7d / 30d / all.
+  Future<List<Map<String, dynamic>>> getLeaderboardByCategory(
+    String category, {
+    String window = 'all',
+  }) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/leaderboard/category/$category')
+          .replace(queryParameters: {'window': window});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final rows = body['rows'] as List? ?? const [];
+        return rows.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('getLeaderboardByCategory: $e');
+    }
+    return const [];
+  }
+
+  /// Authenticated wallet's rank + 4 neighbors.
+  Future<Map<String, dynamic>?> getUserRank({String window = 'all'}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/leaderboard/me')
+          .replace(queryParameters: {'window': window});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('getUserRank: $e');
+    }
+    return null;
+  }
+
+  /// Recent weekly leader rewards (newest first).
+  Future<List<Map<String, dynamic>>> getWeeklyRewards({int weeks = 4}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/leaderboard/weekly-rewards')
+          .replace(queryParameters: {'weeks': '$weeks'});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final rows = body['rewards'] as List? ?? const [];
+        return rows.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('getWeeklyRewards: $e');
+    }
+    return const [];
+  }
+
+  // ─── v3.11.4: Guild member event log ─────────────────────────────────────
+
+  /// Returns the guild's audit-log events (joined / left / role / permission).
+  Future<List<Map<String, dynamic>>> getGuildEvents(int guildId, {int limit = 20}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.baseUrl}/api/v1/guilds/$guildId/events')
+          .replace(queryParameters: {'limit': '$limit'});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final rows = body['events'] as List? ?? const [];
+        return rows.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('getGuildEvents: $e');
+    }
+    return const [];
+  }
+
+  // ─── v3.11.4: Mission scheduling ─────────────────────────────────────────
+
+  /// Sets or replaces a mission's cron schedule. Returns the saved row, or
+  /// null on validation/network error.
+  Future<Map<String, dynamic>?> setMissionSchedule(
+    int missionId, {
+    required String cron,
+    bool enabled = true,
+  }) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.baseUrl}/api/v1/user/missions/$missionId/schedule'),
+        headers: _headers,
+        body: jsonEncode({'cron': cron, 'enabled': enabled}),
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('setMissionSchedule: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('setMissionSchedule: $e');
+    }
+    return null;
+  }
+
+  Future<bool> deleteMissionSchedule(int missionId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('${ApiConstants.baseUrl}/api/v1/user/missions/$missionId/schedule'),
+        headers: _headers,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('deleteMissionSchedule: $e');
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> getMissionSchedules() async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.baseUrl}/api/v1/user/missions/schedules'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final rows = body['schedules'] as List? ?? const [];
+        return rows.cast<Map<String, dynamic>>();
+      }
+    } catch (e) {
+      debugPrint('getMissionSchedules: $e');
+    }
+    return const [];
+  }
 }
 
 /// Outcome of a [ApiService.saveMissionWithRevision] call (v3.7-13.1).
