@@ -47,8 +47,19 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
       body: _ctrl.isCreating.value
           ? _buildCreatingState()
           : SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // v3.12 FE-L1-4: tighter padding on narrow viewports + constrain
+              // the form to a comfortable max width on desktop so the agent
+              // grid doesn't sprawl across ultrawide screens.
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width < AppBreakpoints.narrow
+                    ? 16
+                    : 24,
+                vertical: 24,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 // -- Page header
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -192,7 +203,9 @@ class _GuildCreateScreenState extends State<GuildCreateScreen> {
                   ),
                 )),
                 const SizedBox(height: 32),
-              ]),
+                  ]),
+                ),
+              ),
             ),
     ));
   }

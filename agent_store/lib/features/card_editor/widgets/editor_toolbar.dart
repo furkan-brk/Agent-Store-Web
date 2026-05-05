@@ -5,6 +5,8 @@ import '../../../app/theme.dart';
 import '../controllers/card_editor_controller.dart';
 import '../data/card_presets.dart';
 
+// AppBreakpoints lives in app/theme.dart and is re-exported above.
+
 /// Top toolbar of the card editor screen.
 ///
 /// Contains: title row + sync badge + Undo/Redo + Save + Clone + Export menu
@@ -36,51 +38,79 @@ class EditorToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppTheme.surface,
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          const Icon(Icons.style, color: AppTheme.gold, size: 18),
-          const SizedBox(width: 10),
-          const Text(
-            'Card Editor',
-            style: TextStyle(color: AppTheme.textH, fontSize: 15, fontWeight: FontWeight.w700),
+    // v3.12 FE-L1-4: on narrow viewports the toolbar's 9 buttons can't fit
+    // in a single row at 375×667. We keep the leading title + sync badge
+    // pinned, then horizontally scroll the action cluster instead of
+    // letting it overflow. Desktop layout is unchanged.
+    return LayoutBuilder(builder: (_, c) {
+      final narrow = c.maxWidth < AppBreakpoints.narrow;
+      final actionChildren = <Widget>[
+        PresetMenuButton(controller: controller),
+        const SizedBox(width: 4),
+        if (onPreviewChanges != null)
+          PreviewChangesButton(
+            controller: controller,
+            onPressed: onPreviewChanges!,
           ),
-          const SizedBox(width: 14),
-          SyncStatusBadge(controller: controller),
-          const Spacer(),
-          PresetMenuButton(controller: controller),
+        const SizedBox(width: 4),
+        _UndoRedoCluster(controller: controller),
+        const SizedBox(width: 12),
+        _SaveButton(controller: controller, onPressed: onSave),
+        const SizedBox(width: 8),
+        _IconAction(icon: Icons.content_copy, tooltip: 'Clone agent', onPressed: onClone),
+        if (onShowHistory != null) ...[
           const SizedBox(width: 4),
-          if (onPreviewChanges != null)
-            PreviewChangesButton(
-              controller: controller,
-              onPressed: onPreviewChanges!,
-            ),
-          const SizedBox(width: 4),
-          _UndoRedoCluster(controller: controller),
-          const SizedBox(width: 12),
-          _SaveButton(controller: controller, onPressed: onSave),
-          const SizedBox(width: 8),
-          _IconAction(icon: Icons.content_copy, tooltip: 'Clone agent', onPressed: onClone),
-          if (onShowHistory != null) ...[
-            const SizedBox(width: 4),
-            _IconAction(
-              icon: Icons.history_rounded,
-              tooltip: 'Version history',
-              onPressed: onShowHistory,
-            ),
-          ],
-          const SizedBox(width: 4),
-          _ExportMenu(onExportJson: onExportJson, onExportPng: onExportPng, onExportSkillMd: onExportSkillMd),
-          const SizedBox(width: 4),
-          _IconAction(icon: Icons.close, tooltip: 'Close (Esc)', onPressed: onClose),
+          _IconAction(
+            icon: Icons.history_rounded,
+            tooltip: 'Version history',
+            onPressed: onShowHistory,
+          ),
         ],
-      ),
-    );
+        const SizedBox(width: 4),
+        _ExportMenu(onExportJson: onExportJson, onExportPng: onExportPng, onExportSkillMd: onExportSkillMd),
+        const SizedBox(width: 4),
+        _IconAction(icon: Icons.close, tooltip: 'Close (Esc)', onPressed: onClose),
+      ];
+
+      return Container(
+        decoration: const BoxDecoration(
+          color: AppTheme.surface,
+          border: Border(bottom: BorderSide(color: AppTheme.border)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            const Icon(Icons.style, color: AppTheme.gold, size: 18),
+            const SizedBox(width: 10),
+            if (!narrow) ...[
+              const Text(
+                'Card Editor',
+                style: TextStyle(color: AppTheme.textH, fontSize: 15, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 14),
+            ],
+            SyncStatusBadge(controller: controller),
+            if (narrow)
+              // Allow the action cluster to consume remaining space and
+              // scroll horizontally when it overflows.
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  reverse: true, // keep the close icon visible by default
+                  child: Row(children: [
+                    const SizedBox(width: 8),
+                    ...actionChildren,
+                  ]),
+                ),
+              )
+            else ...[
+              const Spacer(),
+              ...actionChildren,
+            ],
+          ],
+        ),
+      );
+    });
   }
 }
 

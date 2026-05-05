@@ -224,8 +224,12 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // v3.12 FE-L1-4: tighter horizontal padding on narrow viewports so the
+    // search field + dropdown have room to breathe.
+    final narrow = MediaQuery.of(context).size.width < AppBreakpoints.narrow;
+    final hPad = narrow ? 16.0 : 24.0;
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -297,40 +301,43 @@ class _FilterBar extends StatelessWidget {
             )),
           ]),
           const SizedBox(height: 10),
-          // Date filter chips
-          Obx(() => Row(children: [
-            _DateChip(
-              label: '7 days',
-              isSelected: ctrl.dateFilter.value == 7,
-              onTap: () => ctrl.setDateFilter(ctrl.dateFilter.value == 7 ? 0 : 7),
-            ),
-            const SizedBox(width: 8),
-            _DateChip(
-              label: '30 days',
-              isSelected: ctrl.dateFilter.value == 30,
-              onTap: () => ctrl.setDateFilter(ctrl.dateFilter.value == 30 ? 0 : 30),
-            ),
-            const SizedBox(width: 8),
-            _DateChip(
-              label: 'All time',
-              isSelected: ctrl.dateFilter.value == 0,
-              onTap: () => ctrl.setDateFilter(0),
-            ),
-            if (ctrl.hasActiveFilters) ...[
-              const Spacer(),
-              TextButton.icon(
-                onPressed: ctrl.clearFilters,
-                icon: const Icon(Icons.clear_all_rounded, size: 14),
-                label: const Text('Clear', style: TextStyle(fontSize: 12)),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.textM,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+          // Date filter chips — v3.12 FE-L1-4: Wrap so chips + clear button
+          // flow onto the next line on narrow viewports instead of clipping
+          // (375×667 / 414×896 used to truncate "All time" + Clear).
+          Obx(() => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _DateChip(
+                label: '7 days',
+                isSelected: ctrl.dateFilter.value == 7,
+                onTap: () => ctrl.setDateFilter(ctrl.dateFilter.value == 7 ? 0 : 7),
               ),
+              _DateChip(
+                label: '30 days',
+                isSelected: ctrl.dateFilter.value == 30,
+                onTap: () => ctrl.setDateFilter(ctrl.dateFilter.value == 30 ? 0 : 30),
+              ),
+              _DateChip(
+                label: 'All time',
+                isSelected: ctrl.dateFilter.value == 0,
+                onTap: () => ctrl.setDateFilter(0),
+              ),
+              if (ctrl.hasActiveFilters)
+                TextButton.icon(
+                  onPressed: ctrl.clearFilters,
+                  icon: const Icon(Icons.clear_all_rounded, size: 14),
+                  label: const Text('Clear', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.textM,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
             ],
-          ])),
+          )),
         ],
       ),
     );

@@ -168,57 +168,79 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                   ]),
                   if (ctrl.agents.isNotEmpty) ...[
                     const SizedBox(height: 14),
-                    Row(children: [
-                      // Search field
-                      Expanded(
-                        child: SizedBox(
-                          height: 36,
-                          child: TextField(
-                            onChanged: ctrl.setSearchQuery,
-                            style: const TextStyle(color: AppTheme.textH, fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: 'Search agents...',
-                              hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
-                              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppTheme.textM),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                              filled: true,
-                              fillColor: AppTheme.card,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: AppTheme.border),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: AppTheme.border),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: const BorderSide(color: AppTheme.gold, width: 1.5),
-                              ),
+                    // v3.12 FE-L1-4: stack search and sort chips on narrow
+                    // viewports so the chips don't clip beside the search
+                    // field on phone widths.
+                    LayoutBuilder(builder: (_, c) {
+                      final narrow = c.maxWidth < AppBreakpoints.narrow;
+                      final searchField = SizedBox(
+                        height: 36,
+                        child: TextField(
+                          onChanged: ctrl.setSearchQuery,
+                          style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+                          decoration: InputDecoration(
+                            hintText: 'Search agents...',
+                            hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
+                            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppTheme.textM),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            filled: true,
+                            fillColor: AppTheme.card,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppTheme.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppTheme.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(color: AppTheme.gold, width: 1.5),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Sort chips
-                      _ProfileSortChip(
-                        label: 'Newest',
-                        isSelected: ctrl.sortMode.value == 'newest',
-                        onTap: () => ctrl.setSortMode('newest'),
-                      ),
-                      const SizedBox(width: 6),
-                      _ProfileSortChip(
-                        label: 'Most Saved',
-                        isSelected: ctrl.sortMode.value == 'most_saved',
-                        onTap: () => ctrl.setSortMode('most_saved'),
-                      ),
-                      const SizedBox(width: 6),
-                      _ProfileSortChip(
-                        label: 'Most Used',
-                        isSelected: ctrl.sortMode.value == 'most_used',
-                        onTap: () => ctrl.setSortMode('most_used'),
-                      ),
-                    ]),
+                      );
+                      final sortChips = [
+                        _ProfileSortChip(
+                          label: 'Newest',
+                          isSelected: ctrl.sortMode.value == 'newest',
+                          onTap: () => ctrl.setSortMode('newest'),
+                        ),
+                        _ProfileSortChip(
+                          label: 'Most Saved',
+                          isSelected: ctrl.sortMode.value == 'most_saved',
+                          onTap: () => ctrl.setSortMode('most_saved'),
+                        ),
+                        _ProfileSortChip(
+                          label: 'Most Used',
+                          isSelected: ctrl.sortMode.value == 'most_used',
+                          onTap: () => ctrl.setSortMode('most_used'),
+                        ),
+                      ];
+                      if (narrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            searchField,
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: sortChips,
+                            ),
+                          ],
+                        );
+                      }
+                      return Row(children: [
+                        Expanded(child: searchField),
+                        const SizedBox(width: 12),
+                        sortChips[0],
+                        const SizedBox(width: 6),
+                        sortChips[1],
+                        const SizedBox(width: 6),
+                        sortChips[2],
+                      ]);
+                    }),
                   ],
                 ],
               ),
@@ -439,12 +461,16 @@ class _ProfileHeader extends StatelessWidget {
     final username = ctrl.profile.value?['username'] as String? ?? '';
     final bio = ctrl.profile.value?['bio'] as String? ?? '';
     final memberSince = ctrl.profile.value?['created_at'] as String?;
+    // v3.12 FE-L1-4: tighter padding on narrow viewports so the avatar+stats
+    // block has room without horizontally clipping at 375×667 / 414×896.
+    final narrow = MediaQuery.of(context).size.width < AppBreakpoints.narrow;
+    final hPad = narrow ? 16.0 : 32.0;
 
     return Container(
       decoration: const BoxDecoration(
         color: AppTheme.surface,
       ),
-      padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
+      padding: EdgeInsets.fromLTRB(hPad, 28, hPad, 28),
       child: Column(children: [
         // Avatar + name row
         Row(children: [
@@ -571,9 +597,13 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // v3.12 FE-L1-4: match header padding on narrow viewports so the three
+    // stat cards keep breathing room down to 375px.
+    final narrow = MediaQuery.of(context).size.width < AppBreakpoints.narrow;
+    final hPad = narrow ? 16.0 : 32.0;
     return Container(
       color: AppTheme.surface,
-      padding: const EdgeInsets.fromLTRB(32, 0, 32, 24),
+      padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 24),
       child: Row(children: [
         _StatCard(
           icon: Icons.auto_awesome_rounded,

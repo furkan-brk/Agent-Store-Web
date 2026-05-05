@@ -324,6 +324,61 @@ class _MissionCardState extends State<_MissionCard> {
     final description = d['description'] as String? ?? '';
     final category = d['category'] as String? ?? '';
     final creator = d['creator'] as String? ?? '';
+    // v3.12 FE-L1-4: stack actions below content on narrow viewports so
+    // long titles + buttons don't compete for the same row at 375×667.
+    final narrow = MediaQuery.of(context).size.width < AppBreakpoints.narrow;
+
+    final openInLegendBtn = SizedBox(
+      width: 34,
+      height: 34,
+      child: widget.openingInLegend
+          ? const Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppTheme.gold),
+              ),
+            )
+          : IconButton(
+              tooltip: 'Open in Legend',
+              icon: const Icon(Icons.flash_on, color: AppTheme.gold),
+              iconSize: 18,
+              padding: EdgeInsets.zero,
+              constraints:
+                  const BoxConstraints(minWidth: 34, minHeight: 34),
+              onPressed: widget.onOpenInLegend,
+            ),
+    );
+
+    final importBtn = SizedBox(
+      height: 34,
+      child: widget.importing
+          ? const SizedBox(
+              width: 34,
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppTheme.primary),
+                ),
+              ),
+            )
+          : OutlinedButton.icon(
+              onPressed: widget.onImport,
+              icon: const Icon(Icons.download_rounded, size: 14),
+              label: const Text('Import', style: TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: const BorderSide(color: AppTheme.primary),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 0),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+    );
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -407,64 +462,24 @@ class _MissionCardState extends State<_MissionCard> {
                             color: AppTheme.textM, fontSize: 11),
                       ),
                     ],
+                    if (narrow) ...[
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        openInLegendBtn,
+                        const SizedBox(width: 6),
+                        Flexible(child: importBtn),
+                      ]),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              // v3.11.1 — "Open in Legend" quick-action.
-              SizedBox(
-                width: 34,
-                height: 34,
-                child: widget.openingInLegend
-                    ? const Center(
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppTheme.gold),
-                        ),
-                      )
-                    : IconButton(
-                        tooltip: 'Open in Legend',
-                        icon: const Icon(Icons.flash_on, color: AppTheme.gold),
-                        iconSize: 18,
-                        padding: EdgeInsets.zero,
-                        constraints:
-                            const BoxConstraints(minWidth: 34, minHeight: 34),
-                        onPressed: widget.onOpenInLegend,
-                      ),
-              ),
-              const SizedBox(width: 6),
-              // Import button
-              SizedBox(
-                height: 34,
-                child: widget.importing
-                    ? const SizedBox(
-                        width: 34,
-                        child: Center(
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: AppTheme.primary),
-                          ),
-                        ),
-                      )
-                    : OutlinedButton.icon(
-                        onPressed: widget.onImport,
-                        icon: const Icon(Icons.download_rounded, size: 14),
-                        label: const Text('Import',
-                            style: TextStyle(fontSize: 12)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppTheme.primary,
-                          side: const BorderSide(color: AppTheme.primary),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 0),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-              ),
+              if (!narrow) ...[
+                const SizedBox(width: 12),
+                // v3.11.1 — "Open in Legend" quick-action.
+                openInLegendBtn,
+                const SizedBox(width: 6),
+                importBtn,
+              ],
             ],
           ),
         ),
