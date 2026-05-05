@@ -26,6 +26,8 @@ import '../services/legend_service.dart';
 import '../widgets/legend_export_dialog.dart';
 import '../widgets/legend_onboarding.dart';
 import '../widgets/legend_templates_dialog.dart';
+import '../widgets/legend_text_input_dialog.dart';
+import '../widgets/legend_toolbar_overflow.dart';
 import '../widgets/version_diff_panel.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -103,6 +105,11 @@ class _LegendScreenState extends State<LegendScreen>
   final TextEditingController _paletteSearchCtrl = TextEditingController();
   String _paletteQuery = '';
 
+  // ── Keyboard shortcut focus (v3.12 FE-L0-1) ───────────────────────────────
+  // Hoisted out of build() so we don't allocate a fresh FocusNode and steal
+  // focus on every rebuild. requestFocus() is invoked once in initState.
+  final FocusNode _shortcutFocus = FocusNode(debugLabel: 'legend-shortcuts');
+
   // ── Node clipboard ─────────────────────────────────────────────────────────
   WorkflowNode? _clipboardNode;
 
@@ -124,6 +131,14 @@ class _LegendScreenState extends State<LegendScreen>
     _pulseAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
+    // v3.12 FE-L0-1: request keyboard-shortcut focus exactly once. The
+    // pre-fix code allocated `FocusNode()..requestFocus()` inside build(),
+    // re-stealing focus from every dialog/text-field on every rebuild and
+    // leaking the prior FocusNode unbounded.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _shortcutFocus.requestFocus();
+    });
     _loadData();
     _checkOnboarding();
   }
@@ -137,6 +152,7 @@ class _LegendScreenState extends State<LegendScreen>
   void dispose() {
     _pulseCtrl.dispose();
     _paletteSearchCtrl.dispose();
+    _shortcutFocus.dispose();
     super.dispose();
   }
 
@@ -294,49 +310,30 @@ class _LegendScreenState extends State<LegendScreen>
           orElse: () => null,
         );
     if (edge == null) return;
-    final ctrl = TextEditingController(text: edge.label ?? '');
+    // v3.12 FE-P0-3: LegendTextInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('Label Edge', style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(
-            hintText: 'e.g. success, data, trigger...',
-            hintStyle: TextStyle(color: AppTheme.textM),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              Navigator.pop(context);
-              _pushHistory();
-              setState(() {
-                final trimmed = ctrl.text.trim();
-                _edges = _edges
-                    .map((e) => e.id == edgeId
-                        ? WorkflowEdge(
-                            id: e.id,
-                            fromId: e.fromId,
-                            toId: e.toId,
-                            label: trimmed.isEmpty ? null : trimmed,
-                          )
-                        : e)
-                    .toList();
-              });
-            },
-            child: const Text('Apply'),
-          ),
-        ],
+      builder: (_) => LegendTextInputDialog(
+        title: 'Label Edge',
+        hint: 'e.g. success, data, trigger...',
+        confirmLabel: 'Apply',
+        initialValue: edge.label ?? '',
+        onConfirm: (value) {
+          if (!mounted) return;
+          _pushHistory();
+          setState(() {
+            _edges = _edges
+                .map((e) => e.id == edgeId
+                    ? WorkflowEdge(
+                        id: e.id,
+                        fromId: e.fromId,
+                        toId: e.toId,
+                        label: value.isEmpty ? null : value,
+                      )
+                    : e)
+                .toList();
+          });
+        },
       ),
     );
   }
@@ -413,36 +410,20 @@ class _LegendScreenState extends State<LegendScreen>
   }
 
   void _showNewWorkflowDialog() {
-    final ctrl = TextEditingController(text: 'Workflow ${_workflowCount + 1}');
+    // v3.12 FE-P0-3: LegendTextInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('New Workflow',
-            style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(hintText: 'Workflow name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _confirmReplaceCanvas(
-                  () => _startWorkflow(name: ctrl.text));
-            },
-            child: const Text('Create'),
-          ),
-        ],
+      builder: (_) => LegendTextInputDialog(
+        title: 'New Workflow',
+        hint: 'Workflow name',
+        confirmLabel: 'Create',
+        initialValue: 'Workflow ${_workflowCount + 1}',
+        // _startWorkflow trims internally; pass the raw value through.
+        trim: false,
+        onConfirm: (name) async {
+          if (!mounted) return;
+          await _confirmReplaceCanvas(() => _startWorkflow(name: name));
+        },
       ),
     );
   }
@@ -998,36 +979,19 @@ class _LegendScreenState extends State<LegendScreen>
   }
 
   void _showRenameDialog() {
-    final ctrl = TextEditingController(text: _workflowName);
+    // v3.12 FE-P0-3: LegendTextInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('Rename Workflow',
-            style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(hintText: 'Workflow name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              final v = ctrl.text.trim();
-              if (v.isNotEmpty) setState(() => _workflowName = v);
-              Navigator.pop(context);
-            },
-            child: const Text('Rename'),
-          ),
-        ],
+      builder: (_) => LegendTextInputDialog(
+        title: 'Rename Workflow',
+        hint: 'Workflow name',
+        confirmLabel: 'Rename',
+        initialValue: _workflowName,
+        allowEmpty: false,
+        onConfirm: (v) {
+          if (!mounted) return;
+          setState(() => _workflowName = v);
+        },
       ),
     );
   }
@@ -1333,109 +1297,15 @@ class _LegendScreenState extends State<LegendScreen>
 
     final agentCount =
         _nodes.where((n) => n.type == WorkflowNodeType.agent).length;
-    final ctrl = TextEditingController();
-
+    // v3.12 FE-P0-3: LegendExecuteInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Row(
-          children: [
-            Icon(Icons.rocket_launch_outlined,
-                color: AppTheme.gold, size: 20),
-            SizedBox(width: 8),
-            Text('Execute Workflow',
-                style: TextStyle(color: AppTheme.textH, fontSize: 16)),
-          ],
-        ),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.bg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline,
-                        size: 14, color: AppTheme.gold),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This workflow has $agentCount agent node${agentCount != 1 ? 's' : ''} and will cost $agentCount credit${agentCount != 1 ? 's' : ''}.',
-                        style: const TextStyle(
-                            color: AppTheme.textM, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Input Message',
-                  style: TextStyle(
-                      color: AppTheme.textH,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                maxLines: 4,
-                style: const TextStyle(color: AppTheme.textH, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText:
-                      'Enter the input message for your workflow...',
-                  hintStyle: TextStyle(
-                      color: AppTheme.textM.withValues(alpha: 0.6)),
-                  filled: true,
-                  fillColor: AppTheme.bg,
-                  contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(color: AppTheme.gold, width: 2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.gold,
-              foregroundColor: AppTheme.bg,
-            ),
-            icon: const Icon(Icons.rocket_launch, size: 16),
-            label: const Text('Execute'),
-            onPressed: () {
-              final msg = ctrl.text.trim();
-              if (msg.isEmpty) return;
-              Navigator.pop(context);
-              _executeWorkflow(msg);
-            },
-          ),
-        ],
+      builder: (_) => LegendExecuteInputDialog(
+        agentCount: agentCount,
+        onConfirm: (msg) {
+          if (!mounted) return;
+          _executeWorkflow(msg);
+        },
       ),
     );
   }
@@ -2115,8 +1985,12 @@ class _LegendScreenState extends State<LegendScreen>
               : null,
           body: Stack(children: [
             KeyboardListener(
-            focusNode: FocusNode()..requestFocus(),
-            autofocus: true,
+            // v3.12 FE-L0-1: hoisted FocusNode (see _shortcutFocus field).
+            // autofocus: false — focus is requested exactly once via the
+            // post-frame callback in initState; rebuilds must NOT re-steal
+            // focus from any open dialog/text-field.
+            focusNode: _shortcutFocus,
+            autofocus: false,
             onKeyEvent: (event) {
               if (event is! KeyDownEvent) return;
               final ctrl = HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed;
@@ -2431,198 +2305,245 @@ class _LegendScreenState extends State<LegendScreen>
               ),
             ),
           ],
+          // v3.12 FE-L0-2: responsive toolbar.
+          // Below 1100px the secondary action cluster (Starter, Templates,
+          // Auto Layout, Fit, Undo, Redo, Load, Export, Import, History,
+          // Compare, Clear) collapses into an overflow PopupMenu. The
+          // primary actions (New, Save, Execute, credit chip, ?) and any
+          // contextual buttons (Delete, Label Edge, Split) stay visible.
+          // Execute remains pinned to the trailing edge OUTSIDE the
+          // scrollable cluster — pre-fix on iPad-landscape (1024px) the
+          // reverse-scrolled toolbar hid the Execute CTA off-screen.
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              physics: const ClampingScrollPhysics(),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-          _ToolbarButton(
-            icon: Icons.add_box_outlined,
-            label: 'New',
-            onTap: _showNewWorkflowDialog,
+            child: LayoutBuilder(builder: (ctx, constraints) {
+              // The toolbar is laid out inside a Row that already includes
+              // the LEGEND header / sync indicator on desktop. We use the
+              // outer screen width (not constraints.maxWidth) for the
+              // breakpoint so the same width that distinguishes phone vs
+              // tablet vs desktop drives the collapse decision.
+              final screenWidth = MediaQuery.of(ctx).size.width;
+              final compact = legendToolbarShouldCollapse(screenWidth,
+                  isMobile: isMobile);
+              return _buildToolbarActions(compact: compact);
+            }),
           ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.auto_fix_high_outlined,
-            label: 'Starter',
-            onTap: _buildStarterWorkflow,
+        ],
+      ),
+    );
+  }
+
+  // v3.12 FE-L0-2: Toolbar action row, factored out for the
+  // compact / full-width split.
+  Widget _buildToolbarActions({required bool compact}) {
+    // ── Contextual buttons (only visible when the user has a selection).
+    final contextual = <Widget>[
+      if (_selectedNodeId != null || _selectedEdgeId != null) ...[
+        _ToolbarButton(
+          icon: Icons.delete_outline,
+          label: _selectedEdgeId != null ? 'Del Edge' : 'Delete',
+          danger: true,
+          onTap: _deleteSelected,
+        ),
+        const SizedBox(width: 6),
+      ],
+      if (_selectedEdgeId != null) ...[
+        _ToolbarButton(
+          icon: Icons.label_outline,
+          label: 'Label Edge',
+          onTap: () => _showLabelEdgeDialog(_selectedEdgeId!),
+        ),
+        const SizedBox(width: 6),
+      ],
+      // Split button — only when a guild node is selected.
+      if (_selectedNodeId != null &&
+          _nodes.any((n) =>
+              n.id == _selectedNodeId &&
+              n.type == WorkflowNodeType.guild)) ...[
+        _ToolbarButton(
+          icon: Icons.call_split,
+          label: 'Split',
+          accent: true,
+          onTap: () {
+            // Defensive: _selectedNodeId can be stale (e.g. after a
+            // template Replace) — use nullable firstWhere to avoid a
+            // StateError when no matching node exists.
+            final guildNode = _nodes.cast<WorkflowNode?>().firstWhere(
+                (n) => n?.id == _selectedNodeId,
+                orElse: () => null);
+            if (guildNode == null) return;
+            _splitGuildNode(guildNode);
+          },
+        ),
+        const SizedBox(width: 6),
+      ],
+    ];
+
+    // ── Pinned primary actions (always visible). Order: New, Save, [Execute].
+    final pinnedLeading = <Widget>[
+      _ToolbarButton(
+        icon: Icons.add_box_outlined,
+        label: 'New',
+        onTap: _showNewWorkflowDialog,
+      ),
+      const SizedBox(width: 6),
+      _ToolbarButton(
+        icon: Icons.save_outlined,
+        label: 'Save',
+        accent: true,
+        onTap: _saveWorkflow,
+      ),
+      const SizedBox(width: 6),
+    ];
+
+    // ── Pinned trailing: Execute + cost chip + ?.
+    final pinnedTrailing = <Widget>[
+      _ExecuteButton(
+        executing: _executing,
+        onTap: _executing ? null : _showPreflightAndExecute,
+        pulseAnimation: _pulseAnim,
+      ),
+      if (_nodes.any((n) => n.type == WorkflowNodeType.agent)) ...[
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppTheme.gold.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
           ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.auto_awesome_mosaic,
-            label: 'Templates',
-            onTap: _showTemplatesDialog,
+          child: Text(
+            '${_calculateTotalCredits()} cr',
+            style: const TextStyle(
+                color: AppTheme.gold, fontSize: 10, fontWeight: FontWeight.w600),
           ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.account_tree_outlined,
-            label: 'Auto Layout',
-            onTap: _autoLayout,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.fit_screen_outlined,
-            label: 'Fit',
-            onTap: _fitToCanvas,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.undo,
-            label: 'Undo',
-            onTap: _undo,
-            disabled: _history.isEmpty,
-          ),
-          const SizedBox(width: 2),
-          _ToolbarButton(
-            icon: Icons.redo,
-            label: 'Redo',
-            onTap: _redo,
-            disabled: _redoStack.isEmpty,
-          ),
-          const SizedBox(width: 6),
-          if (_selectedNodeId != null || _selectedEdgeId != null) ...[
-            _ToolbarButton(
-              icon: Icons.delete_outline,
-              label: _selectedEdgeId != null ? 'Del Edge' : 'Delete',
-              danger: true,
-              onTap: _deleteSelected,
-            ),
-            const SizedBox(width: 6),
-          ],
-          if (_selectedEdgeId != null) ...[
-            _ToolbarButton(
-              icon: Icons.label_outline,
-              label: 'Label Edge',
-              onTap: () => _showLabelEdgeDialog(_selectedEdgeId!),
-            ),
-            const SizedBox(width: 6),
-          ],
-          // Split button — only when a guild node is selected
-          if (_selectedNodeId != null &&
-              _nodes.any((n) =>
-                  n.id == _selectedNodeId &&
-                  n.type == WorkflowNodeType.guild)) ...[
-            _ToolbarButton(
-              icon: Icons.call_split,
-              label: 'Split',
-              accent: true,
-              onTap: () {
-                // Defensive: _selectedNodeId can be stale (e.g. after a
-                // template Replace) — use nullable firstWhere to avoid a
-                // StateError when no matching node exists.
-                final guildNode = _nodes.cast<WorkflowNode?>().firstWhere(
-                    (n) => n?.id == _selectedNodeId,
-                    orElse: () => null);
-                if (guildNode == null) return;
-                _splitGuildNode(guildNode);
-              },
-            ),
-            const SizedBox(width: 6),
-          ],
-          _ToolbarButton(
-            icon: Icons.folder_open_outlined,
-            label: 'Load',
-            onTap: _showLoadDialog,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.save_outlined,
-            label: 'Save',
-            accent: true,
-            onTap: _saveWorkflow,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.data_object,
-            label: 'Export',
-            onTap: _showExportDialog,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.upload_outlined,
-            label: 'Import',
-            onTap: _showImportDialog,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.history,
-            label: 'History',
-            onTap: _showHistoryDialog,
-          ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.compare_arrows_rounded,
-            label: 'Compare',
-            onTap: _showCompareVersionsDialog,
-          ),
-          const SizedBox(width: 6),
-          _ExecuteButton(
-            executing: _executing,
-            onTap: _executing ? null : _showPreflightAndExecute,
-            pulseAnimation: _pulseAnim,
-          ),
-          if (_nodes.any((n) => n.type == WorkflowNodeType.agent)) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.gold.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.gold.withValues(alpha: 0.3)),
+        ),
+      ],
+      const SizedBox(width: 6),
+      _ToolbarButton(
+        icon: Icons.help_outline_rounded,
+        label: '?',
+        onTap: _showKeyboardShortcutsDialog,
+      ),
+    ];
+
+    // ── Secondary actions (collapse to PopupMenu on narrow viewports).
+    final secondaryItems = <LegendToolbarOverflowItem>[
+      LegendToolbarOverflowItem(
+          icon: Icons.auto_fix_high_outlined,
+          label: 'Starter',
+          onTap: _buildStarterWorkflow),
+      LegendToolbarOverflowItem(
+          icon: Icons.auto_awesome_mosaic,
+          label: 'Templates',
+          onTap: _showTemplatesDialog),
+      LegendToolbarOverflowItem(
+          icon: Icons.account_tree_outlined,
+          label: 'Auto Layout',
+          onTap: _autoLayout),
+      LegendToolbarOverflowItem(
+          icon: Icons.fit_screen_outlined,
+          label: 'Fit',
+          onTap: _fitToCanvas),
+      LegendToolbarOverflowItem(
+          icon: Icons.undo,
+          label: 'Undo',
+          onTap: _undo,
+          disabled: _history.isEmpty),
+      LegendToolbarOverflowItem(
+          icon: Icons.redo,
+          label: 'Redo',
+          onTap: _redo,
+          disabled: _redoStack.isEmpty),
+      LegendToolbarOverflowItem(
+          icon: Icons.folder_open_outlined,
+          label: 'Load',
+          onTap: _showLoadDialog),
+      LegendToolbarOverflowItem(
+          icon: Icons.data_object,
+          label: 'Export',
+          onTap: _showExportDialog),
+      LegendToolbarOverflowItem(
+          icon: Icons.upload_outlined,
+          label: 'Import',
+          onTap: _showImportDialog),
+      LegendToolbarOverflowItem(
+          icon: Icons.history,
+          label: 'History',
+          onTap: _showHistoryDialog),
+      LegendToolbarOverflowItem(
+          icon: Icons.compare_arrows_rounded,
+          label: 'Compare',
+          onTap: _showCompareVersionsDialog),
+      LegendToolbarOverflowItem(
+          icon: Icons.clear_all, label: 'Clear', onTap: _showClearCanvasDialog),
+    ];
+
+    Widget secondaryCluster;
+    if (compact) {
+      // Collapse all into one PopupMenuButton.
+      secondaryCluster = LegendToolbarOverflowMenu(items: secondaryItems);
+    } else {
+      // Inline rendering with horizontal scroll fallback if even the full
+      // cluster doesn't fit on a wide-but-not-massive viewport. Reverse
+      // is intentionally NOT used here so any overflow shows the LEFTMOST
+      // buttons first (the user can already see Execute on the trailing
+      // edge — the reverse:true behavior pre-fix was the bug).
+      secondaryCluster = SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final item in secondaryItems) ...[
+              _ToolbarButton(
+                icon: item.icon,
+                label: item.label,
+                disabled: item.disabled,
+                onTap: item.onTap,
               ),
-              child: Text(
-                '${_calculateTotalCredits()} cr',
-                style: const TextStyle(color: AppTheme.gold, fontSize: 10, fontWeight: FontWeight.w600),
-              ),
-            ),
+              const SizedBox(width: 6),
+            ],
           ],
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.help_outline_rounded,
-            label: '?',
-            onTap: _showKeyboardShortcutsDialog,
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        ...pinnedLeading,
+        ...contextual,
+        Expanded(child: secondaryCluster),
+        const SizedBox(width: 6),
+        ...pinnedTrailing,
+      ],
+    );
+  }
+
+  // v3.12 FE-L0-2: helper called from the secondary cluster Clear button.
+  void _showClearCanvasDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.card,
+        title: const Text('Clear canvas?',
+            style: TextStyle(color: AppTheme.textH)),
+        content: const Text(
+          'All nodes and edges will be removed.',
+          style: TextStyle(color: AppTheme.textM),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppTheme.textM)),
           ),
-          const SizedBox(width: 6),
-          _ToolbarButton(
-            icon: Icons.clear_all,
-            label: 'Clear',
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
-                  backgroundColor: AppTheme.card,
-                  title: const Text('Clear canvas?',
-                      style: TextStyle(color: AppTheme.textH)),
-                  content: const Text(
-                    'All nodes and edges will be removed.',
-                    style: TextStyle(color: AppTheme.textM),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel',
-                          style: TextStyle(color: AppTheme.textM)),
-                    ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _clearCanvas();
-                      },
-                      child: const Text('Clear'),
-                    ),
-                  ],
-                ),
-              );
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+            onPressed: () {
+              Navigator.pop(context);
+              _clearCanvas();
             },
-          ),
-                ],
-              ),
-            ),
+            child: const Text('Clear'),
           ),
         ],
       ),

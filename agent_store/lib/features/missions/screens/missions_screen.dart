@@ -11,6 +11,7 @@ import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/page_header.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
+import '../widgets/mission_editor_dialog.dart';
 
 class _CategoryDef {
   final String name;
@@ -172,17 +173,10 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   void _showCreateDialog() {
-    final titleCtrl = TextEditingController();
-    final promptCtrl = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => _CreateMissionDialog(
-        titleCtrl: titleCtrl,
-        promptCtrl: promptCtrl,
-        onSave: () async {
-          final title = titleCtrl.text.trim();
-          final prompt = promptCtrl.text.trim();
+      builder: (ctx) => MissionEditorDialog(
+        onSave: (title, prompt) async {
           if (title.isEmpty || prompt.isEmpty) return;
           Navigator.of(ctx).pop();
           await MissionService.instance.addMission(title: title, prompt: prompt);
@@ -196,18 +190,13 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   void _showEditDialog(MissionModel m) {
-    final titleCtrl = TextEditingController(text: m.title);
-    final promptCtrl = TextEditingController(text: m.prompt);
-
     showDialog(
       context: context,
-      builder: (ctx) => _CreateMissionDialog(
-        titleCtrl: titleCtrl,
-        promptCtrl: promptCtrl,
+      builder: (ctx) => MissionEditorDialog(
+        initialTitle: m.title,
+        initialPrompt: m.prompt,
         isEdit: true,
-        onSave: () async {
-          final title = titleCtrl.text.trim();
-          final prompt = promptCtrl.text.trim();
+        onSave: (title, prompt) async {
           if (title.isEmpty || prompt.isEmpty) return;
           Navigator.of(ctx).pop();
           final outcome = await MissionService.instance.updateMission(
@@ -789,104 +778,6 @@ class _ActionIcon extends StatelessWidget {
         padding: EdgeInsets.zero,
         splashRadius: 16,
       ),
-    );
-  }
-}
-
-// -- Create / Edit mission dialog --
-
-class _CreateMissionDialog extends StatelessWidget {
-  final TextEditingController titleCtrl;
-  final TextEditingController promptCtrl;
-  final VoidCallback onSave;
-  final bool isEdit;
-
-  const _CreateMissionDialog({
-    required this.titleCtrl,
-    required this.promptCtrl,
-    required this.onSave,
-    this.isEdit = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppTheme.card,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppTheme.border),
-      ),
-      title: Text(
-        isEdit ? 'Edit Mission' : 'Create Mission',
-        style: const TextStyle(color: AppTheme.textH, fontSize: 18, fontWeight: FontWeight.bold),
-      ),
-      content: SizedBox(
-        width: 440,
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(
-            controller: titleCtrl,
-            style: const TextStyle(color: AppTheme.textH, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'Mission title (e.g. Secure API audit)',
-              hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
-              filled: true,
-              fillColor: AppTheme.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: promptCtrl,
-            style: const TextStyle(color: AppTheme.textH, fontSize: 14),
-            minLines: 3,
-            maxLines: 8,
-            decoration: InputDecoration(
-              hintText: 'Mission prompt content...',
-              hintStyle: const TextStyle(color: AppTheme.textM, fontSize: 13),
-              filled: true,
-              fillColor: AppTheme.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-              ),
-            ),
-          ),
-        ]),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: AppTheme.primary,
-            foregroundColor: AppTheme.textH,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onPressed: onSave,
-          child: Text(isEdit ? 'Save' : 'Create'),
-        ),
-      ],
     );
   }
 }
