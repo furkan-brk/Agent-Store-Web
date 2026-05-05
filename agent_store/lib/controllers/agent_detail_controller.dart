@@ -1,6 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import '../features/agent_detail/widgets/purchase_button.dart' show TxState, TxStateX;
+// FE-P1-4: import the pure-Dart tx_state.dart directly. Re-exporting
+// through purchase_button.dart pulled `package:web`, which crashes
+// `flutter test` runs in non-web environments.
+import '../features/agent_detail/widgets/tx_state.dart' show TxState, TxStateX;
 import '../shared/models/agent_model.dart';
 import '../shared/services/api_service.dart';
 import '../shared/services/notification_service.dart';
