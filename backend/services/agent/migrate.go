@@ -14,6 +14,7 @@ func Migrate() {
 	}
 	if err := database.DB.AutoMigrate(
 		&models.Agent{},
+		&models.AgentVersion{},
 		&models.LibraryEntry{},
 		&models.PurchasedAgent{},
 		&models.AgentRating{},

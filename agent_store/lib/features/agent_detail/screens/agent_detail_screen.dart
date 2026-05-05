@@ -21,8 +21,8 @@ import '../../../shared/widgets/skeleton_widgets.dart';
 import '../../store/data/background_data.dart';
 import '../widgets/compare_modal.dart';
 import '../widgets/export_agent_widget.dart';
+import '../widgets/external_use_modal.dart';
 import '../widgets/mini_chat_widget.dart';
-import '../widgets/openclaw_install_modal.dart';
 import '../widgets/prompt_redaction.dart';
 import '../widgets/radar_chart_widget.dart';
 import '../widgets/rating_widget.dart';
@@ -135,19 +135,20 @@ class _AgentDetailViewState extends State<_AgentDetailView>
     }
   }
 
-  /// Opens the OpenClaw install modal — replaces the legacy direct-download
-  /// flow. Modal handles deeplink, manual curl install, and (when [hasAccess])
-  /// the full SKILL.md download in one place.
-  void _showOpenClawModal(bool hasAccess) {
+  /// Opens the unified "Use Externally" modal — 4 tabs (OpenClaw / cURL /
+  /// Python / Node.js). Header icon defaults to the OpenClaw tab; the
+  /// MiniChat terminal icon passes [initialTab]=1 so it lands on cURL.
+  void _showExternalUseModal(bool hasAccess, {int initialTab = 0}) {
     final agent = _ctrl.agent.value;
     if (agent == null) return;
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.55),
-      builder: (_) => OpenClawInstallModal(
+      builder: (_) => ExternalUseModal(
         agentId: agent.id,
         agentTitle: agent.title,
         hasAccess: hasAccess,
+        initialTab: initialTab,
       ),
     );
   }
@@ -822,16 +823,16 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         color: _ctrl.inLibrary.value ? AppTheme.primary : AppTheme.textM,
         onPressed: _toggleLibrary,
       )),
-      // OpenClaw "Install" entry-point — *always* visible. The modal serves
-      // both the deeplink/curl flow (works for anonymous visitors via the
-      // public redacted SKILL.md) and the "Download Full" flow (gated on
-      // hasAccess inside the modal). Keeping this button unconditional makes
-      // the entry-point discoverable regardless of purchase state.
+      // "Use externally" entry-point — opens the unified modal at the
+      // OpenClaw tab. The modal also exposes /chat code samples (cURL /
+      // Python / Node.js); the chat-area MiniChat terminal icon enters the
+      // same modal at the cURL tab. Always visible so the entry-point is
+      // discoverable regardless of purchase state — gating happens inside.
       _HoverIconButton(
         icon: Icons.extension_outlined,
-        tooltip: 'Install in OpenClaw',
+        tooltip: 'Use externally',
         color: const Color(0xFFEF4444),
-        onPressed: () => _showOpenClawModal(hasAccess),
+        onPressed: () => _showExternalUseModal(hasAccess),
       ),
       if (_ctrl.isOwnAgent)
         _HoverIconButton(

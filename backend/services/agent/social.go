@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
@@ -48,6 +49,16 @@ func (s *AgentService) FollowUser(followerWallet, followeeWallet string) error {
 	if result.RowsAffected == 0 {
 		return ErrAlreadyFollowing
 	}
+	// v3.11.3: notify the followee of the new follower. Best-effort, dedup'd
+	// by link so a follow→unfollow→follow cycle within the dedup window only
+	// surfaces one notification.
+	s.notifyOnce(
+		followeeWallet,
+		"social",
+		"New follower",
+		"You have a new follower",
+		"/users/"+followerWallet,
+	)
 	return nil
 }
 
@@ -340,12 +351,7 @@ func (s *AgentService) GetForYou(wallet string) ([]models.Agent, error) {
 
 // containsID checks whether id is in the slice (used for small slices).
 func containsID(ids []uint, id uint) bool {
-	for _, v := range ids {
-		if v == id {
-			return true
-		}
-	}
-	return false // slices.Contains not used to avoid Go 1.21 dependency constraint
+	return slices.Contains(ids, id)
 }
 
 // ── Time-windowed Leaderboard ──────────────────────────────────────────────

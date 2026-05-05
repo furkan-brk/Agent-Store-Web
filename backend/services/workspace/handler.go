@@ -245,6 +245,28 @@ func (h *Handler) GetExecution(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ResumeExecution re-runs a previously failed execution, skipping nodes that
+// completed successfully. v3.11.3.
+func (h *Handler) ResumeExecution(c *gin.Context) {
+	execID, err := strconv.ParseUint(c.Param("execId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid execution ID"})
+		return
+	}
+	result, err := h.legendSvc.ResumeExecution(c.GetString("wallet"), uint(execID))
+	if err != nil {
+		// "not found" maps to 404; other errors (parse, credits, etc.) are 400.
+		msg := err.Error()
+		if strings.Contains(msg, "execution not found") || strings.Contains(msg, "workflow not found") {
+			c.JSON(http.StatusNotFound, gin.H{"error": msg})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": msg})
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // ListExecutions returns paginated executions, optionally filtered by workflow_id.
 func (h *Handler) ListExecutions(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

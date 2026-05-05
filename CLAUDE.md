@@ -302,6 +302,7 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [x] **v3.11.3 — Pro Tools Closure** (Backend + Frontend) ✅ Legend node checkpoint/resume (WorkflowExecution.NodeStates), bulk operations (4 actions + quota guard), agent versioning + rollback (LRU 20), KPI funnel queries, API key scope middleware (dual-auth pilot), notification auto-creation hooks (notifyOnce 1h dedup), workflow versioning diff UI, observability panel (CustomPainter chart), card presets (19) + before/after diff, library bulk select + version history dialog, KPI funnel panel
 - [x] **v3.11.2 — Cross-Cutting Polish** (Backend + Frontend) ✅ notification center, API keys (bcrypt + scopes), per-action credit breakdown, rating moderation, settings sectioning, i18n iskelet, theme toggle (light parchment), notification UI, developer UI, wallet error dictionary + tx timeline + per-action history icons
 - [x] **v3.11.1 — User-Facing High-Impact Polish** (Backend + Frontend) ✅ fuzzy search, similar agents, mission→legend bridge, prompt template gallery, mention preview, redaction toggle, quality score, credit early-check
 - [x] **v3.10 — Pro Tools** (Backend + Frontend) ✅ preflight, workflow versioning, mission marketplace, guild invite/permissions, compatibility explainability, creator analytics
@@ -313,6 +314,150 @@ services:
   - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
   - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
   - ⏳ 2-day bug bash — pending
+
+## v3.11.3 Pro Tools Closure (2026-05-05)
+11 task; Legend resume + bulk ops + agent versioning + KPI funnel + API key
+middleware + notification hooks + frontend diff/observability/presets/bulk UI/KPI panel.
+Backend +33 unit (services/agent ~159 + workspace + middleware), Frontend +14 test
+(174→196). `go vet ./...` clean, `flutter analyze` 0 issue.
+
+**Backend** (6 task):
+- **Legend Node Checkpoint/Resume**: `WorkflowExecution.NodeStates` (text JSON
+  checkpoint blob — `{node_id: {status, output, duration_ms}}`). `services/workspace/
+  legend_service.go` per-node `nodeCheckpoint` writes inside `ExecuteWorkflow`,
+  `loadNodeStates`/`saveNodeStates` helpers, `ResumeExecution(wallet, execID)`
+  skip completed + reuse output, re-execute pending/failed. **Karar**: kredi
+  policy — sadece resumed run complete olunca düş; original failed run partial spend
+  refund yok. `POST /user/legend/executions/:execId/resume` dual-auth (`AuthOrAPIKey
+  ("execute:legend")`). **Karar**: plan "LegendExecution" diyordu, gerçek model adı
+  `WorkflowExecution` — yeni model değil, mevcut'a field eklendi (backward compat:
+  empty string = no checkpoints). 6 unit test.
+- **Bulk Operations**: `POST /agents/bulk` body `{action, ids[], payload}`. 4 action:
+  `remove_from_library`, `tag_add`, `tag_remove`, `regenerate_image`.
+  `bulkActionCost(action, n)` quota guard (regenerate=3 each). Per-id error tolerance
+  (success/failure list). Max 100 ids enforcement. `services/agent/bulk_actions.go`.
+  6 unit test.
+- **Agent Versioning + Rollback**: `AgentVersion` model (AgentID index, Version int
+  sequential, FieldsJSON snapshot, composite unique). `UpdateAgent` →
+  `snapshotAgentVersion` best-effort. **Karar**: Rollback **2 versiyon ekler** —
+  current state'i önce snapshot'lar, sonra historical fields'ı uygular, sonra
+  post-rollback'i de snapshot'lar; rollback'in kendisi reversible olur.
+  LRU eviction at 20 (subquery via `Pluck`, sqlite + postgres uyumlu — `LIMIT` on
+  `DELETE` yok). 5 unit test.
+- **KPI Funnel**: `services/agent/funnel.go` `GetFunnelMetrics(wallet, since)` —
+  `SuggestToExecute`, `EditToPublish`, `PublishToFirstSaveMedianMs`, `TrialToPurchase`
+  ratios + `Daily []DailyFunnelMetric`. Raw SQL aggregations (`strftime` dialect-
+  agnostic). **Karar**: empty denominator için ratio = -1 (UI "—" gösterir, "0%"
+  yanıltıcı değil). **Karar**: `MIN(saved_at)` sqlite'ta string döner — yeni
+  `parseFlexTimestamp` helper iki dialect'i de handle eder, query değişmiyor.
+  Cache `funnel|<wallet>|<since>` 5dk TTL. `GET /admin/kpi/funnel?since=7d|30d|90d`.
+  5 unit test.
+- **API Key Scope Middleware**: `pkg/middleware/api_key_auth.go` — `APIKeyAuth(scope)`
+  + `AuthOrAPIKey(scope)` helpers. Header parse (`X-API-Key` veya `Authorization:
+  Bearer agst_...`), prefix lookup → bcrypt verify → revoked + scope check → wallet
+  inject. **Karar**: middleware `pkg/middleware/` altında (services/agent değil) —
+  import cycle önle, `apiKeyNamespacePrefix` constant duplicate. **Karar**:
+  `AuthOrAPIKey` JWT öncelikli — JWT varsa API key path tamamen bypass, internal
+  microservice trafiği etkilenmez. Async `LastUsedAt` update goroutine + nil-DB
+  guard (RecordActivity pattern). Pilot 3 endpoint dual-auth: `POST /agents`
+  (`write:agents`), yeni `GET /keyed/agents` (`read:agents`), `/legend/executions/
+  :id/resume` (`execute:legend`). 6 unit test.
+- **Notification Auto-Creation Hooks**: `notifyOnce(wallet, type, title, body, link)`
+  helper — IsPrefEnabled check + `notificationDedupCheck` 1h window + `CreateNotification`
+  best-effort. Wired sites: `FollowUser`→followee, `AddToLibrary`→creator,
+  `ForkAgent`→original creator, Legend execution complete (success+failed)→wallet,
+  `RecordPurchase`→creator+buyer. **Karar**: synchronous (RecordActivity nil-DB
+  guard pattern, t.Cleanup race önleme). Self-notifications (creator saving own
+  agent, follower notifying themselves) skipped. Legend execution notifications
+  workspace'ten direct DB write (circular import önle). 6 unit test.
+
+**Frontend** (5 task):
+- **Workflow Versioning Diff UI**: `/legend?id=X&compare=v1,v2` query param.
+  `lib/features/legend/widgets/version_diff_panel.dart` — node-by-node split
+  (added=green border, removed=red strikethrough, modified=yellow + field-level
+  diff). "Compare versions" toolbar dialog (2 dropdown). Backend v3.10
+  `LegendWorkflowVersion` reuse. 4 widget test.
+- **Execution Observability Panel**: `/legend/observability/:executionId` route.
+  `observability_screen.dart` 5 özet kart + `observability_chart.dart` (pure-Dart
+  CustomPainter bar chart, **no chart lib dep**) + DataTable (node id/status/
+  output preview/duration/credits). 3 widget test.
+- **Card Presets + Before/After Diff**: `lib/features/card_editor/data/card_presets.dart`
+  19 preset (8 character types + 2 universal). `card_editor_controller.dart`
+  `applyPreset()` history snapshot + draft merge + dirty flag.
+  `editor_toolbar.dart` `PresetMenuButton` PopupMenuButton (kategori filter) +
+  `PreviewChangesButton`. `card_diff_modal.dart` split-view (sol original AgentCard,
+  sağ draft) + change-chip list (`Wrap` of "field: 'Old' → 'New'"). Pure
+  `diffFields` helper extract for testability. 5 unit test.
+- **Bulk Operations + Versioning UI**:
+  - **T10a Library bulk select**: `library_screen.dart` "Select" mode toggle,
+    Checkbox overlay, `_BulkActionBar` floating bottom bar, `_bulkRemoveSelected`
+    flow. `lib/shared/state/bulk_select_state.dart` — `ChangeNotifier`-backed
+    pure helper (testability).
+  - **T10b Creator Dashboard bulk regenerate**: defer'd to v3.11.4 — Creator
+    Dashboard `StatelessWidget`, refactor non-trivial. Reusable
+    `BulkSelectState` helper, `bulkAgentAction` API, `_BulkActionBar` widget
+    pattern hazır — port "wire 4 things" iş.
+  - **T10c Card editor History dialog**: `version_history_dialog.dart` list +
+    Restore (with `fetchOverride` / `rollbackOverride` test seams) +
+    ConfirmDialog. `editor_toolbar.dart` History icon (Icons.history).
+    `card_editor_screen.dart` `onShowHistory` + `onReload` callback wired.
+  - 4 yeni API method: `bulkAgentAction`, `getAgentVersions`, `getAgentVersion`,
+    `rollbackAgentVersion`. 6 test (3 unit + 3 widget).
+- **KPI Funnel Panel**: `/admin/kpi` route + sidebar "Insights" nav item.
+  `funnel_panel_screen.dart` 7d/30d/90d window selector + 4 `_FunnelCard`
+  metric kart (Suggest→Execute, Edit→Publish, Publish→FirstSave, Trial→Purchase
+  + delta chip + color coding). `funnel_card.dart` widget. `getFunnelMetrics`
+  API. 3 widget test.
+
+**Yeni dosyalar**:
+- `backend/pkg/models/agent_version.go`
+- `backend/pkg/middleware/{api_key_auth.go, api_key_auth_test.go}`
+- `backend/services/agent/{bulk_actions,versioning,funnel}.go` + 3 test
+- `backend/services/agent/notification_hooks_test.go`
+- `backend/services/workspace/legend_resume_test.go`
+- `agent_store/lib/features/legend/widgets/{version_diff_panel,observability_chart}.dart`
+- `agent_store/lib/features/legend/screens/observability_screen.dart`
+- `agent_store/lib/features/card_editor/data/card_presets.dart`
+- `agent_store/lib/features/card_editor/widgets/{card_diff_modal,version_history_dialog}.dart`
+- `agent_store/lib/shared/state/bulk_select_state.dart`
+- `agent_store/lib/features/insights/screens/funnel_panel_screen.dart`
+- `agent_store/lib/features/insights/widgets/funnel_card.dart`
+- `agent_store/test/{widget/{version_diff,observability_chart,version_history,funnel_panel}_test.dart, unit/{card_presets,bulk_select_state}_test.dart}`
+
+**Genişletilen modeller/dosyalar**:
+- `pkg/models/workspace.go` (`WorkflowExecution.NodeStates`)
+- `internal/testutil/db.go` + `services/agent/migrate.go` + `services/workspace/migrate.go`
+  (AgentVersion + WorkflowExecution AutoMigrate)
+- `services/workspace/{legend_service.go (nodeCheckpoint, ResumeExecution,
+  notifyExecutionResult), handler.go, router.go}`
+- `services/agent/{service.go (UpdateAgent snapshot + AddToLibrary/ForkAgent/
+  RecordPurchase notifyOnce + ForkAgent nil-aiClient guard), social.go (FollowUser
+  notify + slices.Contains), notification.go (notifyOnce, notificationDedupCheck,
+  IsPrefEnabled), handler.go, router.go (6 yeni route + dual-auth pilot)}`
+- `services/agent/handler.go` 5 yeni handler (BulkAction, ListAgentVersions,
+  GetAgentVersion, RollbackAgentVersion, GetFunnelMetrics)
+- `agent_store/lib/app/router.dart` (3 yeni route + Insights sidebar)
+- `agent_store/lib/features/legend/screens/legend_screen.dart` (compare query +
+  `_VersionDiffOverlay` + Compare toolbar button)
+- `agent_store/lib/features/card_editor/{controllers/card_editor_controller.dart
+  (applyPreset), widgets/editor_toolbar.dart (3 yeni button), screens/
+  card_editor_screen.dart (callback wiring)}`
+- `agent_store/lib/features/library/screens/library_screen.dart` (bulk mode)
+- `agent_store/lib/shared/services/api_service.dart` (5 yeni method)
+
+**Yeni endpoint'ler** (8):
+- `POST /api/v1/user/legend/executions/:execId/resume` (dual-auth)
+- `POST /api/v1/agents/bulk`
+- `GET /api/v1/agents/:id/versions` + `/:v` + `POST /:v/rollback`
+- `GET /api/v1/admin/kpi/funnel?since=7d|30d|90d`
+- `GET /api/v1/keyed/agents` (dual-auth pilot)
+- `POST /api/v1/agents` upgrade → `AuthOrAPIKey("write:agents")`
+
+**Açık tasklar (post-launch)**: Full i18n string sweep (mevcut 30+ ekran),
+Notification WebSocket/SSE, Agent versioning UI'da diff view (current vs version v),
+Bulk operations scheduling (cron-trigger), KPI A/B test framework, API key middleware
+tüm endpoint'lere full sweep, Mobile responsive observability + funnel panel,
+Creator Dashboard bulk regenerate UI (T10b refactor).
 
 ## v3.11.2 Cross-Cutting Polish (2026-05-05)
 10 task; settings sectioning + i18n iskelet + theme toggle + notification center +

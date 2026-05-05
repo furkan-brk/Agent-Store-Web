@@ -114,6 +114,88 @@ type NodeExecutionResult struct {
 	Error      string `json:"error,omitempty"`
 }
 
+// nodeCheckpoint is the per-node state persisted into WorkflowExecution.NodeStates.
+// status is "completed" or "failed". output is reused on resume so completed nodes
+// don't get re-run (and re-billed). error is the human message captured on failure.
+type nodeCheckpoint struct {
+	Status     string `json:"status"`
+	Output     string `json:"output"`
+	Error      string `json:"error,omitempty"`
+	DurationMs int64  `json:"duration_ms"`
+}
+
+// loadNodeStates parses the JSON checkpoint blob; empty/invalid input yields
+// an empty map (older executions had no checkpointing).
+func loadNodeStates(raw string) map[string]nodeCheckpoint {
+	out := map[string]nodeCheckpoint{}
+	if raw == "" {
+		return out
+	}
+	_ = json.Unmarshal([]byte(raw), &out)
+	return out
+}
+
+// saveNodeStates serialises and writes the checkpoint blob for an execution.
+// Best-effort: callers ignore the returned error.
+func saveNodeStates(execID uint, states map[string]nodeCheckpoint) error {
+	blob, err := json.Marshal(states)
+	if err != nil {
+		return err
+	}
+	return database.DB.Model(&models.WorkflowExecution{}).
+		Where("id = ?", execID).
+		UpdateColumn("node_states", string(blob)).Error
+}
+
+// notifyExecutionResult writes a "system" notification telling the wallet
+// owner that a Legend execution completed (success or failure).
+//
+// We can't import services/agent here without a cycle, so the inbox row +
+// pref check are written directly. Pref defaults to enabled when absent
+// (mirrors agent.IsPrefEnabled). Best-effort — failures are logged.
+func notifyExecutionResult(wallet, workflowName, status string, execID uint) {
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" || database.DB == nil {
+		return
+	}
+	// Pref check: if the user disabled web/system notifications, drop.
+	var pref models.NotificationPref
+	if err := database.DB.
+		Where("wallet = ? AND channel = ? AND type = ?", wallet, "web", "system").
+		First(&pref).Error; err == nil && !pref.Enabled {
+		return
+	}
+
+	link := fmt.Sprintf("/legend?execution=%d", execID)
+	// 1-hour dedup keyed on (wallet, type, link) — the link includes execID
+	// so different runs don't collapse, but a duplicate write of the same
+	// run (e.g. retry) does.
+	cutoff := time.Now().Add(-time.Hour)
+	var existing models.NotificationEvent
+	if err := database.DB.
+		Where("wallet = ? AND type = ? AND link = ? AND created_at >= ?",
+			wallet, "system", link, cutoff).
+		First(&existing).Error; err == nil {
+		return
+	}
+
+	title := "Legend execution complete"
+	body := workflowName
+	if status == "failed" {
+		title = "Legend execution failed"
+	}
+	if err := database.DB.Create(&models.NotificationEvent{
+		Wallet: wallet,
+		Type:   "system",
+		Title:  title,
+		Body:   body,
+		Link:   link,
+	}).Error; err != nil {
+		// log only — execution result notification is best-effort
+		_ = err
+	}
+}
+
 // ExecuteWorkflowInput is the request payload for workflow execution.
 type ExecuteWorkflowInput struct {
 	InputMessage string `json:"input_message" binding:"required"`
@@ -805,6 +887,7 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 
 	nodeOutputs := make(map[string]string, len(nodes))
 	var nodeResults []NodeExecutionResult
+	checkpoints := map[string]nodeCheckpoint{}
 
 	for _, nodeID := range order {
 		node := nodeMap[nodeID]
@@ -851,6 +934,13 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 		if execErr != nil {
 			result.Error = execErr.Error()
 			nodeResults = append(nodeResults, result)
+			checkpoints[node.ID] = nodeCheckpoint{
+				Status:     "failed",
+				Output:     output,
+				Error:      execErr.Error(),
+				DurationMs: durationMs,
+			}
+			_ = saveNodeStates(execution.ID, checkpoints)
 
 			// On failure: set status "failed", save error, NO credit deduction.
 			resultsJSON, _ := json.Marshal(nodeResults)
@@ -863,11 +953,20 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 				"finished_at":     &now,
 			})
 
+			// v3.11.3: notify wallet of failed execution (best-effort).
+			notifyExecutionResult(wallet, workflow.Name, "failed", execution.ID)
+
 			return s.executionToDTO(execution.ID)
 		}
 
 		nodeOutputs[nodeID] = output
 		nodeResults = append(nodeResults, result)
+		checkpoints[node.ID] = nodeCheckpoint{
+			Status:     "completed",
+			Output:     output,
+			DurationMs: durationMs,
+		}
+		_ = saveNodeStates(execution.ID, checkpoints)
 
 		// Update completed count in DB.
 		database.DB.Model(execution).UpdateColumn("completed_nodes", len(nodeResults))
@@ -912,6 +1011,248 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 		"finished_at":     &now,
 	})
 
+	// v3.11.3: notify wallet of completed execution (best-effort).
+	notifyExecutionResult(wallet, workflow.Name, "completed", execution.ID)
+
+	return s.executionToDTO(execution.ID)
+}
+
+// ResumeExecution re-runs a previously failed execution, skipping nodes that
+// completed successfully (their cached output is reused). Pending and failed
+// nodes are re-executed from scratch. Credit deduction only happens on the
+// resumed run if it ultimately completes — partial spend on the first run is
+// not refunded.
+//
+// Behaviour:
+//   - 404 if execution not found or wrong wallet
+//   - resumes a "completed" execution as a no-op (returns the existing DTO)
+//   - any other status → re-walks the DAG from the persisted checkpoints
+func (s *LegendService) ResumeExecution(wallet string, execID uint) (*ExecutionStatusDTO, error) {
+	wallet = strings.ToLower(wallet)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// 1. Load execution + ownership check.
+	var execution models.WorkflowExecution
+	if err := database.DB.
+		Where("user_wallet = ? AND id = ?", wallet, execID).
+		First(&execution).Error; err != nil {
+		return nil, fmt.Errorf("execution not found: %w", err)
+	}
+	if execution.Status == "completed" {
+		// Nothing to do — return current state.
+		return buildExecutionDTO(&execution)
+	}
+
+	// 2. Load workflow definition (must still exist).
+	var workflow models.UserLegendWorkflow
+	if err := database.DB.
+		Where("user_wallet = ? AND client_id = ?", wallet, execution.WorkflowID).
+		First(&workflow).Error; err != nil {
+		return nil, fmt.Errorf("workflow not found: %w", err)
+	}
+
+	nodes, edges, err := parseWorkflow(workflow.NodesJSON, workflow.EdgesJSON)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse workflow: %w", err)
+	}
+	if err := validateWorkflowStructure(nodes, edges); err != nil {
+		return nil, fmt.Errorf("invalid workflow structure: %w", err)
+	}
+
+	// 3. Reset run state: mark "running", clear failure info, keep checkpoints.
+	checkpoints := loadNodeStates(execution.NodeStates)
+	database.DB.Model(&execution).Updates(map[string]any{
+		"status":        "running",
+		"error_message": "",
+		"finished_at":   nil,
+	})
+
+	// 4. Topological order + predecessor map (same as ExecuteWorkflow).
+	adj, inDegree, _ := buildDAG(nodes, edges)
+	order, _ := topologicalSort(nodes, adj, inDegree)
+	predecessors := make(map[string][]string, len(nodes))
+	for _, e := range edges {
+		predecessors[e.To] = append(predecessors[e.To], e.From)
+	}
+	nodeMap := make(map[string]*WorkflowNodeParsed, len(nodes))
+	for i := range nodes {
+		nodeMap[nodes[i].ID] = &nodes[i]
+	}
+
+	// 5. Recompute credit cost (in case workflow definition changed since
+	// the original run). Charge the wallet again only on success.
+	globalEngine := "" // resume uses workflow defaults
+	var requiredCredits int64
+	for _, n := range nodes {
+		if n.Type == "agent" {
+			meta := parseNodeMetadata(n.Metadata)
+			engine := meta.Engine
+			if engine == "" {
+				engine = globalEngine
+			}
+			if engine == "claude" {
+				model := meta.Model
+				if model == "" {
+					model = "sonnet"
+				}
+				if cost, ok := claude.CreditCost[model]; ok {
+					requiredCredits += cost
+				} else {
+					requiredCredits += claude.CreditCost["sonnet"]
+				}
+			} else {
+				requiredCredits++
+			}
+		}
+	}
+
+	credits, err := s.agentClient.GetCredits(ctx, wallet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check credits: %w", err)
+	}
+	if credits < requiredCredits {
+		return nil, fmt.Errorf("insufficient credits: have %d, need %d", credits, requiredCredits)
+	}
+
+	// 6. Walk the DAG. Skip nodes that already completed; re-run pending/failed.
+	nodeOutputs := make(map[string]string, len(nodes))
+	var nodeResults []NodeExecutionResult
+
+	for _, nodeID := range order {
+		node := nodeMap[nodeID]
+
+		// Reuse a completed checkpoint without re-billing or re-calling the AI.
+		if cp, ok := checkpoints[node.ID]; ok && cp.Status == "completed" {
+			nodeOutputs[node.ID] = cp.Output
+			result := NodeExecutionResult{
+				NodeID:     node.ID,
+				NodeType:   node.Type,
+				NodeLabel:  node.Label,
+				Output:     cp.Output,
+				DurationMs: cp.DurationMs,
+			}
+			if node.Type == "agent" {
+				if agentID, perr := strconv.ParseUint(node.RefID, 10, 64); perr == nil {
+					aid := uint(agentID)
+					result.AgentID = &aid
+				}
+			}
+			nodeResults = append(nodeResults, result)
+			continue
+		}
+
+		// Re-execute from scratch.
+		var contextInput string
+		preds := predecessors[node.ID]
+		if len(preds) == 0 {
+			contextInput = execution.InputMessage
+		} else {
+			parts := make([]string, 0, len(preds))
+			for _, predID := range preds {
+				if out, ok := nodeOutputs[predID]; ok && out != "" {
+					parts = append(parts, out)
+				}
+			}
+			contextInput = strings.Join(parts, "\n\n---\n\n")
+		}
+
+		startTime := time.Now()
+		output, execErr := s.executeNode(ctx, *node, contextInput, wallet, globalEngine)
+		durationMs := time.Since(startTime).Milliseconds()
+
+		if len(output) > 10000 {
+			output = output[:10000]
+		}
+
+		result := NodeExecutionResult{
+			NodeID:     node.ID,
+			NodeType:   node.Type,
+			NodeLabel:  node.Label,
+			Input:      contextInput,
+			Output:     output,
+			DurationMs: durationMs,
+		}
+		if node.Type == "agent" {
+			if agentID, perr := strconv.ParseUint(node.RefID, 10, 64); perr == nil {
+				aid := uint(agentID)
+				result.AgentID = &aid
+			}
+		}
+
+		if execErr != nil {
+			result.Error = execErr.Error()
+			nodeResults = append(nodeResults, result)
+			checkpoints[node.ID] = nodeCheckpoint{
+				Status:     "failed",
+				Output:     output,
+				Error:      execErr.Error(),
+				DurationMs: durationMs,
+			}
+			_ = saveNodeStates(execution.ID, checkpoints)
+
+			resultsJSON, _ := json.Marshal(nodeResults)
+			now := time.Now()
+			database.DB.Model(&execution).Updates(map[string]any{
+				"status":          "failed",
+				"error_message":   execErr.Error(),
+				"node_results":    string(resultsJSON),
+				"completed_nodes": len(nodeResults),
+				"finished_at":     &now,
+			})
+			notifyExecutionResult(wallet, workflow.Name, "failed", execution.ID)
+			return s.executionToDTO(execution.ID)
+		}
+
+		nodeOutputs[node.ID] = output
+		nodeResults = append(nodeResults, result)
+		checkpoints[node.ID] = nodeCheckpoint{
+			Status:     "completed",
+			Output:     output,
+			DurationMs: durationMs,
+		}
+		_ = saveNodeStates(execution.ID, checkpoints)
+		database.DB.Model(&execution).UpdateColumn("completed_nodes", len(nodeResults))
+	}
+
+	// 7. Success — find final output, deduct credits, mark completed.
+	var finalOutput string
+	for i := len(order) - 1; i >= 0; i-- {
+		n := nodeMap[order[i]]
+		if n.Type == "end" {
+			finalOutput = nodeOutputs[n.ID]
+			break
+		}
+	}
+
+	if requiredCredits > 0 {
+		if err := s.agentClient.DeductCredits(ctx, wallet, requiredCredits, "workflow_execute"); err != nil {
+			resultsJSON, _ := json.Marshal(nodeResults)
+			now := time.Now()
+			database.DB.Model(&execution).Updates(map[string]any{
+				"status":          "completed",
+				"final_output":    finalOutput,
+				"node_results":    string(resultsJSON),
+				"completed_nodes": len(nodeResults),
+				"credits_used":    requiredCredits,
+				"error_message":   fmt.Sprintf("credit deduction failed: %v", err),
+				"finished_at":     &now,
+			})
+			return s.executionToDTO(execution.ID)
+		}
+	}
+
+	resultsJSON, _ := json.Marshal(nodeResults)
+	now := time.Now()
+	database.DB.Model(&execution).Updates(map[string]any{
+		"status":          "completed",
+		"final_output":    finalOutput,
+		"node_results":    string(resultsJSON),
+		"completed_nodes": len(nodeResults),
+		"credits_used":    requiredCredits,
+		"finished_at":     &now,
+	})
+	notifyExecutionResult(wallet, workflow.Name, "completed", execution.ID)
 	return s.executionToDTO(execution.ID)
 }
 

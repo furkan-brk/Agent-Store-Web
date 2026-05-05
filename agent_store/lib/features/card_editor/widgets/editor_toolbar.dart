@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../app/theme.dart';
 import '../controllers/card_editor_controller.dart';
+import '../data/card_presets.dart';
 
 /// Top toolbar of the card editor screen.
 ///
@@ -19,6 +20,8 @@ class EditorToolbar extends StatelessWidget {
     required this.onExportPng,
     required this.onExportSkillMd,
     required this.onClose,
+    this.onPreviewChanges,
+    this.onShowHistory,
   });
 
   final CardEditorController controller;
@@ -28,6 +31,8 @@ class EditorToolbar extends StatelessWidget {
   final VoidCallback onExportPng;
   final VoidCallback onExportSkillMd;
   final VoidCallback onClose;
+  final VoidCallback? onPreviewChanges;
+  final VoidCallback? onShowHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +53,27 @@ class EditorToolbar extends StatelessWidget {
           const SizedBox(width: 14),
           SyncStatusBadge(controller: controller),
           const Spacer(),
+          PresetMenuButton(controller: controller),
+          const SizedBox(width: 4),
+          if (onPreviewChanges != null)
+            PreviewChangesButton(
+              controller: controller,
+              onPressed: onPreviewChanges!,
+            ),
+          const SizedBox(width: 4),
           _UndoRedoCluster(controller: controller),
           const SizedBox(width: 12),
           _SaveButton(controller: controller, onPressed: onSave),
           const SizedBox(width: 8),
           _IconAction(icon: Icons.content_copy, tooltip: 'Clone agent', onPressed: onClone),
+          if (onShowHistory != null) ...[
+            const SizedBox(width: 4),
+            _IconAction(
+              icon: Icons.history_rounded,
+              tooltip: 'Version history',
+              onPressed: onShowHistory,
+            ),
+          ],
           const SizedBox(width: 4),
           _ExportMenu(onExportJson: onExportJson, onExportPng: onExportPng, onExportSkillMd: onExportSkillMd),
           const SizedBox(width: 4),
@@ -189,6 +210,123 @@ class _IconAction extends StatelessWidget {
         disabledForegroundColor: AppTheme.textM.withValues(alpha: 0.4),
       ),
     );
+  }
+}
+
+/// PopupMenu button surfacing card stat-trait presets (v3.11.3 — T9a).
+/// Filtered to the agent's character_type plus the universal "any" entries.
+class PresetMenuButton extends StatelessWidget {
+  const PresetMenuButton({super.key, required this.controller});
+  final CardEditorController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final type = controller.draft.value.characterType;
+      final available = presetsForCharacter(type);
+      return PopupMenuButton<String>(
+        tooltip: 'Apply a preset',
+        position: PopupMenuPosition.under,
+        color: AppTheme.card2,
+        onSelected: (id) {
+          final preset = available.firstWhere(
+            (p) => p.id == id,
+            orElse: () => available.first,
+          );
+          controller.applyPreset(preset);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            duration: const Duration(seconds: 2),
+            content: Text('Applied preset: ${preset.name}'),
+          ));
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppTheme.gold.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: AppTheme.gold.withValues(alpha: 0.35)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_fix_high_outlined, size: 14, color: AppTheme.gold),
+              SizedBox(width: 6),
+              Text(
+                'Presets',
+                style: TextStyle(
+                  color: AppTheme.gold,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(width: 4),
+              Icon(Icons.expand_more, size: 14, color: AppTheme.gold),
+            ],
+          ),
+        ),
+        itemBuilder: (_) => [
+          for (final p in available)
+            PopupMenuItem<String>(
+              value: p.id,
+              child: SizedBox(
+                width: 280,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      p.name,
+                      style: const TextStyle(
+                        color: AppTheme.textH,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      p.description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppTheme.textM, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+}
+
+/// Outlined button that opens the original-vs-draft diff modal.
+/// Disabled when there are no pending changes.
+class PreviewChangesButton extends StatelessWidget {
+  const PreviewChangesButton({
+    super.key,
+    required this.controller,
+    required this.onPressed,
+  });
+  final CardEditorController controller;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      controller.draft.value;
+      final dirty = controller.isDirty;
+      return TextButton.icon(
+        onPressed: dirty ? onPressed : null,
+        icon: const Icon(Icons.compare_outlined, size: 14),
+        label: const Text('Preview'),
+        style: TextButton.styleFrom(
+          foregroundColor: AppTheme.gold,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          disabledForegroundColor: AppTheme.textM.withValues(alpha: 0.4),
+        ),
+      );
+    });
   }
 }
 

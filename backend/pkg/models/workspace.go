@@ -69,6 +69,15 @@ type LegendWorkflowVersion struct {
 }
 
 // WorkflowExecution records a single run of a legend workflow.
+//
+// NodeStates (v3.11.3) is a JSON-encoded map keyed by node id:
+//
+//	{"<node_id>": {"status": "completed"|"failed", "output": "...", "error": "...", "duration_ms": 123}, ...}
+//
+// It is populated incrementally as the executor runs. ResumeExecution reads it
+// to skip already-completed nodes (reusing their cached output) and re-run any
+// node that was pending or failed. Empty string means "no per-node checkpoint" —
+// older executions remain compatible and just cannot be resumed.
 type WorkflowExecution struct {
 	ID             uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserWallet     string     `gorm:"column:user_wallet;not null;index" json:"user_wallet"`
@@ -78,6 +87,7 @@ type WorkflowExecution struct {
 	InputMessage   string     `gorm:"column:input_message;type:text" json:"input_message"`
 	FinalOutput    string     `gorm:"column:final_output;type:text" json:"final_output"`
 	NodeResults    string     `gorm:"column:node_results;type:jsonb;not null;default:'[]'" json:"-"`
+	NodeStates     string     `gorm:"column:node_states;type:text" json:"-"`
 	TotalNodes     int        `gorm:"column:total_nodes;default:0" json:"total_nodes"`
 	CompletedNodes int        `gorm:"column:completed_nodes;default:0" json:"completed_nodes"`
 	CreditsUsed    int64      `gorm:"column:credits_used;default:0" json:"credits_used"`

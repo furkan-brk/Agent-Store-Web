@@ -12,6 +12,7 @@ import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/collection_service.dart';
 import '../../../shared/services/wallet_service.dart';
+import '../../../shared/state/bulk_select_state.dart';
 import '../../../shared/widgets/achievement_badge.dart';
 import '../../../shared/widgets/confirm_dialog.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
@@ -38,6 +39,10 @@ class _LibraryScreenState extends State<LibraryScreen>
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
+  /// v3.11.3 — T10a — Bulk select state for the Saved tab.
+  final BulkSelectState _bulkSelect = BulkSelectState();
+  bool _bulkRunning = false;
+
   // Filter/sort state lives on LibraryController so it can round-trip through
   // the URL (v3.7-7.1). Read-only proxies keep existing call sites working.
   String get _searchQuery => _ctrl.searchQuery.value;
@@ -59,7 +64,42 @@ class _LibraryScreenState extends State<LibraryScreen>
     _tabCtrl.dispose();
     _searchCtrl.dispose();
     _debounce?.cancel();
+    _bulkSelect.dispose();
     super.dispose();
+  }
+
+  // ── Bulk select actions (v3.11.3 — T10a) ────────────────────────────────
+
+  Future<void> _bulkRemoveSelected() async {
+    if (_bulkSelect.selectedIds.isEmpty) return;
+    final ids = _bulkSelect.selectedIds.toList();
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Remove ${ids.length} agents?',
+      message: 'They will be removed from your library. This cannot be undone.',
+      confirmLabel: 'Remove',
+      isDestructive: true,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _bulkRunning = true);
+    final result = await ApiService.instance.bulkAgentAction(
+      'remove_from_library',
+      ids,
+    );
+    if (!mounted) return;
+    setState(() => _bulkRunning = false);
+    if (result.isEmpty) {
+      AppSnackBar.error(context, 'Bulk action failed.');
+      return;
+    }
+    final removed = (result['success'] as num?)?.toInt() ??
+        (result['removed'] as num?)?.toInt() ??
+        ids.length;
+    _bulkSelect.exit();
+    await _ctrl.load();
+    if (!mounted) return;
+    AppSnackBar.success(context, '$removed agents removed');
   }
 
   Future<void> _reload() async {
@@ -229,28 +269,51 @@ class _LibraryScreenState extends State<LibraryScreen>
 
     return Obx(() => Scaffold(
           backgroundColor: AppTheme.bg,
-          body: ShimmerScope(
-            child: RefreshIndicator(
-              onRefresh: _reload,
-              color: AppTheme.primary,
-              child: Column(children: [
-                _buildHeader(),
-                Expanded(
-                  child: _ctrl.isLoading.value
-                      ? _buildLoadingSkeleton()
-                      : _hasError
-                          ? _buildErrorState()
-                          : TabBarView(
-                              controller: _tabCtrl,
-                              children: [
-                                _buildSavedTab(),
-                                _buildCreatedTab(),
-                              ],
-                            ),
-                ),
-              ]),
+          body: Stack(children: [
+            ShimmerScope(
+              child: RefreshIndicator(
+                onRefresh: _reload,
+                color: AppTheme.primary,
+                child: Column(children: [
+                  _buildHeader(),
+                  Expanded(
+                    child: _ctrl.isLoading.value
+                        ? _buildLoadingSkeleton()
+                        : _hasError
+                            ? _buildErrorState()
+                            : TabBarView(
+                                controller: _tabCtrl,
+                                children: [
+                                  _buildSavedTab(),
+                                  _buildCreatedTab(),
+                                ],
+                              ),
+                  ),
+                ]),
+              ),
             ),
-          ),
+            // Bulk action bar appears at the bottom when select mode is active
+            // and at least one item is selected.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: AnimatedBuilder(
+                animation: _bulkSelect,
+                builder: (_, __) {
+                  if (!_bulkSelect.isActive || _bulkSelect.selectedCount == 0) {
+                    return const SizedBox.shrink();
+                  }
+                  return _BulkActionBar(
+                    count: _bulkSelect.selectedCount,
+                    running: _bulkRunning,
+                    onCancel: _bulkSelect.exit,
+                    onRemove: _bulkRemoveSelected,
+                  );
+                },
+              ),
+            ),
+          ]),
         ));
   }
 
@@ -309,6 +372,34 @@ class _LibraryScreenState extends State<LibraryScreen>
                       ],
                     ),
                   ),
+                  // v3.11.3 — bulk select toggle (Saved tab only)
+                  AnimatedBuilder(
+                    animation: _bulkSelect,
+                    builder: (_, __) => TextButton.icon(
+                      onPressed: _ctrl.saved.isEmpty
+                          ? null
+                          : () {
+                              if (_bulkSelect.isActive) {
+                                _bulkSelect.exit();
+                              } else {
+                                _bulkSelect.enter();
+                              }
+                            },
+                      icon: Icon(
+                        _bulkSelect.isActive
+                            ? Icons.close_rounded
+                            : Icons.checklist_rounded,
+                        size: 16,
+                      ),
+                      label: Text(_bulkSelect.isActive ? 'Cancel' : 'Select'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _bulkSelect.isActive
+                            ? AppTheme.primary
+                            : AppTheme.gold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   // Export library as OpenClaw workspace bundle (v3.13).
                   // Hidden until at least one saved or created agent with a
                   // non-empty prompt exists, since an empty bundle is useless.
@@ -546,13 +637,53 @@ class _LibraryScreenState extends State<LibraryScreen>
                       final isOwned = wallet != null &&
                           a.creatorWallet.toLowerCase() ==
                               wallet.toLowerCase();
-                      return _LibraryAgentCard(
+                      final card = _LibraryAgentCard(
                         agent: a,
                         isOwned: isOwned,
                         onLongPress: () =>
                             _showAddToCollectionSheet(a),
                         onRemove: () => _confirmRemoveAgent(a),
                         collectionDots: _CollectionDots(agentId: a.id),
+                      );
+                      return AnimatedBuilder(
+                        animation: _bulkSelect,
+                        builder: (_, __) {
+                          if (!_bulkSelect.isActive) return card;
+                          final selected = _bulkSelect.isSelected(a.id);
+                          return Stack(children: [
+                            // Mute the card when not selected so the checkbox
+                            // visually owns the row.
+                            Opacity(
+                              opacity: selected ? 1 : 0.85,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => _bulkSelect.toggle(a.id),
+                                child: AbsorbPointer(child: card),
+                              ),
+                            ),
+                            Positioned(
+                              top: 8,
+                              left: 8,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.bg.withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Checkbox(
+                                    value: selected,
+                                    onChanged: (_) =>
+                                        _bulkSelect.toggle(a.id),
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]);
+                        },
                       );
                     },
                     childCount: filtered.length,
@@ -2186,5 +2317,81 @@ class LibraryWorkspaceDownloader {
     anchor.download = filename;
     anchor.click();
     web.URL.revokeObjectURL(url);
+  }
+}
+
+// ─── Bulk action bar (v3.11.3 — T10a) ───────────────────────────────────────
+
+/// Bottom-anchored action bar for the Library bulk-select mode. Surfaced
+/// when at least one item is checked. Shows the selected count, a "Cancel"
+/// button (deactivates select mode), and a "Remove" button.
+class _BulkActionBar extends StatelessWidget {
+  final int count;
+  final bool running;
+  final VoidCallback onCancel;
+  final VoidCallback onRemove;
+
+  const _BulkActionBar({
+    required this.count,
+    required this.running,
+    required this.onCancel,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(children: [
+          const Icon(Icons.check_circle_outline_rounded,
+              color: AppTheme.gold, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            '$count selected',
+            style: const TextStyle(
+              color: AppTheme.textH,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: running ? null : onCancel,
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: running ? null : onRemove,
+            icon: running
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.delete_outline, size: 14),
+            label: const Text('Remove from library'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 }

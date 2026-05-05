@@ -203,6 +203,9 @@ func (s *AgentService) CreateNotification(wallet, ntype, title, body, link strin
 	if !validNotificationType(ntype) {
 		return ErrInvalidNotificationType
 	}
+	if database.DB == nil {
+		return nil
+	}
 	// Honour the user's web channel preference. If absent, default to enabled
 	// (matches the seed behaviour in ListPrefs).
 	var pref models.NotificationPref
@@ -220,4 +223,70 @@ func (s *AgentService) CreateNotification(wallet, ntype, title, body, link strin
 		Link:   link,
 	}
 	return database.DB.Create(&row).Error
+}
+
+// notificationDedupCheck reports whether a recent (wallet, type, link) event
+// exists within dedupWindow. Returns true when the new notification should be
+// dropped (a near-duplicate already landed in the inbox).
+//
+// Why a (link) dedup key: the link is what the user would click — if two
+// notifications point at the same place inside the window, the second one is
+// almost certainly noise (same agent saved twice in 5 minutes by different
+// people, etc.). Title/body can drift; the link is stable.
+func (s *AgentService) notificationDedupCheck(wallet, ntype, link string, dedupWindow time.Duration) bool {
+	if database.DB == nil {
+		return false
+	}
+	cutoff := time.Now().Add(-dedupWindow)
+	var existing models.NotificationEvent
+	err := database.DB.
+		Where("wallet = ? AND type = ? AND link = ? AND created_at >= ?",
+			strings.ToLower(wallet), ntype, link, cutoff).
+		First(&existing).Error
+	if err == nil {
+		return true
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		// On a query error, fail-open (don't drop the notification) so a
+		// flaky DB doesn't silently swallow inbox events.
+		return false
+	}
+	return false
+}
+
+// IsPrefEnabled returns true when the (wallet, channel, type) preference
+// allows the notification. Defaults to enabled when no row exists yet
+// (matches ListPrefs seed behaviour).
+func (s *AgentService) IsPrefEnabled(wallet, channel, ntype string) bool {
+	if database.DB == nil {
+		return true
+	}
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	var pref models.NotificationPref
+	err := database.DB.
+		Where("wallet = ? AND channel = ? AND type = ?", wallet, channel, ntype).
+		First(&pref).Error
+	if err != nil {
+		// Missing or DB error → treat as enabled. Same as the seed default;
+		// safe failure mode (better to over-notify than to silently drop).
+		return true
+	}
+	return pref.Enabled
+}
+
+// notifyOnce wraps CreateNotification with the standard 1-hour dedup window
+// and pref check. The whole flow is best-effort: errors are logged via the
+// caller (which usually has more context).
+func (s *AgentService) notifyOnce(wallet, ntype, title, body, link string) {
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return
+	}
+	if !s.IsPrefEnabled(wallet, "web", ntype) {
+		return
+	}
+	if s.notificationDedupCheck(wallet, ntype, link, time.Hour) {
+		return
+	}
+	_ = s.CreateNotification(wallet, ntype, title, body, link)
 }

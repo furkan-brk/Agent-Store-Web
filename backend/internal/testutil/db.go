@@ -36,6 +36,7 @@ func NewTestDB(t *testing.T) *gorm.DB {
 	if err := db.AutoMigrate(
 		&models.User{},
 		&models.Agent{},
+		&models.AgentVersion{},
 		&models.LibraryEntry{},
 		&models.PurchasedAgent{},
 		&models.AgentRating{},
@@ -48,6 +49,7 @@ func NewTestDB(t *testing.T) *gorm.DB {
 		&models.UserMission{},
 		&models.UserLegendWorkflow{},
 		&models.LegendWorkflowVersion{},
+		&models.WorkflowExecution{},
 		&models.GuildMasterSession{},
 		&models.GuildInvite{},
 		&models.UserFollow{},

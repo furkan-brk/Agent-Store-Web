@@ -8,6 +8,7 @@ import '../../../shared/models/agent_model.dart';
 import '../../../shared/services/api_service.dart';
 import '../../../shared/services/conflict_resolver.dart';
 import '../../character/character_types.dart';
+import '../data/card_presets.dart';
 
 /// Sync status states surfaced in the toolbar badge (mirrors v3.2 Mission/Legend pattern).
 /// `conflict` indicates the server returned 409 — the screen layer should open
@@ -205,6 +206,20 @@ class CardEditorController extends GetxController {
     _conflictServer = null;
     syncStatus.value = SyncStatus.dirty;
     await forceSyncToBackend();
+  }
+
+  // ── Card presets (v3.11.3 — T9a) ───────────────────────────────────────
+
+  /// Applies a preset's stat boost + trait append to the current draft.
+  /// Pure delegation to [applyPresetToDraft] keeps the merge logic unit-testable
+  /// without booting the controller.
+  void applyPreset(CardPreset preset) {
+    final merged = applyPresetToDraft(
+      preset: preset,
+      existingStats: draft.value.stats,
+      existingTraits: draft.value.traits,
+    );
+    updateField((a) => a.copyWith(stats: merged.stats, traits: merged.traits));
   }
 
   // ── Re-detect type/rarity from prompt ───────────────────────────────────

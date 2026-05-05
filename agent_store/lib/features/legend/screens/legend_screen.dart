@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../features/character/character_types.dart';
 import '../../../shared/models/agent_model.dart';
@@ -21,6 +22,7 @@ import '../services/legend_service.dart';
 import '../widgets/legend_export_dialog.dart';
 import '../widgets/legend_onboarding.dart';
 import '../widgets/legend_templates_dialog.dart';
+import '../widgets/version_diff_panel.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +101,12 @@ class _LegendScreenState extends State<LegendScreen>
 
   // ── Node clipboard ─────────────────────────────────────────────────────────
   WorkflowNode? _clipboardNode;
+
+  // ── Version diff overlay (v3.11.3 — T7) ───────────────────────────────────
+  Map<String, dynamic>? _diffFromVersion;
+  Map<String, dynamic>? _diffToVersion;
+  bool _diffLoading = false;
+  String _lastCompareParam = '';
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -1434,6 +1442,202 @@ class _LegendScreenState extends State<LegendScreen>
     );
   }
 
+  // ── Version diff (v3.11.3 — T7) ───────────────────────────────────────────
+
+  void _showCompareVersionsDialog() async {
+    if (_currentWorkflowId == null) {
+      _showNotice('Save the workflow before comparing versions.',
+          background: AppTheme.error);
+      return;
+    }
+    if (!ApiService.instance.isAuthenticated) {
+      _showNotice('Connect wallet to compare workflow versions.',
+          background: AppTheme.error);
+      return;
+    }
+    final versions =
+        await ApiService.instance.getWorkflowVersions(_currentWorkflowId!);
+    if (!mounted) return;
+    if (versions.length < 2) {
+      _showNotice('Need at least 2 saved versions to compare.',
+          background: AppTheme.gold);
+      return;
+    }
+
+    int? fromV = (versions.last['version'] as num?)?.toInt();
+    int? toV = (versions.first['version'] as num?)?.toInt();
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          backgroundColor: AppTheme.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: AppTheme.border),
+          ),
+          title: const Text('Compare versions',
+              style: TextStyle(color: AppTheme.textH)),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _versionDropdown(
+                  label: 'From',
+                  selected: fromV,
+                  versions: versions,
+                  onChanged: (v) => setSt(() => fromV = v),
+                ),
+                const SizedBox(height: 12),
+                _versionDropdown(
+                  label: 'To',
+                  selected: toV,
+                  versions: versions,
+                  onChanged: (v) => setSt(() => toV = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel',
+                  style: TextStyle(color: AppTheme.textM)),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.gold,
+                  foregroundColor: const Color(0xFF1E1A14)),
+              onPressed: (fromV == null || toV == null || fromV == toV)
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      context.go(
+                          '/legend?id=$_currentWorkflowId&compare=$fromV,$toV');
+                      _loadCompareVersions(_currentWorkflowId!, fromV!, toV!);
+                    },
+              child: const Text('Compare'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _versionDropdown({
+    required String label,
+    required int? selected,
+    required List<Map<String, dynamic>> versions,
+    required ValueChanged<int?> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 60,
+          child: Text(label,
+              style: const TextStyle(color: AppTheme.textM, fontSize: 12)),
+        ),
+        Expanded(
+          child: DropdownButtonFormField<int>(
+            value: selected,
+            isDense: true,
+            dropdownColor: AppTheme.card,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: AppTheme.surface,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppTheme.border),
+              ),
+            ),
+            items: versions.map((v) {
+              final ver = (v['version'] as num?)?.toInt() ?? 0;
+              final name = v['name'] as String? ?? '';
+              return DropdownMenuItem<int>(
+                value: ver,
+                child: Text(
+                  'v$ver${name.isEmpty ? "" : " · $name"}',
+                  style: const TextStyle(color: AppTheme.textH, fontSize: 13),
+                ),
+              );
+            }).toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _loadCompareVersions(String workflowId, int fromV, int toV) async {
+    setState(() {
+      _diffLoading = true;
+      _diffFromVersion = null;
+      _diffToVersion = null;
+    });
+    final results = await Future.wait([
+      ApiService.instance.getWorkflowVersion(workflowId, fromV),
+      ApiService.instance.getWorkflowVersion(workflowId, toV),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _diffFromVersion = results[0];
+      _diffToVersion = results[1];
+      _diffLoading = false;
+    });
+    if (_diffFromVersion == null || _diffToVersion == null) {
+      _showNotice('Failed to load workflow versions.',
+          background: AppTheme.error);
+    }
+  }
+
+  void _closeDiffOverlay() {
+    setState(() {
+      _diffFromVersion = null;
+      _diffToVersion = null;
+      _lastCompareParam = '';
+    });
+    if (_currentWorkflowId != null) {
+      context.go('/legend?id=$_currentWorkflowId');
+    } else {
+      context.go('/legend');
+    }
+  }
+
+  /// Reads `?compare=v1,v2` from the route once per param-change so that hot
+  /// navigation (e.g. pasting a deep-link) auto-opens the diff overlay.
+  void _maybeHandleCompareParam() {
+    if (!mounted) return;
+    final route = GoRouterState.of(context);
+    final compare = route.uri.queryParameters['compare'] ?? '';
+    final id = route.uri.queryParameters['id'] ?? _currentWorkflowId ?? '';
+    final key = '$id|$compare';
+    if (compare.isEmpty || id.isEmpty) {
+      if (_lastCompareParam.isNotEmpty &&
+          (_diffFromVersion != null || _diffToVersion != null)) {
+        // URL was cleared while overlay was open — close it.
+        setState(() {
+          _diffFromVersion = null;
+          _diffToVersion = null;
+          _lastCompareParam = '';
+        });
+      }
+      return;
+    }
+    if (key == _lastCompareParam) return;
+    final parts = compare.split(',');
+    if (parts.length != 2) return;
+    final from = int.tryParse(parts[0]);
+    final to = int.tryParse(parts[1]);
+    if (from == null || to == null) return;
+    _lastCompareParam = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCompareVersions(id, from, to);
+    });
+  }
+
   // ── Node name editing ──────────────────────────────────────────────────────
 
   void _showRenameNodeDialog(WorkflowNode node) {
@@ -1785,6 +1989,10 @@ class _LegendScreenState extends State<LegendScreen>
 
   @override
   Widget build(BuildContext context) {
+    // v3.11.3 — T7: deep-link `/legend?id=X&compare=v1,v2` opens the diff
+    // overlay automatically. Defer until after the frame so we can safely
+    // call setState from inside build.
+    _maybeHandleCompareParam();
     return LayoutBuilder(
       builder: (context, constraints) {
         final isMobile = constraints.maxWidth < 768;
@@ -1913,6 +2121,28 @@ class _LegendScreenState extends State<LegendScreen>
           if (_showOnboarding)
             LegendOnboarding(
               onDismiss: () => setState(() => _showOnboarding = false),
+            ),
+          if (_diffLoading)
+            Container(
+              color: Colors.black.withValues(alpha: 0.5),
+              alignment: Alignment.center,
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: AppTheme.gold),
+                  SizedBox(height: 16),
+                  Text('Loading versions…',
+                      style: TextStyle(color: AppTheme.textH)),
+                ],
+              ),
+            ),
+          if (!_diffLoading &&
+              _diffFromVersion != null &&
+              _diffToVersion != null)
+            VersionDiffPanel(
+              fromVersion: _diffFromVersion!,
+              toVersion: _diffToVersion!,
+              onClose: _closeDiffOverlay,
             ),
           ]),
         ),
@@ -2227,6 +2457,12 @@ class _LegendScreenState extends State<LegendScreen>
             icon: Icons.history,
             label: 'History',
             onTap: _showHistoryDialog,
+          ),
+          const SizedBox(width: 6),
+          _ToolbarButton(
+            icon: Icons.compare_arrows_rounded,
+            label: 'Compare',
+            onTap: _showCompareVersionsDialog,
           ),
           const SizedBox(width: 6),
           _ExecuteButton(

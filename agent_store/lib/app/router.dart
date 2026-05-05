@@ -24,7 +24,9 @@ import '../features/guild_master/screens/guild_master_screen.dart';
 import '../features/missions/screens/missions_screen.dart';
 import '../features/missions/screens/mission_marketplace_screen.dart';
 import '../features/legend/screens/legend_screen.dart';
+import '../features/legend/screens/observability_screen.dart';
 import '../features/card_editor/screens/card_editor_screen.dart';
+import '../features/insights/screens/funnel_panel_screen.dart';
 import '../controllers/auth_controller.dart';
 import '../shared/services/app_telemetry_service.dart';
 import 'theme.dart';
@@ -125,7 +127,19 @@ class AppRouter {
           GoRoute(path: '/missions', builder: (_, __) => const MissionsScreen()),
           GoRoute(path: '/missions/marketplace', builder: (_, __) => const MissionMarketplaceScreen()),
           GoRoute(path: '/legend', builder: (_, __) => const LegendScreen()),
+          GoRoute(
+            path: '/legend/observability/:executionId',
+            builder: (ctx, s) {
+              final id = int.tryParse(s.pathParameters['executionId'] ?? '');
+              if (id == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => ctx.go('/legend'));
+                return const SizedBox.shrink();
+              }
+              return ObservabilityScreen(executionId: id);
+            },
+          ),
           GoRoute(path: '/creator', builder: (_, __) => const CreatorDashboardScreen()),
+          GoRoute(path: '/admin/kpi', builder: (_, __) => const FunnelPanelScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           GoRoute(
             path: '/settings/notifications',
@@ -587,6 +601,13 @@ class _Sidebar extends StatelessWidget {
                     _SectionLabel(label: 'ACCOUNT', colorScheme: colorScheme),
                     _NavItem(
                         icon: Icons.analytics_outlined, label: 'Dashboard', path: '/creator', loc: loc, isDrawer: isDrawer),
+                    _NavItem(
+                        icon: Icons.insights_outlined,
+                        label: 'Insights',
+                        path: '/admin/kpi',
+                        loc: loc,
+                        tooltip: 'Funnel KPIs',
+                        isDrawer: isDrawer),
                     _NavItem(icon: Icons.settings_outlined, label: 'Settings', path: '/settings', loc: loc, isDrawer: isDrawer),
                     _NavItem(
                         icon: Icons.account_balance_wallet_outlined,

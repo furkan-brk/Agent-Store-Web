@@ -1054,6 +1054,146 @@ func (h *Handler) GetCreatorInsights(c *gin.Context) {
 	c.JSON(http.StatusOK, insights)
 }
 
+// ListAgentVersions handles GET /api/v1/agents/:id/versions (auth, owner-only).
+func (h *Handler) ListAgentVersions(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	versions, err := h.agentSvc.ListAgentVersions(c.GetString("wallet"), uint(id))
+	if err != nil {
+		// Owner check / not-found errors come back as 404 so we don't leak existence
+		// to non-owners. DB errors stay 500.
+		switch err.Error() {
+		case "agent not found", "unauthorized":
+			c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		default:
+			log.Printf("[AgentHandler.ListAgentVersions] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"versions": versions})
+}
+
+// GetAgentVersion handles GET /api/v1/agents/:id/versions/:v (auth, owner-only).
+func (h *Handler) GetAgentVersion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	v, err := strconv.Atoi(c.Param("v"))
+	if err != nil || v < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid version"})
+		return
+	}
+	dto, err := h.agentSvc.GetAgentVersion(c.GetString("wallet"), uint(id), v)
+	if err != nil {
+		if errors.Is(err, ErrAgentVersionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "version not found"})
+			return
+		}
+		switch err.Error() {
+		case "agent not found", "unauthorized":
+			c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		default:
+			log.Printf("[AgentHandler.GetAgentVersion] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, dto)
+}
+
+// RollbackAgentVersion handles POST /api/v1/agents/:id/versions/:v/rollback.
+// Owner-only — applies the historical fields and snapshots both before+after
+// so the rollback itself is reversible.
+func (h *Handler) RollbackAgentVersion(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	v, err := strconv.Atoi(c.Param("v"))
+	if err != nil || v < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid version"})
+		return
+	}
+	agent, err := h.agentSvc.RollbackAgentVersion(c.GetString("wallet"), uint(id), v)
+	if err != nil {
+		if errors.Is(err, ErrAgentVersionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "version not found"})
+			return
+		}
+		switch err.Error() {
+		case "agent not found", "unauthorized":
+			c.JSON(http.StatusNotFound, gin.H{"error": "agent not found"})
+		default:
+			log.Printf("[AgentHandler.RollbackAgentVersion] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, agent)
+}
+
+// GetFunnelMetrics handles GET /api/v1/admin/kpi/funnel.
+//
+// Creator-scoped: reports the funnel for the authenticated wallet's own
+// activity. The "admin" prefix in the URL reflects who reads it (a creator
+// admin'ing their own product), not a global admin role.
+func (h *Handler) GetFunnelMetrics(c *gin.Context) {
+	since := c.DefaultQuery("since", "30d")
+	metrics, err := h.agentSvc.GetFunnelMetrics(c.GetString("wallet"), since)
+	if err != nil {
+		log.Printf("[AgentHandler.GetFunnelMetrics] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, metrics)
+}
+
+// BulkAction handles POST /api/v1/agents/bulk — wallet-scoped bulk operations.
+//
+// Request body:
+//
+//	{"action": "remove_from_library"|"tag_add"|"tag_remove"|"regenerate_image",
+//	 "ids": [1,2,3], "payload": {"tag": "wizard"}}
+//
+// Status codes:
+//   - 200: per-id results in body (always check `failures`, partial success OK)
+//   - 400: malformed body, unknown action, too many ids, or insufficient credits
+//   - 500: DB-level failure
+func (h *Handler) BulkAction(c *gin.Context) {
+	var body struct {
+		Action  string         `json:"action" binding:"required"`
+		IDs     []uint         `json:"ids" binding:"required"`
+		Payload map[string]any `json:"payload"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	result, err := h.agentSvc.BulkAction(c.GetString("wallet"), body.Action, body.IDs, body.Payload)
+	if err != nil {
+		// Validation errors are 400; everything else is 500. Quota / unknown
+		// action / cap errors are caller-correctable so we don't 5xx them.
+		switch {
+		case errors.Is(err, ErrBulkUnknownAction),
+			errors.Is(err, ErrBulkTooManyIDs),
+			errors.Is(err, ErrBulkInsufficientCredits):
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		default:
+			log.Printf("[AgentHandler.BulkAction] error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // RecordPurchase handles POST /api/v1/agents/:id/purchase
 func (h *Handler) RecordPurchase(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)

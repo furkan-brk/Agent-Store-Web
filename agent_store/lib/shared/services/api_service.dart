@@ -1562,6 +1562,111 @@ class ApiService {
     }
   }
 
+  // ── Bulk operations + agent versioning (v3.11.3) ────────────────────────
+
+  /// Performs a bulk action across [ids]. [action] must match a backend-side
+  /// handler (e.g. `remove_from_library`, `tag_add`, `tag_remove`,
+  /// `regenerate_image`). Returns the parsed response body so callers can
+  /// surface partial success / failure counts. Empty map on transport failure.
+  Future<Map<String, dynamic>> bulkAgentAction(
+    String action,
+    List<int> ids, {
+    Map<String, dynamic>? payload,
+  }) async {
+    if (ids.isEmpty) return const {};
+    try {
+      final body = <String, dynamic>{
+        'action': action,
+        'ids': ids,
+        if (payload != null && payload.isNotEmpty) 'payload': payload,
+      };
+      final res = await http
+          .post(
+            Uri.parse('${ApiConstants.agents}/bulk'),
+            headers: _headers,
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 60));
+      if (res.statusCode == 200) {
+        invalidateCache('agents');
+        invalidateCache('library');
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      debugPrint('bulkAgentAction: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('bulkAgentAction: $e');
+    }
+    return const {};
+  }
+
+  /// Lists snapshot versions for [agentId] (newest first, max 20). Owner-only
+  /// — server returns 403 for non-owners. Empty list on failure.
+  Future<List<Map<String, dynamic>>> getAgentVersions(int agentId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.agents}/$agentId/versions'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return ((data['versions'] as List?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+      debugPrint('getAgentVersions: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getAgentVersions: $e');
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>?> getAgentVersion(int agentId, int version) async {
+    try {
+      final res = await http.get(
+        Uri.parse('${ApiConstants.agents}/$agentId/versions/$version'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) { debugPrint('getAgentVersion: $e'); }
+    return null;
+  }
+
+  /// Restores [agentId] to [version]. The backend snapshots the current row
+  /// before applying the rollback so history is preserved. Returns the
+  /// updated agent or null on failure.
+  Future<Map<String, dynamic>?> rollbackAgentVersion(int agentId, int version) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.agents}/$agentId/versions/$version/rollback'),
+        headers: _headers,
+      );
+      if (res.statusCode == 200) {
+        invalidateCache('agents');
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      }
+      debugPrint('rollbackAgentVersion: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('rollbackAgentVersion: $e');
+    }
+    return null;
+  }
+
+  /// v3.11.3 — Returns funnel KPI metrics for the authed creator. [window]
+  /// must be one of `7d`, `30d`, `90d`. Returns null on transport failure
+  /// so the panel can render a friendly empty state.
+  Future<Map<String, dynamic>?> getFunnelMetrics({String window = '30d'}) async {
+    try {
+      final uri = Uri.parse('${ApiConstants.apiV1}/admin/kpi/funnel')
+          .replace(queryParameters: {'since': window});
+      final res = await http.get(uri, headers: _headers);
+      if (res.statusCode == 200) return jsonDecode(res.body) as Map<String, dynamic>;
+      debugPrint('getFunnelMetrics: HTTP ${res.statusCode}');
+    } catch (e) {
+      debugPrint('getFunnelMetrics: $e');
+    }
+    return null;
+  }
+
   /// Downloads the OpenClaw-compatible SKILL.md for [agentId].
   /// Returns the raw Markdown text, or null on error / 403 (not purchased).
   Future<String?> fetchAgentSkillMd(int agentId) async {

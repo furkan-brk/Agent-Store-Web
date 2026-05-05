@@ -39,6 +39,10 @@ func SetupRouter(handler *Handler) *gin.Engine {
 	auth := middleware.InternalAuth()
 	optionalAuth := middleware.OptionalInternalAuth()
 
+	// v3.11.3 pilot: dual-auth (JWT OR API key). JWT wins when both are present.
+	listAgentsAuth := middleware.AuthOrAPIKey("read:agents")
+	writeAgentsAuth := middleware.AuthOrAPIKey("write:agents")
+
 	// Per-wallet rate limiters for expensive endpoints
 	createRL := middleware.NewRateLimiter(10, 1*time.Hour)
 	chatRL := middleware.NewRateLimiter(30, 1*time.Minute)
@@ -52,13 +56,22 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("/trending", handler.TrendingAgents)
 		agents.GET("/categories", handler.GetCategories)
 		agents.POST("/batch", optionalAuth, handler.BatchGetAgents)
+		// v3.11.3: wallet-scoped bulk operations (library remove, tag add/remove, image regen).
+		agents.POST("/bulk", auth, handler.BulkAction)
 		agents.GET("/:id", optionalAuth, handler.GetAgent)
 		agents.GET("/:id/similar", optionalAuth, handler.GetSimilar)
 		// Public endpoint: unauth callers get redacted SKILL.md so the
 		// `openclaw://install-skill?url=...` deeplink can be opened from
 		// anywhere. Full prompt is served only to owner/purchaser.
 		agents.GET("/:id/skill.md", optionalAuth, handler.GetAgentSkillMd)
-		agents.POST("", auth, createRL.WalletMiddleware(), handler.CreateAgent)
+		// v3.11.3: dual-auth (JWT OR API key with `write:agents`) on create.
+		// JWT-authed callers behave exactly as before (header takes precedence).
+		agents.POST("", writeAgentsAuth, createRL.WalletMiddleware(), handler.CreateAgent)
+		// v3.11.3: programmatic /agents listing for API-key callers. The public
+		// `GET /agents` route stays open; this dedicated path enforces a key so
+		// scope-gated bots can prove provenance. JWT-authed users can hit
+		// either path.
+		v1.GET("/keyed/agents", listAgentsAuth, handler.ListAgents)
 		agents.PUT("/:id", auth, handler.UpdateAgent)
 		agents.POST("/:id/regenerate-image", auth, createRL.WalletMiddleware(), handler.RegenerateImage)
 		agents.POST("/:id/fork", auth, forkRL.WalletMiddleware(), handler.ForkAgent)
@@ -71,6 +84,11 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("/:id/ratings", handler.GetRatings)
 		agents.POST("/:id/ratings/:ratingID/helpful", auth, handler.MarkRatingHelpful)
 		agents.POST("/:id/ratings/:ratingID/flag", auth, handler.FlagRating)
+
+		// v3.11.3: agent version history + rollback (owner-only).
+		agents.GET("/:id/versions", auth, handler.ListAgentVersions)
+		agents.GET("/:id/versions/:v", auth, handler.GetAgentVersion)
+		agents.POST("/:id/versions/:v/rollback", auth, handler.RollbackAgentVersion)
 
 		user := v1.Group("/user", auth)
 		user.GET("/library", handler.GetLibrary)
@@ -100,6 +118,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 
 		// v3.10: creator analytics
 		user.GET("/creator/insights", handler.GetCreatorInsights)
+
+		// v3.11.3: cross-cutting KPI funnel (creator-scoped).
+		v1.GET("/admin/kpi/funnel", auth, handler.GetFunnelMetrics)
 
 		// v3.11.2: notification center
 		notif := user.Group("/notifications")

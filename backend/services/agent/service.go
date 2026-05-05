@@ -632,6 +632,23 @@ func (s *AgentService) AddToLibrary(wallet string, agentID uint) error {
 	s.cache.Delete("trending")
 	s.cache.Delete("for-you|" + wallet)
 	s.RecordActivity(wallet, models.ActivityAgentSaved, agentID, nil)
+
+	// v3.11.3: notify the creator that someone saved their agent. Synchronous
+	// (matches RecordActivity pattern) — no goroutine, so t.Cleanup can't race
+	// the inbox write. Self-saves don't notify.
+	var saved models.Agent
+	if err := database.DB.Select("id, title, creator_wallet").First(&saved, agentID).Error; err == nil {
+		creator := strings.ToLower(saved.CreatorWallet)
+		if creator != "" && creator != wallet {
+			s.notifyOnce(
+				creator,
+				"social",
+				"New library save",
+				saved.Title+" was added to a library",
+				fmt.Sprintf("/agent/%d", agentID),
+			)
+		}
+	}
 	return nil
 }
 
@@ -752,12 +769,16 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		return nil, fmt.Errorf("original agent not found: %w", err)
 	}
 
-	// Generate a fresh avatar via AI Pipeline
+	// Generate a fresh avatar via AI Pipeline. aiClient is nil in unit tests
+	// — skip the network call and let downstream code carry an empty image.
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	forkProfile := &client.AgentProfile{Name: original.Title}
-	avatarRes, _ := s.aiClient.Avatar(ctx, forkProfile, "A variant of "+original.CharacterType+" agent", original.CharacterType)
+	var avatarRes *client.AvatarResult
+	if s.aiClient != nil {
+		forkProfile := &client.AgentProfile{Name: original.Title}
+		avatarRes, _ = s.aiClient.Avatar(ctx, forkProfile, "A variant of "+original.CharacterType+" agent", original.CharacterType)
+	}
 
 	// Deduct 5 credits
 	if creatorWallet != "" {
@@ -804,6 +825,19 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		"original_id":    originalID,
 		"original_title": fork.Title,
 	})
+
+	// v3.11.3: notify the *original* creator of the fork so they know their
+	// agent is being remixed. Skip self-forks.
+	originalCreator := strings.ToLower(original.CreatorWallet)
+	if originalCreator != "" && originalCreator != strings.ToLower(creatorWallet) {
+		s.notifyOnce(
+			originalCreator,
+			"social",
+			"Your agent was forked",
+			original.Title+" was forked into a new variant",
+			fmt.Sprintf("/agent/%d", fork.ID),
+		)
+	}
 
 	return fork, nil
 }
@@ -963,7 +997,7 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 		return fmt.Errorf("transaction verification failed: %w", err)
 	}
 
-	return database.DB.Transaction(func(dbTx *gorm.DB) error {
+	if err := database.DB.Transaction(func(dbTx *gorm.DB) error {
 		var existing models.PurchasedAgent
 		if dbTx.Where("buyer_wallet = ? AND agent_id = ?", buyerWallet, agentID).First(&existing).Error == nil {
 			return nil // already purchased — idempotent
@@ -997,7 +1031,33 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 			Metadata: string(metadata),
 		}).Error
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	// v3.11.3: notify both sides of a successful purchase. Outside the
+	// transaction so a notification failure can't roll the purchase back.
+	creator := strings.ToLower(agent.CreatorWallet)
+	buyer := strings.ToLower(buyerWallet)
+	if creator != "" && creator != buyer {
+		s.notifyOnce(
+			creator,
+			"credit",
+			"Your agent was purchased",
+			agent.Title+" was purchased for "+strconv.FormatFloat(amountMon, 'f', -1, 64)+" MON",
+			fmt.Sprintf("/agent/%d", agentID),
+		)
+	}
+	if buyer != "" {
+		s.notifyOnce(
+			buyer,
+			"system",
+			"Purchase confirmed",
+			agent.Title+" is now in your library",
+			fmt.Sprintf("/agent/%d", agentID),
+		)
+	}
+	return nil
 }
 
 // IsPurchased checks if a wallet has purchased the agent.
@@ -1127,6 +1187,11 @@ func (s *AgentService) UpdateAgent(agentID uint, wallet string, req *UpdateAgent
 		return nil, fmt.Errorf("update failed: %w", err)
 	}
 	database.DB.First(&agent, agentID)
+
+	// v3.11.3: snapshot post-update state into AgentVersion for history/rollback.
+	// Best-effort — failure is logged inside snapshotAgentVersion and never
+	// surfaces to the caller.
+	s.snapshotAgentVersion(agentID)
 
 	s.cache.DeletePrefix("agents|")
 	s.cache.Delete("trending")

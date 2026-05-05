@@ -15,9 +15,11 @@ import '../../../shared/widgets/conflict_dialog.dart';
 import '../bindings/card_editor_binding.dart';
 import '../controllers/card_editor_controller.dart';
 import '../services/card_export_service.dart';
+import '../widgets/card_diff_modal.dart';
 import '../widgets/editor_preview_panel.dart';
 import '../widgets/editor_toolbar.dart';
 import '../widgets/sections/editor_sections.dart';
+import '../widgets/version_history_dialog.dart';
 
 /// Card Editor — split-view ekranı.
 ///
@@ -161,6 +163,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
           return _ErrorScaffold(message: result?.error ?? 'Unknown error', agentId: widget.agentId);
         }
         return _Editor(
+          agentId: widget.agentId,
           agent: result.agent!,
           controller: result.controller!,
           previewBoundaryKey: _previewBoundaryKey,
@@ -168,6 +171,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
           onClone: _onClone,
           onExportPng: _onExportPng,
           onExportSkillMd: _onExportSkillMd,
+          onReload: () => setState(() => _loadFuture = _load()),
         );
       },
     );
@@ -176,6 +180,7 @@ class _CardEditorScreenState extends State<CardEditorScreen> {
 
 class _Editor extends StatefulWidget {
   const _Editor({
+    required this.agentId,
     required this.agent,
     required this.controller,
     required this.previewBoundaryKey,
@@ -183,8 +188,10 @@ class _Editor extends StatefulWidget {
     required this.onClone,
     required this.onExportPng,
     required this.onExportSkillMd,
+    required this.onReload,
   });
 
+  final int agentId;
   final AgentModel agent;
   final CardEditorController controller;
   final GlobalKey previewBoundaryKey;
@@ -192,6 +199,11 @@ class _Editor extends StatefulWidget {
   final Future<void> Function(BuildContext, CardEditorController) onClone;
   final Future<void> Function(BuildContext, AgentModel) onExportPng;
   final Future<void> Function(BuildContext, AgentModel) onExportSkillMd;
+
+  /// Triggers the outer screen to re-fetch the agent and rebuild — used by
+  /// the version-history rollback flow so the editor surfaces the
+  /// rolled-back row immediately.
+  final VoidCallback onReload;
 
   @override
   State<_Editor> createState() => _EditorState();
@@ -300,6 +312,16 @@ class _EditorState extends State<_Editor> {
                     onExportPng: () => onExportPng(context, controller.draft.value),
                     onExportSkillMd: () => onExportSkillMd(context, controller.draft.value),
                     onClose: () => onClose(context, controller),
+                    onPreviewChanges: () => CardDiffModal.show(
+                      context,
+                      original: controller.original,
+                      draft: controller.draft.value,
+                    ),
+                    onShowHistory: () => VersionHistoryDialog.show(
+                      context,
+                      agentId: widget.agentId,
+                      onRollbackComplete: widget.onReload,
+                    ),
                   ),
                   Expanded(
                     child: isWide

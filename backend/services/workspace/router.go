@@ -29,6 +29,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 	}
 
 	auth := middleware.InternalAuth()
+	// v3.11.3: dual-auth on the legend resume endpoint so programmatic clients
+	// can re-run a failed run via API key with `execute:legend` scope.
+	resumeAuth := middleware.AuthOrAPIKey("execute:legend")
 
 	// Rate limiter for workflow execution (expensive — AI calls)
 	executeRL := middleware.NewRateLimiter(20, 1*time.Minute)
@@ -69,6 +72,13 @@ func SetupRouter(handler *Handler) *gin.Engine {
 
 		// Public mission marketplace (no auth needed)
 		v1.GET("/missions/public", handler.GetPublicMissions)
+
+		// v3.11.3: resume a failed execution from the last successful node.
+		// Dual-auth: JWT (via gateway) OR API key with execute:legend scope.
+		// Registered on v1 directly so resumeAuth fully owns auth (no
+		// double-auth via the parent user-group middleware).
+		v1.POST("/user/legend/executions/:execId/resume",
+			resumeAuth, executeRL.WalletMiddleware(), handler.ResumeExecution)
 	}
 
 	r.GET("/health", func(c *gin.Context) {
