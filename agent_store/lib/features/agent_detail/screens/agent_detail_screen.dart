@@ -29,43 +29,41 @@ import '../widgets/rating_widget.dart';
 import '../widgets/similar_agents_ribbon.dart';
 import '../widgets/tx_timeline.dart';
 
-/// Outer StatelessWidget — registers the controller keyed by agentId.
-class AgentDetailScreen extends StatelessWidget {
+/// Outer StatefulWidget — registers the controller keyed by agentId in
+/// initState (NOT build) so parent rebuilds don't replace the in-flight
+/// controller and prematurely call onClose on pending futures.
+class AgentDetailScreen extends StatefulWidget {
   final int agentId;
   const AgentDetailScreen({super.key, required this.agentId});
 
   @override
-  Widget build(BuildContext context) {
-    final ctrl = Get.put(AgentDetailController(agentId), tag: '$agentId');
-    return _AgentDetailView(ctrl: ctrl);
-  }
+  State<AgentDetailScreen> createState() => _AgentDetailScreenState();
 }
 
-/// Thin StatefulWidget shell — ONLY for TabController (requires TickerProvider).
-/// All data state lives in AgentDetailController.
-class _AgentDetailView extends StatefulWidget {
-  final AgentDetailController ctrl;
-  const _AgentDetailView({required this.ctrl});
-
-  @override
-  State<_AgentDetailView> createState() => _AgentDetailViewState();
-}
-
-class _AgentDetailViewState extends State<_AgentDetailView>
+class _AgentDetailScreenState extends State<AgentDetailScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabCtrl;
-  AgentDetailController get _ctrl => widget.ctrl;
+  late final AgentDetailController _ctrl;
+  late final String _tag;
+  late final TabController _tabCtrl;
 
   @override
   void initState() {
     super.initState();
+    _tag = '${widget.agentId}';
+    // Reuse a registered controller if one already exists (e.g. hot-reload).
+    // Production parent rebuilds no longer hit Get.put repeatedly.
+    if (Get.isRegistered<AgentDetailController>(tag: _tag)) {
+      _ctrl = Get.find<AgentDetailController>(tag: _tag);
+    } else {
+      _ctrl = Get.put(AgentDetailController(widget.agentId), tag: _tag);
+    }
     _tabCtrl = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
     _tabCtrl.dispose();
-    Get.delete<AgentDetailController>(tag: '${_ctrl.agentId}');
+    Get.delete<AgentDetailController>(tag: _tag);
     super.dispose();
   }
 
@@ -1136,7 +1134,7 @@ class _AgentDetailViewState extends State<_AgentDetailView>
         const SizedBox(height: 24),
         const _SectionHeader(icon: Icons.star_outline_rounded, title: 'Ratings'),
         const SizedBox(height: 14),
-        RatingWidget(agentId: widget.ctrl.agentId),
+        RatingWidget(agentId: _ctrl.agentId),
 
         // v3.11.1 — Similar agents (silently hides on empty/error)
         SimilarAgentsRibbon(agentId: a.id),
