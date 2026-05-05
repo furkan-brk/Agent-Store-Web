@@ -279,6 +279,10 @@ class AppSizing {
 
 class AppBreakpoints {
   static const mobile = 600.0;
+  /// "Narrow" — the cutoff AppShell already uses to swap drawer / bottom-nav
+  /// (also returned by `isNarrow(context)` in `responsive_layout.dart`).
+  /// Used by responsive widgets to switch from multi-column to single-column.
+  static const narrow = 768.0;
   static const tablet = 1024.0;
 
   static bool isMobile(double w)  => w < mobile;

@@ -691,6 +691,29 @@ class ApiService {
     return null;
   }
 
+  /// v3.12 FE-L1-5: Re-runs only the failed nodes of a previous execution
+  /// (continues from where it left off rather than re-executing from
+  /// scratch). Backend: POST /user/legend/executions/:execId/resume.
+  ///
+  /// Returns the new [WorkflowExecution] on success, or null on any
+  /// transport / non-200 response.
+  Future<WorkflowExecution?> resumeLegendExecution(int execId) async {
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConstants.userLegendExecutions}/$execId/resume'),
+        headers: _headers,
+      ).timeout(const Duration(seconds: 180));
+      if (res.statusCode == 200) {
+        return WorkflowExecution.fromJson(
+            jsonDecode(res.body) as Map<String, dynamic>);
+      }
+      debugPrint('resumeLegendExecution: HTTP ${res.statusCode} — ${res.body}');
+    } catch (e) {
+      debugPrint('resumeLegendExecution: $e');
+    }
+    return null;
+  }
+
   Future<({List<WorkflowExecution> executions, int total})> listExecutions({
     String? workflowId,
     int page = 1,

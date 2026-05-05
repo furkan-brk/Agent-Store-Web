@@ -132,39 +132,52 @@ class _FunnelPanelScreenState extends State<FunnelPanelScreen> {
   Widget _buildContent() {
     return ListView(
       children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            FunnelCard(
-              title: 'Suggest → Execute',
-              subtitle: 'Guild Master suggestion that ran in Legend.',
-              percent: _readPct('suggest_to_execute'),
-              deltaPercent: _readDelta('suggest_to_execute'),
-              icon: Icons.psychology_outlined,
-            ),
-            FunnelCard(
-              title: 'Edit → Publish',
-              subtitle: 'Card edits that result in a published agent.',
-              percent: _readPct('edit_to_publish'),
-              deltaPercent: _readDelta('edit_to_publish'),
-              icon: Icons.publish_outlined,
-            ),
-            FunnelCard(
-              title: 'Publish → First Save',
-              subtitle: 'New agents that get a save within the window.',
-              percent: _readPct('publish_to_first_save'),
-              deltaPercent: _readDelta('publish_to_first_save'),
-              icon: Icons.bookmark_added_outlined,
-            ),
-            FunnelCard(
-              title: 'Trial → Purchase',
-              subtitle: 'Trial tokens that converted to a purchase.',
-              percent: _readPct('trial_to_purchase'),
-              deltaPercent: _readDelta('trial_to_purchase'),
-              icon: Icons.shopping_bag_outlined,
-            ),
-          ],
+        // v3.12 FE-L1-4: collapse to a single-column stack on narrow
+        // viewports (< AppBreakpoints.narrow / 768px). The fixed-220
+        // FunnelCard inside Wrap clipped on phone widths near 240–360px.
+        LayoutBuilder(
+          builder: (_, c) {
+            final narrow = c.maxWidth < AppBreakpoints.narrow;
+            final cardWidth = narrow ? c.maxWidth : 220.0;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FunnelCard(
+                  title: 'Suggest → Execute',
+                  subtitle: 'Guild Master suggestion that ran in Legend.',
+                  percent: _readPct('suggest_to_execute'),
+                  deltaPercent: _readDelta('suggest_to_execute'),
+                  icon: Icons.psychology_outlined,
+                  width: cardWidth,
+                ),
+                FunnelCard(
+                  title: 'Edit → Publish',
+                  subtitle: 'Card edits that result in a published agent.',
+                  percent: _readPct('edit_to_publish'),
+                  deltaPercent: _readDelta('edit_to_publish'),
+                  icon: Icons.publish_outlined,
+                  width: cardWidth,
+                ),
+                FunnelCard(
+                  title: 'Publish → First Save',
+                  subtitle: 'New agents that get a save within the window.',
+                  percent: _readPct('publish_to_first_save'),
+                  deltaPercent: _readDelta('publish_to_first_save'),
+                  icon: Icons.bookmark_added_outlined,
+                  width: cardWidth,
+                ),
+                FunnelCard(
+                  title: 'Trial → Purchase',
+                  subtitle: 'Trial tokens that converted to a purchase.',
+                  percent: _readPct('trial_to_purchase'),
+                  deltaPercent: _readDelta('trial_to_purchase'),
+                  icon: Icons.shopping_bag_outlined,
+                  width: cardWidth,
+                ),
+              ],
+            );
+          },
         ),
         // v3.11.4: Discovery + Guild Master sections
         const SizedBox(height: 24),
@@ -243,29 +256,39 @@ class _DiscoveryFunnelSectionState extends State<DiscoveryFunnelSection> {
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           )
         else
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FunnelCard(
-                title: 'Search → Save',
-                subtitle: 'Search queries that ended in a library save.',
-                percent: _readPct('search_to_save'),
-                icon: Icons.search,
-              ),
-              FunnelCard(
-                title: 'Impression → Open',
-                subtitle: 'Cards rendered in store that got opened.',
-                percent: _readPct('impression_to_open'),
-                icon: Icons.remove_red_eye_outlined,
-              ),
-              FunnelCard(
-                title: 'Open → Save',
-                subtitle: 'Detail views that converted to a save.',
-                percent: _readPct('open_to_save'),
-                icon: Icons.bookmark_border,
-              ),
-            ],
+          // v3.12 FE-L1-4: same narrow-viewport collapse as parent panel.
+          LayoutBuilder(
+            builder: (_, c) {
+              final narrow = c.maxWidth < AppBreakpoints.narrow;
+              final cardWidth = narrow ? c.maxWidth : 220.0;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FunnelCard(
+                    title: 'Search → Save',
+                    subtitle: 'Search queries that ended in a library save.',
+                    percent: _readPct('search_to_save'),
+                    icon: Icons.search,
+                    width: cardWidth,
+                  ),
+                  FunnelCard(
+                    title: 'Impression → Open',
+                    subtitle: 'Cards rendered in store that got opened.',
+                    percent: _readPct('impression_to_open'),
+                    icon: Icons.remove_red_eye_outlined,
+                    width: cardWidth,
+                  ),
+                  FunnelCard(
+                    title: 'Open → Save',
+                    subtitle: 'Detail views that converted to a save.',
+                    percent: _readPct('open_to_save'),
+                    icon: Icons.bookmark_border,
+                    width: cardWidth,
+                  ),
+                ],
+              );
+            },
           ),
       ],
     );
@@ -337,29 +360,39 @@ class _GuildMasterFunnelSectionState extends State<GuildMasterFunnelSection> {
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           )
         else
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FunnelCard(
-                title: 'Suggest acceptance',
-                subtitle: 'Suggestions that became Mission/Legend bridges.',
-                percent: _readPct('suggest_acceptance_rate'),
-                icon: Icons.handshake_outlined,
-              ),
-              FunnelCard(
-                title: 'Chat → Action',
-                subtitle: 'Chat messages that ended in a bridge.',
-                percent: _readPct('chat_to_action_rate'),
-                icon: Icons.chat_bubble_outline,
-              ),
-              FunnelCard(
-                title: 'Rerun rate',
-                subtitle: 'Sessions where suggest fired more than once.',
-                percent: _readPct('rerun_rate'),
-                icon: Icons.refresh,
-              ),
-            ],
+          // v3.12 FE-L1-4: same narrow-viewport collapse as parent panel.
+          LayoutBuilder(
+            builder: (_, c) {
+              final narrow = c.maxWidth < AppBreakpoints.narrow;
+              final cardWidth = narrow ? c.maxWidth : 220.0;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FunnelCard(
+                    title: 'Suggest acceptance',
+                    subtitle: 'Suggestions that became Mission/Legend bridges.',
+                    percent: _readPct('suggest_acceptance_rate'),
+                    icon: Icons.handshake_outlined,
+                    width: cardWidth,
+                  ),
+                  FunnelCard(
+                    title: 'Chat → Action',
+                    subtitle: 'Chat messages that ended in a bridge.',
+                    percent: _readPct('chat_to_action_rate'),
+                    icon: Icons.chat_bubble_outline,
+                    width: cardWidth,
+                  ),
+                  FunnelCard(
+                    title: 'Rerun rate',
+                    subtitle: 'Sessions where suggest fired more than once.',
+                    percent: _readPct('rerun_rate'),
+                    icon: Icons.refresh,
+                    width: cardWidth,
+                  ),
+                ],
+              );
+            },
           ),
       ],
     );

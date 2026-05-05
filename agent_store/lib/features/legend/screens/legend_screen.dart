@@ -20,6 +20,7 @@ import '../../../shared/utils/legend_error_dialog.dart';
 import '../../../shared/widgets/monaco_editor_widget.dart';
 import '../models/workflow_models.dart';
 import '../utils/dag_utils.dart';
+import '../../../core/utils/dialog_utils.dart';
 import '../../../core/utils/input_mode.dart';
 import '../services/claude_export_service.dart';
 import '../services/legend_service.dart';
@@ -1047,13 +1048,20 @@ class _LegendScreenState extends State<LegendScreen>
                               onPressed: () async {
                                 final confirmed = await showDialog<bool>(
                                   context: ctx,
-                                  builder: (_) => AlertDialog(
+                                  builder: (dCtx) => AlertDialog(
                                     backgroundColor: AppTheme.card,
                                     title: const Text('Delete Workflow?',
                                         style: TextStyle(color: AppTheme.textH)),
-                                    content: Text(
-                                      '"${wf.name}" will be permanently deleted.',
-                                      style: const TextStyle(color: AppTheme.textM),
+                                    // v3.12 FE-L1-6: clamp dialog width
+                                    // on wide monitors.
+                                    content: SizedBox(
+                                      width:
+                                          dialogMaxWidth(dCtx, max: 420),
+                                      child: Text(
+                                        '"${wf.name}" will be permanently deleted.',
+                                        style: const TextStyle(
+                                            color: AppTheme.textM),
+                                      ),
                                     ),
                                     actions: [
                                       TextButton(
@@ -1387,8 +1395,54 @@ class _LegendScreenState extends State<LegendScreen>
           Navigator.pop(context);
           _executeWorkflow(exec.inputMessage, isRerun: true);
         },
+        // v3.12 FE-L1-5: Resume — re-runs only the failed nodes of a
+        // failed/partial execution. Visible only when status is failed
+        // or partial.
+        onResume: (exec) {
+          Navigator.pop(context);
+          _resumeExecution(exec);
+        },
       ),
     );
+  }
+
+  /// v3.12 FE-L1-5: Resume a failed / partial execution from the failed
+  /// node onward (server-side re-runs only the unfinished tail).
+  Future<void> _resumeExecution(WorkflowExecution exec) async {
+    if (_executing) return;
+    setState(() {
+      _executing = true;
+      _lastExecution = null;
+      _showResultsPanel = true;
+    });
+    try {
+      final result =
+          await ApiService.instance.resumeLegendExecution(exec.id);
+      if (!mounted) return;
+      if (result != null) {
+        setState(() {
+          _lastExecution = result;
+          _executing = false;
+        });
+        if (result.isCompleted) {
+          _showNotice('Resumed execution completed.',
+              background: AppTheme.success);
+        } else if (result.isFailed) {
+          _showNotice(
+              'Resume failed: ${result.errorMessage ?? "Unknown error"}',
+              background: AppTheme.error);
+        }
+        _showExecutionResultDialog(result);
+      } else {
+        setState(() => _executing = false);
+        _showNotice('Resume failed. Check your credits and try again.',
+            background: AppTheme.error);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _executing = false);
+      _showNotice('Resume error: $e', background: AppTheme.error);
+    }
   }
 
   // ── Version diff (v3.11.3 — T7) ───────────────────────────────────────────
@@ -2122,7 +2176,7 @@ class _LegendScreenState extends State<LegendScreen>
   Future<String?> _showUnsavedDialog() {
     return showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.card,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -2130,7 +2184,15 @@ class _LegendScreenState extends State<LegendScreen>
         ),
         icon: const Icon(Icons.warning_amber_rounded, color: AppTheme.gold, size: 28),
         title: const Text('Unsaved Changes', style: TextStyle(color: AppTheme.textH, fontWeight: FontWeight.bold)),
-        content: const Text('You have unsaved changes. What would you like to do?', style: TextStyle(color: AppTheme.textB)),
+        // v3.12 FE-L1-6: clamp dialog width on large desktop monitors so
+        // the message doesn't stretch the entire viewport.
+        content: SizedBox(
+          width: dialogMaxWidth(ctx, max: 420),
+          child: const Text(
+            'You have unsaved changes. What would you like to do?',
+            style: TextStyle(color: AppTheme.textB),
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -2523,13 +2585,17 @@ class _LegendScreenState extends State<LegendScreen>
   void _showClearCanvasDialog() {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.card,
         title: const Text('Clear canvas?',
             style: TextStyle(color: AppTheme.textH)),
-        content: const Text(
-          'All nodes and edges will be removed.',
-          style: TextStyle(color: AppTheme.textM),
+        // v3.12 FE-L1-6: clamp dialog width on wide monitors.
+        content: SizedBox(
+          width: dialogMaxWidth(ctx, max: 420),
+          child: const Text(
+            'All nodes and edges will be removed.',
+            style: TextStyle(color: AppTheme.textM),
+          ),
         ),
         actions: [
           TextButton(
@@ -3758,11 +3824,15 @@ class _ExecutionHistoryDialog extends StatefulWidget {
   final String? workflowId;
   final Function(WorkflowExecution) onViewExecution;
   final Function(WorkflowExecution) onRerun;
+  // v3.12 FE-L1-5: optional Resume callback — only rendered when the
+  // execution row is failed/partial.
+  final Function(WorkflowExecution)? onResume;
 
   const _ExecutionHistoryDialog({
     this.workflowId,
     required this.onViewExecution,
     required this.onRerun,
+    this.onResume,
   });
 
   @override
@@ -3932,6 +4002,49 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
                                                 Text('Rerun',
                                                     style: TextStyle(
                                                         color: AppTheme.gold,
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w600)),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    // v3.12 FE-L1-5: Resume — only for
+                                    // failed / partial executions, picks
+                                    // up where the run stopped.
+                                    if (exec.isResumable &&
+                                        widget.onResume != null) ...[
+                                      const SizedBox(width: 4),
+                                      Tooltip(
+                                        message: 'Resume from failed node',
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(4),
+                                          onTap: () =>
+                                              widget.onResume!(exec),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 7, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.success
+                                                  .withValues(alpha: 0.12),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                  color: AppTheme.success
+                                                      .withValues(alpha: 0.3)),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.play_arrow_rounded,
+                                                    size: 12,
+                                                    color: AppTheme.success),
+                                                SizedBox(width: 3),
+                                                Text('Resume',
+                                                    style: TextStyle(
+                                                        color: AppTheme.success,
                                                         fontSize: 10,
                                                         fontWeight:
                                                             FontWeight.w600)),

@@ -330,28 +330,61 @@ class _DiffRow extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _NodeFacet(
-                    title: 'From',
-                    node: entry.from,
-                    strikethrough: entry.status == _NodeDiffStatus.removed,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Icon(Icons.arrow_forward_rounded,
-                    color: AppTheme.textM, size: 16),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _NodeFacet(
-                    title: 'To',
-                    node: entry.to,
-                    strikethrough: false,
-                  ),
-                ),
-              ],
+            // v3.12 FE-L1-3: stack From / To vertically on narrow viewports
+            // (< 768px / AppBreakpoints.narrow). The fixed two-column row
+            // would otherwise clip on tablet-portrait and phone widths.
+            LayoutBuilder(
+              builder: (_, c) {
+                final stack = c.maxWidth < AppBreakpoints.narrow;
+                if (stack) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _NodeFacet(
+                        title: 'From',
+                        node: entry.from,
+                        strikethrough:
+                            entry.status == _NodeDiffStatus.removed,
+                      ),
+                      const SizedBox(height: 8),
+                      const Center(
+                        child: Icon(Icons.arrow_downward_rounded,
+                            color: AppTheme.textM, size: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      _NodeFacet(
+                        title: 'To',
+                        node: entry.to,
+                        strikethrough: false,
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _NodeFacet(
+                        title: 'From',
+                        node: entry.from,
+                        strikethrough:
+                            entry.status == _NodeDiffStatus.removed,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(Icons.arrow_forward_rounded,
+                        color: AppTheme.textM, size: 16),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _NodeFacet(
+                        title: 'To',
+                        node: entry.to,
+                        strikethrough: false,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
             if (entry.changedFields.isNotEmpty) ...[
               const SizedBox(height: 10),

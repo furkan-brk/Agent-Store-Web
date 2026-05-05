@@ -285,6 +285,12 @@ class WorkflowExecution {
   bool get isCompleted => status == 'completed';
   bool get isFailed => status == 'failed';
   bool get isRunning => status == 'running';
+  bool get isPartial => status == 'partial';
+
+  /// v3.12 FE-L1-5: an execution is "resumable" (re-run only the failed
+  /// nodes) when it is failed or partially completed — but not fully
+  /// completed nor still running.
+  bool get isResumable => isFailed || isPartial;
 
   Duration? get duration =>
       finishedAt?.difference(startedAt);
