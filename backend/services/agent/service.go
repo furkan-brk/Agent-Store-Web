@@ -336,50 +336,72 @@ func normaliseLedgerAction(txType string) string {
 // list endpoints expose per-action metadata without a join.
 func (s *AgentService) appendLedger(wallet string, delta int64, actionType string, agentID *uint, nodeRef *string, breakdown map[string]any) error {
 	return database.DB.Transaction(func(dbTx *gorm.DB) error {
-		var user models.User
-		if err := dbTx.Set("gorm:query_option", "FOR UPDATE").
-			Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
-			return fmt.Errorf("user not found: %w", err)
-		}
-		newBalance := user.Credits + delta
-		if newBalance < 0 {
-			return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, -delta)
-		}
-		if err := dbTx.Model(&models.User{}).Where("wallet_address = ?", wallet).
-			UpdateColumn("credits", gorm.Expr("credits + ?", delta)).Error; err != nil {
-			return fmt.Errorf("failed to apply credit delta: %w", err)
-		}
-		breakdownStr := ""
-		if breakdown != nil {
-			b, err := json.Marshal(breakdown)
-			if err != nil {
-				return fmt.Errorf("failed to marshal cost breakdown: %w", err)
-			}
-			breakdownStr = string(b)
-		}
-		legacyAmount := delta
-		canonicalAction := normaliseLedgerAction(actionType)
-		creditTx := models.CreditTransaction{
-			Wallet:   wallet,
-			Type:     actionType,
-			Amount:   legacyAmount,
-			AgentID:  agentID,
-			Action:   canonicalAction,
-			Metadata: breakdownStr,
-		}
-		if err := dbTx.Create(&creditTx).Error; err != nil {
-			return fmt.Errorf("failed to write credit transaction: %w", err)
-		}
-		entry := models.CreditLedgerEntry{
-			UserWallet:    wallet,
-			Delta:         delta,
-			BalanceAfter:  newBalance,
-			ActionType:    actionType,
-			NodeRef:       nodeRef,
-			CostBreakdown: breakdownStr,
-		}
-		return dbTx.Create(&entry).Error
+		return appendLedgerTx(dbTx, wallet, delta, actionType, agentID, nodeRef, breakdown)
 	})
+}
+
+// appendLedgerTx is the inner ledger primitive that runs inside a caller-
+// provided *gorm.DB transaction. Use this when you need to atomically
+// combine a credit deduction with another DB write (e.g. CreateAgent +
+// deductCredits — see SECURITY note in CreateAgent).
+//
+// SECURITY (v3.12-P0-4): the previous CreateAgent/ForkAgent flow ran
+// deductCredits in its own transaction, then ran Create in another. If
+// the Create failed (constraint violation, DB blip), credits had already
+// left the wallet with no compensating refund. Wrapping both writes in
+// a single tx via this helper rolls the deduct back automatically on
+// any subsequent error.
+func appendLedgerTx(dbTx *gorm.DB, wallet string, delta int64, actionType string, agentID *uint, nodeRef *string, breakdown map[string]any) error {
+	var user models.User
+	if err := dbTx.Set("gorm:query_option", "FOR UPDATE").
+		Where("wallet_address = ?", wallet).First(&user).Error; err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+	newBalance := user.Credits + delta
+	if newBalance < 0 {
+		return fmt.Errorf("insufficient credits: have %d, need %d", user.Credits, -delta)
+	}
+	if err := dbTx.Model(&models.User{}).Where("wallet_address = ?", wallet).
+		UpdateColumn("credits", gorm.Expr("credits + ?", delta)).Error; err != nil {
+		return fmt.Errorf("failed to apply credit delta: %w", err)
+	}
+	breakdownStr := ""
+	if breakdown != nil {
+		b, err := json.Marshal(breakdown)
+		if err != nil {
+			return fmt.Errorf("failed to marshal cost breakdown: %w", err)
+		}
+		breakdownStr = string(b)
+	}
+	legacyAmount := delta
+	canonicalAction := normaliseLedgerAction(actionType)
+	creditTx := models.CreditTransaction{
+		Wallet:   wallet,
+		Type:     actionType,
+		Amount:   legacyAmount,
+		AgentID:  agentID,
+		Action:   canonicalAction,
+		Metadata: breakdownStr,
+	}
+	if err := dbTx.Create(&creditTx).Error; err != nil {
+		return fmt.Errorf("failed to write credit transaction: %w", err)
+	}
+	entry := models.CreditLedgerEntry{
+		UserWallet:    wallet,
+		Delta:         delta,
+		BalanceAfter:  newBalance,
+		ActionType:    actionType,
+		NodeRef:       nodeRef,
+		CostBreakdown: breakdownStr,
+	}
+	return dbTx.Create(&entry).Error
+}
+
+// deductCreditsTx is the tx-scoped variant of deductCredits. Use when you
+// need to atomically combine the deduction with a follow-on write inside
+// the same transaction — see CreateAgent and ForkAgent for the pattern.
+func (s *AgentService) deductCreditsTx(dbTx *gorm.DB, wallet string, amount int64, txType string, agentID *uint) error {
+	return appendLedgerTx(dbTx, wallet, -amount, txType, agentID, nil, nil)
 }
 
 // AppendLedger is the public ledger primitive used by other services (Workspace,
@@ -499,20 +521,20 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		serviceDesc = scoreResult.ServiceDescription
 	}
 
-	// Deduct 10 credits for agent creation
-	if input.CreatorWallet != "" {
-		if err := s.deductCredits(input.CreatorWallet, 10, "create", nil); err != nil {
-			return nil, fmt.Errorf("credit check failed: %w", err)
-		}
-	}
-
 	// Determine generated image base64
 	generatedImage := ""
 	if avatarRes != nil && avatarRes.ImageBase64 != "" {
 		generatedImage = avatarRes.ImageBase64
 	}
 
-	// Persist
+	// SECURITY (v3.12-P0-4): atomic deduct + Create. The previous
+	// implementation ran deductCredits in its own transaction, then ran
+	// the agent Create in another. If the Create failed (DB blip,
+	// constraint violation, post-AI persistence error), the user had
+	// already lost 10 credits with no compensating refund. Wrapping both
+	// writes in a single tx via deductCreditsTx + tx.Create means any
+	// failure rolls the deduct back automatically — no manual refund path
+	// needed, no audit-trail noise.
 	agent := &models.Agent{
 		Title:              input.Title,
 		Description:        input.Description,
@@ -529,7 +551,14 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 		ServiceDescription: serviceDesc,
 		CardVersion:        "2.0",
 	}
-	if err := database.DB.Create(agent).Error; err != nil {
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if input.CreatorWallet != "" {
+			if err := s.deductCreditsTx(tx, input.CreatorWallet, 10, "create", nil); err != nil {
+				return fmt.Errorf("credit check failed: %w", err)
+			}
+		}
+		return tx.Create(agent).Error
+	}); err != nil {
 		return nil, err
 	}
 
@@ -782,18 +811,15 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		avatarRes, _ = s.aiClient.Avatar(ctx, forkProfile, "A variant of "+original.CharacterType+" agent", original.CharacterType)
 	}
 
-	// Deduct 5 credits
-	if creatorWallet != "" {
-		if err := s.deductCredits(creatorWallet, 5, "fork", &original.ID); err != nil {
-			return nil, fmt.Errorf("credit check failed: %w", err)
-		}
-	}
-
 	generatedImage := ""
 	if avatarRes != nil {
 		generatedImage = avatarRes.ImageBase64
 	}
 
+	// SECURITY (v3.12-P0-4): atomic deduct + Create. See CreateAgent for
+	// the full rationale. Forking historically charged 5 credits before
+	// the Create — if the Create failed, the credits were gone. Now the
+	// deduct rolls back automatically on any tx error.
 	fork := &models.Agent{
 		Title:         original.Title + " (Fork)",
 		Description:   "Forked from: " + original.Title,
@@ -808,7 +834,14 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		CardVersion:   "2.0",
 	}
 
-	if err := database.DB.Create(fork).Error; err != nil {
+	if err := database.DB.Transaction(func(tx *gorm.DB) error {
+		if creatorWallet != "" {
+			if err := s.deductCreditsTx(tx, creatorWallet, 5, "fork", &original.ID); err != nil {
+				return fmt.Errorf("credit check failed: %w", err)
+			}
+		}
+		return tx.Create(fork).Error
+	}); err != nil {
 		return nil, err
 	}
 

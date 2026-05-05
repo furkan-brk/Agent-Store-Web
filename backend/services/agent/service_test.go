@@ -12,6 +12,7 @@ import (
 	"github.com/agentstore/backend/services/workspace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 // newSvc returns an AgentService backed by the in-memory test DB. AI client
@@ -211,6 +212,96 @@ func TestGetUserCredits_UnknownReturnsZeroNotError(t *testing.T) {
 	got, err := svc.GetUserCredits(wallet)
 	require.NoError(t, err, "unknown wallet should silently return 0")
 	assert.EqualValues(t, 0, got)
+}
+
+// ── v3.12-P0-4 atomic deduct + create regression ──────────────────────────────
+//
+// Before FIX 4, CreateAgent and ForkAgent ran deductCredits in one
+// transaction and Create in another. If Create failed (DB blip,
+// constraint violation, post-AI persistence error), the user lost 10
+// (or 5 for fork) credits with no compensating refund.
+//
+// The fix wraps both in a single tx: the deduct rolls back automatically
+// on any subsequent Create error. These tests verify the atomicity of
+// the new deductCreditsTx primitive — the same primitive CreateAgent
+// and ForkAgent both call.
+
+// TestDeductCreditsTx_RollsBackOnFollowOnError pins the atomic-tx contract:
+// when a follow-on Create fails inside the same transaction, the deduct
+// must roll back so the user's credits are unchanged. This is the
+// CreateAgent path's safety net — without it, a Create error leaks credits.
+func TestDeductCreditsTx_RollsBackOnFollowOnError(t *testing.T) {
+	svc := newSvc(t)
+	db := testutil.NewTestDB(t)
+	wallet, _ := testutil.NewWallet(t)
+	testutil.NewUser(t, db, wallet) // 100 credits
+
+	simulatedErr := errors.New("simulated post-deduct failure")
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if derr := svc.deductCreditsTx(tx, wallet, 10, "create", nil); derr != nil {
+			return derr
+		}
+		// Simulate a Create failure happening AFTER a successful deduct.
+		// The tx must roll the deduct back.
+		return simulatedErr
+	})
+	require.ErrorIs(t, err, simulatedErr, "tx returns the original error")
+
+	// Balance is unchanged — the deduct was rolled back atomically.
+	balance, gerr := svc.GetUserCredits(wallet)
+	require.NoError(t, gerr)
+	assert.EqualValues(t, 100, balance,
+		"deductCreditsTx must roll back when the enclosing tx fails — otherwise CreateAgent leaks credits on Create errors")
+
+	// Likewise, no ledger row should have been written (the tx rolled back).
+	var n int64
+	require.NoError(t, db.Model(&models.CreditTransaction{}).Where("wallet = ?", wallet).Count(&n).Error)
+	assert.EqualValues(t, 0, n, "ledger writes must roll back with the deduct")
+}
+
+// TestDeductCreditsTx_CommitsOnSuccess is the positive control — when
+// the enclosing tx commits, the deduct + ledger writes land together.
+func TestDeductCreditsTx_CommitsOnSuccess(t *testing.T) {
+	svc := newSvc(t)
+	db := testutil.NewTestDB(t)
+	wallet, _ := testutil.NewWallet(t)
+	testutil.NewUser(t, db, wallet) // 100 credits
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		return svc.deductCreditsTx(tx, wallet, 10, "create", nil)
+	})
+	require.NoError(t, err)
+
+	// Balance reflects the deduct.
+	balance, gerr := svc.GetUserCredits(wallet)
+	require.NoError(t, gerr)
+	assert.EqualValues(t, 90, balance)
+
+	// Ledger has exactly one row.
+	var n int64
+	require.NoError(t, db.Model(&models.CreditTransaction{}).Where("wallet = ?", wallet).Count(&n).Error)
+	assert.EqualValues(t, 1, n)
+}
+
+// TestDeductCreditsTx_InsufficientFundsRollsBack covers the case where the
+// deduct itself fails (insufficient balance). The whole tx must roll back
+// — no half-state where the user table is updated but the ledger isn't.
+func TestDeductCreditsTx_InsufficientFundsRollsBack(t *testing.T) {
+	svc := newSvc(t)
+	db := testutil.NewTestDB(t)
+	wallet, _ := testutil.NewWallet(t)
+	// User starts with the default 100 credits but we ask for 200.
+	testutil.NewUser(t, db, wallet)
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		return svc.deductCreditsTx(tx, wallet, 200, "create", nil)
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "insufficient")
+
+	balance, gerr := svc.GetUserCredits(wallet)
+	require.NoError(t, gerr)
+	assert.EqualValues(t, 100, balance, "balance unchanged after a failed deduct")
 }
 
 // ── Purchases ─────────────────────────────────────────────────────────────────
