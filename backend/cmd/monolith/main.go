@@ -302,6 +302,19 @@ func main() {
 		c.JSON(200, gin.H{"status": "ok", "service": "monolith", "db_ready": database.IsReady()})
 	})
 
+	// v3.11.4: mission scheduler goroutine — only the monolith owns the
+	// 60s tick; standalone workspacesvc binary leaves schedules functional
+	// from the API side but won't fire them.
+	go func() {
+		t := time.NewTicker(60 * time.Second)
+		defer t.Stop()
+		for range t.C {
+			if n := legendSvc.RunDueSchedules(); n > 0 {
+				log.Printf("[mission-scheduler] fired %d schedule(s)", n)
+			}
+		}
+	}()
+
 	log.Printf("Monolith starting on :%s", port)
 	if err := r.Run(":" + port); err != nil {
 		log.Fatalf("Monolith error: %v", err)

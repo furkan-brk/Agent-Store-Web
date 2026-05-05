@@ -53,6 +53,12 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		v1.GET("/legend/templates/metrics", handler.GetTemplateMetrics)
 		v1.POST("/user/legend/templates/:templateId/used", auth, handler.RecordTemplateUse)
 
+		// v3.11.4: mission scheduling (cron-driven re-runs; v3.11.4 fires
+		// = UserActivity marker only — actual exec deferred to v3.11.5)
+		user.GET("/missions/schedules", handler.ListMissionSchedules)
+		user.POST("/missions/:id/schedule", handler.SetMissionSchedule)
+		user.DELETE("/missions/:id/schedule", handler.DeleteMissionSchedule)
+
 		// Legend workflow endpoints
 		legend := user.Group("/legend")
 		legend.GET("/workflows", handler.GetLegendWorkflows)

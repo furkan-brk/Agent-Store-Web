@@ -53,6 +53,81 @@ func (h *Handler) SetMissionBridge(bridge MissionLegendBridge) {
 	h.missionBridge = bridge
 }
 
+// SetMissionSchedule handles POST /api/v1/user/missions/:id/schedule.
+// Body: {"cron": "0 9 * * *", "enabled": true}.
+func (h *Handler) SetMissionSchedule(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mission id"})
+		return
+	}
+	var input ScheduleInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	row, err := h.legendSvc.SetSchedule(wallet, uint(id), input)
+	if err != nil {
+		if errors.Is(err, ErrScheduleInvalidCron) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if errors.Is(err, ErrScheduleMissionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "mission not found"})
+			return
+		}
+		log.Printf("[WorkspaceHandler.SetMissionSchedule] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, row)
+}
+
+// DeleteMissionSchedule handles DELETE /api/v1/user/missions/:id/schedule.
+func (h *Handler) DeleteMissionSchedule(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mission id"})
+		return
+	}
+	if err := h.legendSvc.RemoveSchedule(wallet, uint(id)); err != nil {
+		if errors.Is(err, ErrScheduleMissionNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "schedule not found"})
+			return
+		}
+		log.Printf("[WorkspaceHandler.DeleteMissionSchedule] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": true})
+}
+
+// ListMissionSchedules handles GET /api/v1/user/missions/schedules.
+func (h *Handler) ListMissionSchedules(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	rows, err := h.legendSvc.ListSchedules(wallet)
+	if err != nil {
+		log.Printf("[WorkspaceHandler.ListMissionSchedules] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"schedules": rows, "count": len(rows)})
+}
+
 // GetTemplateMetrics handles GET /api/v1/legend/templates/metrics?limit=20.
 // v3.11.4: usage counts + success rates per template_id for the gallery's
 // trending-templates badge. Public endpoint — no auth required.

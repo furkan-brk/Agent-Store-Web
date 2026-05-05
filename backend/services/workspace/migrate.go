@@ -18,6 +18,7 @@ func Migrate() {
 		&models.LegendWorkflowVersion{},
 		&models.WorkflowExecution{},
 		&models.LegendTemplateUsage{},
+		&models.MissionSchedule{},
 	); err != nil {
 		log.Fatalf("Workspace Service migration failed: %v", err)
 	}
