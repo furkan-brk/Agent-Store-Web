@@ -150,6 +150,10 @@ func (s *GuildService) AddMember(guildID, agentID uint, wallet string) error {
 	err := database.DB.Create(member).Error
 	if err == nil {
 		s.cache.DeletePrefix("guilds|")
+		// v3.11.4: append to audit log (best-effort).
+		s.LogMemberEvent(guildID, wallet, models.GuildEventJoined, map[string]any{
+			"agent_id": agentID, "role": role, "via": "owner_add",
+		})
 	}
 	return err
 }
@@ -178,6 +182,10 @@ func (s *GuildService) JoinGuild(guildID uint, wallet string) error {
 	err := database.DB.Create(member).Error
 	if err == nil {
 		s.cache.DeletePrefix("guilds|")
+		// v3.11.4: audit log
+		s.LogMemberEvent(guildID, wallet, models.GuildEventJoined, map[string]any{
+			"agent_id": agent.ID, "role": role, "via": "self_join",
+		})
 	}
 	return err
 }
@@ -192,6 +200,10 @@ func (s *GuildService) LeaveGuild(guildID uint, wallet string) error {
 		Delete(&models.GuildMember{}).Error
 	if err == nil {
 		s.cache.DeletePrefix("guilds|")
+		// v3.11.4: audit log
+		s.LogMemberEvent(guildID, wallet, models.GuildEventLeft, map[string]any{
+			"agent_id": agent.ID, "via": "self_leave",
+		})
 	}
 	return err
 }
@@ -209,6 +221,10 @@ func (s *GuildService) RemoveMember(guildID, agentID uint, wallet string) error 
 		Delete(&models.GuildMember{}).Error
 	if err == nil {
 		s.cache.DeletePrefix("guilds|")
+		// v3.11.4: audit log
+		s.LogMemberEvent(guildID, wallet, models.GuildEventLeft, map[string]any{
+			"agent_id": agentID, "via": "owner_remove",
+		})
 	}
 	return err
 }

@@ -46,6 +46,8 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		guilds.DELETE("/:id/invite", auth, handler.DeleteInvite)
 		guilds.PUT("/:id/members/:memberId/permissions", auth, handler.SetMemberPermissions)
 		guilds.GET("/:id/explain", handler.ExplainCompatibility)
+		// v3.11.4: guild member event log (audit trail for joins, leaves, permission changes)
+		guilds.GET("/:id/events", handler.ListGuildEvents)
 		// invite token routes (no guild-id in path — token is the key)
 		guilds.GET("/invite/:token", handler.GetInvite)
 		guilds.POST("/invite/:token/accept", auth, handler.AcceptInvite)
@@ -53,6 +55,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		gm := v1.Group("/guild-master", auth, gmRL.WalletMiddleware())
 		gm.POST("/suggest", handler.Suggest)
 		gm.POST("/chat", handler.TeamChat)
+
+		// v3.11.4: cross-cutting KPI for Guild Master conversion (creator-scoped)
+		v1.GET("/admin/kpi/guild-master", auth, handler.GetGuildMasterKPI)
 
 		// v3.8: persistent chat history + action bridges. Session writes
 		// share the gmRL rate limiter with /suggest and /chat so a runaway

@@ -90,6 +90,31 @@ func (h *Handler) GetGuild(c *gin.Context) {
 	})
 }
 
+// ListGuildEvents handles GET /api/v1/guilds/:id/events?limit=20.
+// v3.11.4: returns the audit-log rows for guild membership changes
+// (joined / left / permission_changed). Public for guild members; the
+// composition itself is already public so we don't gate by membership.
+func (h *Handler) ListGuildEvents(c *gin.Context) {
+	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid guild id"})
+		return
+	}
+	limit := 20
+	if v := c.Query("limit"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil && n > 0 {
+			limit = n
+		}
+	}
+	rows, err := h.guildSvc.ListGuildEvents(uint(guildID), limit)
+	if err != nil {
+		log.Printf("[GuildHandler.ListGuildEvents] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"events": rows, "count": len(rows)})
+}
+
 // AddMember handles POST /api/v1/guilds/:id/members
 func (h *Handler) AddMember(c *gin.Context) {
 	guildID, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -194,14 +219,21 @@ func (h *Handler) Suggest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+	wallet := c.GetString("wallet")
 	if body.SessionID != nil {
-		wallet := c.GetString("wallet")
 		if _, err := h.sessionSvc.UpdateSession(wallet, *body.SessionID, UpdateSessionInput{
 			Suggestion: suggestion,
 		}); err != nil && !errors.Is(err, ErrSessionNotFound) {
 			log.Printf("[GuildMasterHandler.Suggest] persist suggestion: %v", err)
 		}
 	}
+	// v3.11.4: KPI funnel signal (best-effort). session_id (when present)
+	// powers the rerun-rate denominator.
+	var sid uint
+	if body.SessionID != nil {
+		sid = *body.SessionID
+	}
+	recordGMActivity(wallet, GMActSuggest, 0, sid)
 	c.JSON(http.StatusOK, suggestion)
 }
 
@@ -373,7 +405,27 @@ func (h *Handler) TeamChat(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+	// v3.11.4: KPI funnel signal — chat denominator for ChatToActionRate.
+	recordGMActivity(c.GetString("wallet"), GMActChat, 0, 0)
 	c.JSON(http.StatusOK, gin.H{"responses": responses})
+}
+
+// GetGuildMasterKPI handles GET /api/v1/admin/kpi/guild-master?since=7d|30d|90d|all
+// Returns SuggestAcceptanceRate / ChatToActionRate / RerunRate for the
+// authenticated wallet (creator-scoped — own usage only).
+func (h *Handler) GetGuildMasterKPI(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	kpi, err := h.gmSvc.GetGuildMasterKPI(wallet, c.Query("since"))
+	if err != nil {
+		log.Printf("[GuildMasterHandler.GetGuildMasterKPI] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, kpi)
 }
 
 // ─── Guild Invite Handlers ────────────────────────────────────────────────────

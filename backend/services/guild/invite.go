@@ -161,6 +161,10 @@ func (s *GuildService) SetMemberPermissions(wallet string, guildID, memberID uin
 	if result.RowsAffected == 0 {
 		return fmt.Errorf("member not found")
 	}
+	// v3.11.4: audit-log permission change.
+	s.LogMemberEvent(guildID, wallet, models.GuildEventPermissionChanged, map[string]any{
+		"member_id": memberID, "permissions": permissions,
+	})
 	return nil
 }
 

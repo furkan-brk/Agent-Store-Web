@@ -85,6 +85,8 @@ func (b *BridgeService) ToMission(wallet string, sessionID uint) (*MissionDraftR
 	if err := database.DB.Create(mission).Error; err != nil {
 		return nil, fmt.Errorf("save mission: %w", err)
 	}
+	// v3.11.4: KPI funnel signal — bridge accepts the suggestion.
+	recordGMActivity(wallet, GMActBridgeMission, mission.ID, sessionID)
 	return &MissionDraftResult{
 		Mission: mission,
 		Source:  fmt.Sprintf("guildmaster:%d", sessionID),
@@ -138,6 +140,8 @@ func (b *BridgeService) ToLegend(wallet string, sessionID uint) (*LegendDraftRes
 	if err := database.DB.Create(wf).Error; err != nil {
 		return nil, fmt.Errorf("save workflow: %w", err)
 	}
+	// v3.11.4: KPI funnel signal — Legend bridge accepts the suggestion.
+	recordGMActivity(wallet, GMActBridgeLegend, wf.ID, sessionID)
 	return &LegendDraftResult{
 		WorkflowID:   clientID,
 		WorkflowName: name,
