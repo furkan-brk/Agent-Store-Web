@@ -87,6 +87,8 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		// v3.11.4: discovery funnel signal — record when authenticated user
 		// copies an agent's prompt. Empty body, attribution via wallet header.
 		agents.POST("/:id/copy-analytics", auth, handler.CopyAnalytics)
+		// v3.11.4: re-run AI pipeline stages (analyze/profile/avatar) with timeout+retry
+		agents.POST("/:id/regenerate-pipeline", auth, createRL.WalletMiddleware(), handler.RegeneratePipeline)
 
 		// v3.11.3: agent version history + rollback (owner-only).
 		agents.GET("/:id/versions", auth, handler.ListAgentVersions)

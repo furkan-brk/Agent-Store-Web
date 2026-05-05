@@ -18,6 +18,7 @@ import (
 
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/pkg/models"
+	"github.com/agentstore/backend/services/aipipeline"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -28,11 +29,21 @@ var txHashRegex = regexp.MustCompile(`^0x[0-9a-fA-F]{64}$`)
 // Handler exposes HTTP endpoints for the Agent Service.
 type Handler struct {
 	agentSvc *AgentService
+	// v3.11.4: Optional pipeline service used by RegeneratePipeline endpoint.
+	// nil in standalone svc binaries; monolith wires it via SetPipelineService.
+	pipelineSvc *aipipeline.PipelineService
 }
 
 // NewHandler creates an Agent handler.
 func NewHandler(agentSvc *AgentService) *Handler {
 	return &Handler{agentSvc: agentSvc}
+}
+
+// SetPipelineService installs the AI pipeline orchestrator. Optional —
+// when nil, the regenerate-pipeline endpoint returns a stub result with
+// all stages flagged as skipped.
+func (h *Handler) SetPipelineService(p *aipipeline.PipelineService) {
+	h.pipelineSvc = p
 }
 
 // ListAgents handles GET /api/v1/agents
@@ -1416,6 +1427,39 @@ func (h *Handler) GetAchievements(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"achievements": rows, "count": len(rows)})
+}
+
+// RegeneratePipeline handles POST /api/v1/agents/:id/regenerate-pipeline?stages=…
+// v3.11.4: re-runs requested AI pipeline stages with timeout + retry. Owner-only.
+// Empty `stages` query → all stages (analyze, profile, avatar) run.
+func (h *Handler) RegeneratePipeline(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	stages := ParseStagesCSV(c.Query("stages"))
+
+	// PipelineService is held by handler (h.pipelineSvc) when wired in monolith;
+	// when nil, the service returns a stub result with all stages skipped.
+	res, err := h.agentSvc.RegeneratePipelineForAgent(
+		c.Request.Context(), wallet, uint(id), stages, h.pipelineSvc,
+	)
+	if err != nil {
+		if errors.Is(err, ErrRegeneratePipelineNotOwner) {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		log.Printf("[AgentHandler.RegeneratePipeline] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, res)
 }
 
 // CopyAnalytics handles POST /api/v1/agents/:id/copy-analytics.
