@@ -4,12 +4,15 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/pkg/models"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func encodeJSON(v any) ([]byte, error) { return json.Marshal(v) }
@@ -82,28 +85,143 @@ func (s *GuildService) GetInvite(token string) (*models.GuildInvite, error) {
 }
 
 // AcceptInvite adds the requesting wallet as a member of the guild.
-// Returns an error if the invite is invalid/expired/exhausted or the user is already a member.
+//
+// SECURITY (v3.12-P0-3): the previous implementation had two bugs that
+// together made the endpoint a no-op-with-side-effects:
+//
+//  1. TOCTOU on UsesCount: GetInvite read uses_count, then the increment
+//     wrote a literal value (uses_count = read+1). N concurrent calls all
+//     read 0 and wrote 1 — a MaxUses=1 invite minted N memberships.
+//  2. Missing GuildMember insert: the function bumped uses_count and
+//     returned the guild but never created the membership row, so
+//     "accepting" an invite did nothing observable.
+//
+// The fix wraps everything in a single DB transaction:
+//   - SELECT the invite FOR UPDATE so concurrent acceptors serialize.
+//   - Re-validate ExpiresAt and MaxUses inside the lock.
+//   - Increment uses_count via gorm.Expr("uses_count + 1") — atomic and
+//     race-free (no read-then-write).
+//   - Pick the user's first agent and INSERT the GuildMember row with
+//     ON CONFLICT DO NOTHING so re-acceptance (user clicks twice) is
+//     idempotent rather than an error.
+//   - Best-effort audit log AFTER the transaction commits.
+//
+// Returns an error if the invite is invalid/expired/exhausted, the user
+// has no agents, or the user is the guild owner.
 func (s *GuildService) AcceptInvite(wallet, token string) (*models.Guild, error) {
-	wallet = strings.ToLower(wallet)
+	wallet = strings.ToLower(strings.TrimSpace(wallet))
+	if wallet == "" {
+		return nil, fmt.Errorf("wallet required")
+	}
+	if database.DB == nil {
+		return nil, fmt.Errorf("database not ready")
+	}
 
-	invite, err := s.GetInvite(token)
+	var (
+		guild        models.Guild
+		joinedAgent  models.Agent
+		alreadyMember bool
+	)
+
+	err := database.DB.Transaction(func(tx *gorm.DB) error {
+		// FOR UPDATE serialises concurrent acceptors of the same invite —
+		// the cap check + increment now happens under exclusive lock.
+		// SQLite (used in tests) ignores the locking clause but the
+		// transaction itself is still serialised. Postgres honours it.
+		var invite models.GuildInvite
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("token = ?", token).
+			First(&invite).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("invite not found")
+			}
+			return fmt.Errorf("invite lookup: %w", err)
+		}
+		if time.Now().After(invite.ExpiresAt) {
+			return fmt.Errorf("invite has expired")
+		}
+		if invite.MaxUses > 0 && invite.UsesCount >= invite.MaxUses {
+			return fmt.Errorf("invite has reached maximum uses")
+		}
+
+		// Load the guild for the response and to enforce the owner check.
+		if err := tx.First(&guild, invite.GuildID).Error; err != nil {
+			return fmt.Errorf("guild not found")
+		}
+		if strings.ToLower(guild.CreatorWallet) == wallet {
+			return fmt.Errorf("you are already the guild owner")
+		}
+
+		// Capacity check (max 4 members).
+		var memberCount int64
+		if err := tx.Model(&models.GuildMember{}).
+			Where("guild_id = ?", invite.GuildID).
+			Count(&memberCount).Error; err != nil {
+			return fmt.Errorf("member count: %w", err)
+		}
+		if memberCount >= 4 {
+			return fmt.Errorf("guild is full (max 4 members)")
+		}
+
+		// Pick the user's first agent — same convention as JoinGuild.
+		if err := tx.Where("LOWER(creator_wallet) = ?", wallet).
+			Order("created_at ASC").First(&joinedAgent).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("you have no agents to join with")
+			}
+			return fmt.Errorf("agent lookup: %w", err)
+		}
+
+		// Idempotent insert: if this agent is already a member, treat as
+		// a successful re-accept rather than an error. Note we still bump
+		// uses_count below because the invite itself was redeemed
+		// (preserving cap semantics across retries would require a
+		// per-(invite, wallet) dedup table — out of scope).
+		role := determineMemberRole(joinedAgent)
+		member := models.GuildMember{
+			GuildID: invite.GuildID,
+			AgentID: joinedAgent.ID,
+			Role:    role,
+		}
+		insertRes := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&member)
+		if insertRes.Error != nil {
+			return fmt.Errorf("member insert: %w", insertRes.Error)
+		}
+		// SQLite + Postgres both report 0 RowsAffected when ON CONFLICT
+		// DO NOTHING fires — we use a separate existence query rather than
+		// relying on RowsAffected (which has cross-dialect inconsistencies).
+		var existing int64
+		_ = tx.Model(&models.GuildMember{}).
+			Where("guild_id = ? AND agent_id = ?", invite.GuildID, joinedAgent.ID).
+			Count(&existing).Error
+		if existing > 0 && insertRes.RowsAffected == 0 {
+			alreadyMember = true
+		}
+
+		// Atomic uses_count increment — avoids the read-then-write race
+		// the previous implementation had.
+		if err := tx.Model(&models.GuildInvite{}).
+			Where("id = ?", invite.ID).
+			UpdateColumn("uses_count", gorm.Expr("uses_count + 1")).Error; err != nil {
+			return fmt.Errorf("uses_count bump: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	var guild models.Guild
-	if err := database.DB.Preload("Members").First(&guild, invite.GuildID).Error; err != nil {
-		return nil, fmt.Errorf("guild not found")
+	// Cache + audit log AFTER commit so we don't pollute either when the
+	// transaction rolls back. Best-effort — failures here don't surface.
+	s.cache.DeletePrefix("guilds|")
+	if !alreadyMember {
+		s.LogMemberEvent(guild.ID, wallet, models.GuildEventJoined, map[string]any{
+			"agent_id": joinedAgent.ID,
+			"role":     joinedAgent.CharacterType,
+			"via":      "invite_accept",
+			"token":    token,
+		})
 	}
-
-	// Check already a member (via agent ownership — wallet-level membership not directly tracked,
-	// but prevent double-joining the same guild as the creator).
-	if strings.ToLower(guild.CreatorWallet) == wallet {
-		return nil, fmt.Errorf("you are already the guild owner")
-	}
-
-	// Increment usage count.
-	database.DB.Model(invite).UpdateColumn("uses_count", invite.UsesCount+1)
 
 	return &guild, nil
 }

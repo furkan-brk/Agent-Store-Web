@@ -50,6 +50,8 @@ func NewTestDB(t *testing.T) *gorm.DB {
 		&models.UserLegendWorkflow{},
 		&models.LegendWorkflowVersion{},
 		&models.WorkflowExecution{},
+		&models.Guild{},
+		&models.GuildMember{},
 		&models.GuildMasterSession{},
 		&models.GuildInvite{},
 		&models.UserFollow{},
@@ -64,6 +66,7 @@ func NewTestDB(t *testing.T) *gorm.DB {
 		&models.WeeklyLeaderReward{},
 		&models.GuildMasterReflection{},
 		&models.MissionSchedule{},
+		&models.MissionRun{},
 	); err != nil {
 		t.Fatalf("testutil: migrate: %v", err)
 	}

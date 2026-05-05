@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../controllers/leaderboard_controller.dart';
 import '../../../shared/widgets/skeleton_widgets.dart';
+import '../widgets/leaderboard_extras.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LeaderboardScreen — tabbed leaderboard with Top Creators, By Uses, By Rating.
@@ -63,12 +64,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               final rankings = _ctrl.data.value?['rankings'] as List? ?? [];
               if (rankings.isEmpty) return _buildEmptyState();
 
-              return TabBarView(
-                controller: _tabCtrl,
+              return Column(
                 children: [
-                  _buildRankingList(context, rankings, _SortMode.bySaves, isMobile),
-                  _buildRankingList(context, rankings, _SortMode.byUses, isMobile),
-                  _buildRankingList(context, rankings, _SortMode.byAgents, isMobile),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabCtrl,
+                      children: [
+                        _buildRankingList(context, rankings, _SortMode.bySaves, isMobile),
+                        _buildRankingList(context, rankings, _SortMode.byUses, isMobile),
+                        _buildRankingList(context, rankings, _SortMode.byAgents, isMobile),
+                      ],
+                    ),
+                  ),
+                  // v3.11.5: collapsible footer with category leaderboard +
+                  // weekly rewards. Lives outside the tab bodies so it
+                  // shows on every tab without per-tab duplication.
+                  _buildLeaderboardFooter(),
                 ],
               );
             }),
@@ -145,6 +156,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 selected: _ctrl.window.value,
                 onSelect: _ctrl.selectWindow,
               )),
+          // v3.11.5: "You are here" rail — backend wired in v3.11.4 T5,
+          // mounted here so the user always sees their rank+neighbors
+          // regardless of which tab is active.
+          Obx(() => YouAreHereRail(window: _ctrl.window.value)),
         ],
       ),
     );
@@ -310,6 +325,62 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   // ── Empty state ──────────────────────────────────────────────────────────
+
+  /// v3.11.5: collapsible footer that hosts the v3.11.4 leaderboard extras
+  /// (kategori bazlı liderler + haftalık ödüller). Defaults to collapsed so
+  /// the existing rankings list stays the focal point; user opens it on demand.
+  Widget _buildLeaderboardFooter() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.surface,
+        border: Border(top: BorderSide(color: AppTheme.border)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          leading: const Icon(Icons.expand_more_rounded, color: AppTheme.gold),
+          title: const Text(
+            'More leaderboards',
+            style: TextStyle(
+              color: AppTheme.textH,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: const Text(
+            'Categories · Weekly rewards',
+            style: TextStyle(color: AppTheme.textM, fontSize: 11),
+          ),
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 360),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Obx(() => CategoryLeaderboardSection(window: _ctrl.window.value)),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Weekly rewards',
+                      style: TextStyle(
+                        color: AppTheme.textH,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const WeeklyRewardsList(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildEmptyState() {
     return Center(

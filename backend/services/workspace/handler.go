@@ -112,6 +112,35 @@ func (h *Handler) DeleteMissionSchedule(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": true})
 }
 
+// ListMissionRuns handles GET /api/v1/user/missions/:id/runs?limit=20.
+// v3.11.5: history of the cron-driven runs for a mission (expanded prompts
+// + any expansion errors). Owner-only via wallet match in the service.
+func (h *Handler) ListMissionRuns(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid mission id"})
+		return
+	}
+	limit := 20
+	if v := c.Query("limit"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil {
+			limit = n
+		}
+	}
+	rows, err := h.legendSvc.ListMissionRuns(wallet, uint(id), limit)
+	if err != nil {
+		log.Printf("[WorkspaceHandler.ListMissionRuns] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"runs": rows, "count": len(rows)})
+}
+
 // ListMissionSchedules handles GET /api/v1/user/missions/schedules.
 func (h *Handler) ListMissionSchedules(c *gin.Context) {
 	wallet := c.GetString("wallet")

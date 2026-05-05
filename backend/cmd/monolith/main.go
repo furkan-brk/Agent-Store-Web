@@ -90,12 +90,22 @@ func main() {
 	// v3.11.1: wire the Mission→Legend bridge. The guild bridge returns
 	// guild.LegendDraftResult; adapt to workspace.LegendDraftResult so the
 	// workspace package doesn't have to import guild.
-	workspaceHandler.SetMissionBridge(missionBridgeAdapter{guild.NewBridgeService(guild.NewSessionService())})
+	// Share one SessionService between the Mission→Legend bridge and the
+	// v3.11.5 reflection auto-record adapter so both observe the same
+	// session state (the service is stateless today, but pinning to one
+	// instance future-proofs against any caching/in-memory state added
+	// later).
+	guildSessionSvc := guild.NewSessionService()
+	workspaceHandler.SetMissionBridge(missionBridgeAdapter{guild.NewBridgeService(guildSessionSvc)})
 	// v3.11.5: scheduler resolves #slug references via MissionService.
 	// Wiring through the workspace.MissionExpander interface keeps the
 	// scheduler unit-testable and the standalone workspacesvc binary
 	// can ship without this dependency (falls back to raw prompt).
 	legendSvc.SetMissionExpander(missionSvc)
+	// v3.11.5: auto-record GuildMaster reflection on Legend execution
+	// completion when the workflow originated from a "guildmaster:<id>"
+	// session. Same interface+adapter pattern as MissionLegendBridge.
+	workspace.SetReflectionTarget(guildReflectionAdapter{guildSessionSvc})
 
 	// --- Single Gin Engine ---
 	r := gin.Default()
@@ -355,4 +365,20 @@ func (a missionBridgeAdapter) MissionToLegend(wallet string, missionID uint) (*w
 		EdgeCount:    res.EdgeCount,
 		Source:       res.Source,
 	}, nil
+}
+
+// guildReflectionAdapter implements workspace.ReflectionTarget by delegating
+// to guild.SessionService.RecordReflection and discarding the return row
+// (workspace only needs the error).
+//
+// v3.11.5: pattern mirror of missionBridgeAdapter — keeps the workspace and
+// guild packages free of each other while still letting Legend execution
+// completion hook back into the GM session that spawned it.
+type guildReflectionAdapter struct {
+	inner *guild.SessionService
+}
+
+func (a guildReflectionAdapter) RecordReflection(wallet string, sessionID, executionID uint, summary string) error {
+	_, err := a.inner.RecordReflection(wallet, sessionID, executionID, summary)
+	return err
 }

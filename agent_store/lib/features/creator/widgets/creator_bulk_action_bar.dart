@@ -17,6 +17,11 @@ import '../../../shared/widgets/confirm_dialog.dart';
 
 const int kBulkRegenerateCostPerAgent = 3;
 
+/// Bulk action kind. v3.11.5 expanded the bar from regenerate-only to
+/// include free tag add / tag remove (covers könçürleme.md 3.2.4 #5
+/// "Creator dashboard toplu aksiyon").
+enum BulkActionKind { regenerate, tagAdd, tagRemove }
+
 class CreatorBulkActionBar extends StatelessWidget {
   /// Owned agents to choose from in the multi-select.
   final List<AgentModel> agents;
@@ -28,8 +33,9 @@ class CreatorBulkActionBar extends StatelessWidget {
   final VoidCallback? onAfterAction;
 
   /// Test seam: optional override for the bulk POST so widget tests don't
-  /// hit ApiService.instance.
-  final Future<bool> Function(List<int> ids)? bulkActionOverride;
+  /// hit ApiService.instance. The signature mirrors [BulkActionKind] so
+  /// tag-add/remove tests can return synthetic results.
+  final Future<bool> Function(List<int> ids, BulkActionKind kind, {List<String>? tags})? bulkActionOverride;
 
   const CreatorBulkActionBar({
     super.key,
@@ -76,6 +82,69 @@ class CreatorBulkActionBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+          // v3.11.5: split into a popup so tag actions are reachable.
+          PopupMenuButton<BulkActionKind>(
+            tooltip: 'Bulk actions',
+            enabled: agents.isNotEmpty,
+            onSelected: (kind) => _openSelector(context, kind),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: BulkActionKind.regenerate,
+                child: Row(children: [
+                  Icon(Icons.image_outlined, size: 16, color: AppTheme.gold),
+                  SizedBox(width: 8),
+                  Text('Regenerate images…'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: BulkActionKind.tagAdd,
+                child: Row(children: [
+                  Icon(Icons.label_outline, size: 16, color: AppTheme.gold),
+                  SizedBox(width: 8),
+                  Text('Add tag…'),
+                ]),
+              ),
+              PopupMenuItem(
+                value: BulkActionKind.tagRemove,
+                child: Row(children: [
+                  Icon(Icons.label_off_outlined, size: 16, color: AppTheme.gold),
+                  SizedBox(width: 8),
+                  Text('Remove tag…'),
+                ]),
+              ),
+            ],
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: agents.isEmpty
+                    ? AppTheme.border
+                    : AppTheme.gold),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.checklist, size: 16,
+                      color: agents.isEmpty ? AppTheme.textM : AppTheme.gold),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Bulk action…',
+                    style: TextStyle(
+                      color: agents.isEmpty ? AppTheme.textM : AppTheme.gold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.arrow_drop_down, size: 16,
+                      color: agents.isEmpty ? AppTheme.textM : AppTheme.gold),
+                ],
+              ),
+            ),
+          ),
+          // Legacy path: keep the standalone "Regenerate images…" button as a
+          // discoverable entry point for the most common action. Tests still
+          // find it by label text.
+          const SizedBox(width: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.image_outlined, size: 16),
             label: const Text('Regenerate images…'),
@@ -86,21 +155,25 @@ class CreatorBulkActionBar extends StatelessWidget {
             ),
             onPressed: agents.isEmpty
                 ? null
-                : () => _openSelector(context),
+                : () => _openSelector(context, BulkActionKind.regenerate),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _openSelector(BuildContext context) async {
+  Future<void> _openSelector(BuildContext context, BulkActionKind kind) async {
     final picked = await showDialog<Set<int>>(
       context: context,
       builder: (_) => _BulkSelectorDialog(agents: agents),
     );
     if (picked == null || picked.isEmpty) return;
     if (!context.mounted) return;
-    await _confirmAndRun(context, picked.toList());
+    if (kind == BulkActionKind.regenerate) {
+      await _confirmAndRun(context, picked.toList());
+    } else {
+      await _runTagAction(context, picked.toList(), kind);
+    }
   }
 
   Future<void> _confirmAndRun(BuildContext context, List<int> ids) async {
@@ -119,13 +192,12 @@ class CreatorBulkActionBar extends StatelessWidget {
     if (!ok || !affordable || !context.mounted) return;
 
     final fn = bulkActionOverride ??
-        (List<int> picked) async {
+        (List<int> picked, BulkActionKind kind, {List<String>? tags}) async {
           final res = await ApiService.instance
               .bulkAgentAction('regenerate_image', picked);
-          // Empty map = transport failure; non-empty = backend ack.
           return res.isNotEmpty;
         };
-    final success = await fn(ids);
+    final success = await fn(ids, BulkActionKind.regenerate);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(success
@@ -133,6 +205,62 @@ class CreatorBulkActionBar extends StatelessWidget {
           : 'Bulk regenerate failed — try again'),
     ));
     if (success) onAfterAction?.call();
+  }
+
+  /// v3.11.5: tag add / remove. Free of charge — no credit gate.
+  Future<void> _runTagAction(BuildContext context, List<int> ids, BulkActionKind kind) async {
+    final tag = await _promptForTag(context, kind);
+    if (tag == null || tag.isEmpty || !context.mounted) return;
+
+    final fn = bulkActionOverride ??
+        (List<int> picked, BulkActionKind k, {List<String>? tags}) async {
+          final action = k == BulkActionKind.tagAdd ? 'tag_add' : 'tag_remove';
+          final res = await ApiService.instance.bulkAgentAction(
+            action, picked,
+            payload: {'tags': tags ?? const []},
+          );
+          return res.isNotEmpty;
+        };
+    final success = await fn(ids, kind, tags: [tag]);
+    if (!context.mounted) return;
+    final verb = kind == BulkActionKind.tagAdd ? 'added' : 'removed';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success
+          ? 'Tag "$tag" $verb on ${ids.length} agents'
+          : 'Bulk tag $verb failed — try again'),
+    ));
+    if (success) onAfterAction?.call();
+  }
+
+  Future<String?> _promptForTag(BuildContext context, BulkActionKind kind) {
+    final ctrl = TextEditingController();
+    final isAdd = kind == BulkActionKind.tagAdd;
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isAdd ? 'Add tag to selected' : 'Remove tag from selected'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Tag',
+            hintText: isAdd ? 'e.g. featured' : 'tag to remove',
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
+            child: Text(isAdd ? 'Add' : 'Remove'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

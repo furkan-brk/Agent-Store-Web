@@ -58,6 +58,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		user.GET("/missions/schedules", handler.ListMissionSchedules)
 		user.POST("/missions/:id/schedule", handler.SetMissionSchedule)
 		user.DELETE("/missions/:id/schedule", handler.DeleteMissionSchedule)
+		// v3.11.5: per-mission cron run history (expanded prompts captured by
+		// the scheduler). Owner-scoped via service-level wallet match.
+		user.GET("/missions/:id/runs", handler.ListMissionRuns)
 
 		// Legend workflow endpoints
 		legend := user.Group("/legend")

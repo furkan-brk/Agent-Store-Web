@@ -137,12 +137,32 @@ func (s *LegendService) ListSchedules(wallet string) ([]models.MissionSchedule, 
 	return rows, err
 }
 
+// MissionExpander is the cross-package contract LegendService uses to
+// resolve #slug references in a mission's prompt. v3.11.5 wires
+// MissionService.ExpandMissionTags as the implementation.
+//
+// Splitting via interface keeps RunDueSchedules unit-testable without a
+// concrete MissionService instance and lets the standalone workspacesvc
+// binary skip wiring entirely (returns marker-only results).
+type MissionExpander interface {
+	ExpandMissionTags(wallet, text string) (*ExpandMissionOutput, error)
+}
+
+// SetMissionExpander installs the v3.11.5 expander — call once at boot
+// from the monolith with the same MissionService instance used by handlers.
+// Test code can pass a stub that returns a deterministic expanded body.
+func (s *LegendService) SetMissionExpander(e MissionExpander) {
+	s.missionExpander = e
+}
+
 // RunDueSchedules picks rows where NextRunAt has passed and Enabled is true,
 // then for each:
 //   * recompute NextRunAt via the cron parser
 //   * stamp LastRunAt = now
-//   * insert a UserActivity "mission_schedule_fired" marker (the v3.11.4
-//     stand-in for actually running the mission)
+//   * v3.11.5: load the mission, expand its prompt via MissionExpander,
+//     and persist a MissionRun row with the expanded prompt + any error
+//   * insert a UserActivity "mission_schedule_fired" marker (kept for the
+//     funnel queries that rely on it)
 //
 // Returns the count of rows that fired so the caller can log it. Errors
 // inside the per-row loop are logged but don't abort the batch — one bad
@@ -174,8 +194,33 @@ func (s *LegendService) RunDueSchedules() int {
 		if err := database.DB.Model(&sched).Updates(updates).Error; err != nil {
 			continue
 		}
-		// Marker activity row — Wallet is the schedule owner; RefID is the
-		// mission ID so the FE can group "mission X fired N times".
+
+		// v3.11.5: real execution — load + expand the mission, persist
+		// a MissionRun row capturing what the schedule produced.
+		runRow := models.MissionRun{
+			MissionID: sched.MissionID,
+			Wallet:    sched.Wallet,
+			Source:    "schedule",
+		}
+		var mission models.UserMission
+		if mErr := database.DB.Where("id = ? AND user_wallet = ?", sched.MissionID, sched.Wallet).First(&mission).Error; mErr != nil {
+			runRow.Error = "mission not found"
+		} else if s.missionExpander != nil {
+			out, eErr := s.missionExpander.ExpandMissionTags(sched.Wallet, mission.Prompt)
+			if eErr != nil {
+				runRow.Error = eErr.Error()
+				runRow.ExpandedPrompt = mission.Prompt // fall back to raw
+			} else {
+				runRow.ExpandedPrompt = out.ExpandedText
+			}
+		} else {
+			// No expander wired (standalone svc binary) → store the raw prompt.
+			runRow.ExpandedPrompt = mission.Prompt
+		}
+		_ = database.DB.Create(&runRow).Error
+
+		// Marker activity row — kept so the funnel + activity-feed queries
+		// that already filter on `mission_schedule_fired` keep working.
 		_ = database.DB.Create(&models.UserActivity{
 			Wallet: sched.Wallet,
 			Type:   "mission_schedule_fired",
@@ -184,4 +229,16 @@ func (s *LegendService) RunDueSchedules() int {
 		fired++
 	}
 	return fired
+}
+
+// ListMissionRuns returns the most recent runs for a mission, newest first.
+// Used by the FE schedule history dialog. limit caps at 50.
+func (s *LegendService) ListMissionRuns(wallet string, missionID uint, limit int) ([]models.MissionRun, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	var rows []models.MissionRun
+	err := database.DB.Where("mission_id = ? AND wallet = ?", missionID, strings.ToLower(strings.TrimSpace(wallet))).
+		Order("id DESC").Limit(limit).Find(&rows).Error
+	return rows, err
 }

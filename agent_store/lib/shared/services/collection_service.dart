@@ -98,7 +98,11 @@ class CollectionService {
       color: color,
       createdAt: DateTime.now(),
     );
-    final all = await getAll()..add(collection);
+    // v3.11.5 fix: parenthesise so the cascade operates on the awaited
+    // List, not on the Future returned by getAll(). Previous version
+    // raised at runtime because Future has no .add() method — explains
+    // the "Collections düzgün çalışmıyor" report in könçürleme.md.
+    final all = (await getAll())..add(collection);
     await _save(all);
     return collection;
   }
@@ -124,7 +128,8 @@ class CollectionService {
   }
 
   Future<void> delete(String collectionId) async {
-    final all = await getAll()..removeWhere((c) => c.id == collectionId);
+    // v3.11.5 fix: same cascade-on-Future bug as create() — see comment there.
+    final all = (await getAll())..removeWhere((c) => c.id == collectionId);
     await _save(all);
   }
 

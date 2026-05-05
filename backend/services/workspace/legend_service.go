@@ -21,6 +21,11 @@ type LegendService struct {
 	agentClient  *client.AgentClient
 	missionSvc   *MissionService
 	claudeClient *claude.Client
+	// v3.11.5: optional mission expander used by RunDueSchedules to resolve
+	// #slug references in scheduled mission prompts. Wired by the monolith
+	// via SetMissionExpander; standalone svc binaries leave it nil and the
+	// scheduler falls back to storing the raw prompt.
+	missionExpander MissionExpander
 }
 
 // NewLegendService creates a new LegendService.
@@ -147,8 +152,60 @@ func saveNodeStates(execID uint, states map[string]nodeCheckpoint) error {
 		UpdateColumn("node_states", string(blob)).Error
 }
 
+// ─── v3.11.5: GuildMaster reflection auto-record adapter ─────────────────
+//
+// Workspace can't import the guild package without a cycle (guild already
+// imports workspace.LegendDraftResult via the v3.11.1 MissionLegendBridge).
+// We solve the same way: a tiny interface lives here, and cmd/monolith/main.go
+// installs an adapter wrapping *guild.SessionService.RecordReflection.
+//
+// Behaviour:
+//   * On execution complete (status="completed"), if the workflow's ClientID
+//     starts with "guildmaster:<sessionID>" (the prefix BridgeService.ToLegend
+//     stamps in v3.8), we extract the session ID and call ReflectionTarget.
+//   * No-op when ReflectionTarget is unset (standalone svc binary), when the
+//     workflow didn't originate from a GM session, or when the call fails
+//     (best-effort — never blocks notification).
+
+// ReflectionTarget is the cross-package contract used to stash a
+// post-execution reflection on a GuildMaster session.
+type ReflectionTarget interface {
+	RecordReflection(wallet string, sessionID, executionID uint, summary string) error
+}
+
+var reflectionTarget ReflectionTarget
+
+// SetReflectionTarget installs the adapter. Call once at boot from the
+// monolith. Standalone workspacesvc leaves it nil and the auto-record
+// branch in notifyExecutionResult is silently skipped.
+func SetReflectionTarget(t ReflectionTarget) {
+	reflectionTarget = t
+}
+
+// extractGuildMasterSessionID parses BridgeService.ToLegend's clientID
+// convention `"guildmaster:<id>"` (also accepts `"guildmaster:<id>:..."`
+// for future suffixed variants). Returns 0 when the prefix doesn't match.
+func extractGuildMasterSessionID(clientID string) uint {
+	const prefix = "guildmaster:"
+	if !strings.HasPrefix(clientID, prefix) {
+		return 0
+	}
+	rest := strings.TrimPrefix(clientID, prefix)
+	if i := strings.IndexByte(rest, ':'); i >= 0 {
+		rest = rest[:i]
+	}
+	v, err := strconv.ParseUint(rest, 10, 64)
+	if err != nil || v == 0 {
+		return 0
+	}
+	return uint(v)
+}
+
 // notifyExecutionResult writes a "system" notification telling the wallet
 // owner that a Legend execution completed (success or failure).
+//
+// v3.11.5: also auto-records a GuildMasterReflection when the source
+// workflow originated from a GM session (clientID prefix "guildmaster:<id>").
 //
 // We can't import services/agent here without a cycle, so the inbox row +
 // pref check are written directly. Pref defaults to enabled when absent
@@ -194,6 +251,31 @@ func notifyExecutionResult(wallet, workflowName, status string, execID uint) {
 		// log only — execution result notification is best-effort
 		_ = err
 	}
+
+	// v3.11.5: auto-record a GuildMaster reflection if the source workflow
+	// came from a GM session (clientID prefix "guildmaster:<id>"). Only
+	// fires on success — a failed run isn't a useful seed for "what would
+	// you change next iteration" prompting.
+	if status != "completed" || reflectionTarget == nil {
+		return
+	}
+	var exec models.WorkflowExecution
+	if err := database.DB.Select("id, workflow_id").
+		Where("id = ?", execID).First(&exec).Error; err != nil {
+		return
+	}
+	var wf models.UserLegendWorkflow
+	if err := database.DB.Select("id, client_id").
+		Where("client_id = ? AND user_wallet = ?", exec.WorkflowID, wallet).
+		First(&wf).Error; err != nil {
+		return
+	}
+	sessionID := extractGuildMasterSessionID(wf.ClientID)
+	if sessionID == 0 {
+		return
+	}
+	summary := "Legend run finished: " + workflowName
+	_ = reflectionTarget.RecordReflection(wallet, sessionID, execID, summary)
 }
 
 // ExecuteWorkflowInput is the request payload for workflow execution.

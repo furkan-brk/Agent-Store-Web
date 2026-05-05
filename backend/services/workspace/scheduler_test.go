@@ -69,6 +69,41 @@ func TestSetSchedule_UpsertsAndComputesNextRun(t *testing.T) {
 	assert.Equal(t, "0 18 * * *", updated.CronExpr)
 }
 
+// stubExpander returns a deterministic expanded body so the scheduler test
+// can assert MissionRun rows without a real MissionService.
+type stubExpander struct {
+	called int
+}
+
+func (s *stubExpander) ExpandMissionTags(wallet, text string) (*ExpandMissionOutput, error) {
+	s.called++
+	return &ExpandMissionOutput{ExpandedText: "EXPANDED:" + text, UsedSlugs: nil}, nil
+}
+
+func TestRunDueSchedules_PersistsMissionRunWithExpandedPrompt(t *testing.T) {
+	svc := newSchedulerSvc(t)
+	mid := seedMissionForSchedule(t, "0xowner")
+	stub := &stubExpander{}
+	svc.SetMissionExpander(stub)
+
+	past := time.Now().Add(-1 * time.Hour)
+	require.NoError(t, database.DB.Create(&models.MissionSchedule{
+		MissionID: mid, Wallet: "0xowner", CronExpr: "0 9 * * *",
+		NextRunAt: past, Enabled: true,
+	}).Error)
+
+	fired := svc.RunDueSchedules()
+	assert.GreaterOrEqual(t, fired, 1)
+	assert.Equal(t, 1, stub.called, "expander invoked exactly once per schedule")
+
+	rows, err := svc.ListMissionRuns("0xowner", mid, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "schedule", rows[0].Source)
+	assert.Equal(t, "EXPANDED:do x", rows[0].ExpandedPrompt)
+	assert.Empty(t, rows[0].Error)
+}
+
 func TestRunDueSchedules_FiresOverdueRowsAndAdvancesNextRun(t *testing.T) {
 	svc := newSchedulerSvc(t)
 	mid := seedMissionForSchedule(t, "0xowner")
