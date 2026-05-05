@@ -6,6 +6,138 @@
 
 ---
 
+## v3.12 Bug Bash (2026-05-05) ✅ — branch `sprint/v3.12-bug-bash`
+
+Full codebase audit + fix sprint. 6 independent audit agents (backend, frontend,
+coverage, static analysis, Legend deep-dive, responsive inventory) produced a
+unified triage. PRs landed in 6 worktrees, all merged with conflict resolution
+into `sprint/v3.12-bug-bash`. `go vet` ✅, `flutter analyze` 0 issues ✅,
+189 unit + 95 widget Flutter tests ✅, all backend packages ✅.
+
+### Security
+
+- **P0-1 Auth bypass** (`pkg/middleware/strip_wallet_header.go` NEW): Global
+  Gin middleware strips inbound `X-Wallet-Address` header before `JWTExtractor`
+  runs. Any caller who set this header manually could impersonate any wallet.
+  Registered first in all three entry points: `cmd/monolith`, `cmd/gateway`,
+  `cmd/agentsvc`. 6 unit tests including the spoof scenario.
+
+### Backend P1 fixes (14 issues)
+
+- **P1-1 Pipeline goroutine ctx** (`services/aipipeline/run_stages.go`): context
+  cancellation now propagates into stage goroutines; previously a cancelled
+  pipeline could leak goroutines until all stages returned.
+- **P1-2 notifyOnce dedup** (`services/agent/notification.go`): replaced
+  SELECT-then-INSERT racy dedup with `ON CONFLICT DO NOTHING` on DedupKey unique
+  index. `computeNotifyDedupKey` hashes (wallet, type, link, hour-bucket) → 32-char
+  hex. `CreateNotification` uses `rawDedupCounter` (sync/atomic) + UnixNano so
+  bulk raw inserts never collide on empty key.
+- **P1-3 ensureUniqueSlug retry** (`services/workspace/mission_service.go`):
+  slug collisions now retried up to 5× with incremental suffix; DB unique index
+  enforced so concurrent creates don't race through duplicates.
+- **P1-4 Scheduler CAS** (`services/workspace/scheduler.go`): `RunDueSchedules`
+  uses `UPDATE … WHERE next_run_at = ?` + `RowsAffected` check so two
+  concurrent ticks cannot both claim the same run slot.
+- **P1-5/6 ResumeExecution rate-limit + atomic flip**
+  (`services/workspace/legend_service.go`): cap at 3 resume attempts per
+  execution ID (`WorkflowExecution.ResumeAttempts` field); status flip uses
+  `UPDATE … WHERE status = 'failed'` to prevent two concurrent resume calls
+  from both advancing.
+- **P1-7 AgentVersion snapshot retry** (`services/agent/versioning.go`):
+  `snapshotAgentVersion` retries up to 3× on unique-(agent_id, version) conflict;
+  `isAgentVersionUniqueConflict` classifier guards the dialect-portable error shape.
+- **P1-8 APIKey prefix index** (`pkg/models/api_key.go`): added
+  `index:idx_api_key_prefix` on `Prefix` column so prefix-lookup O(log n) not O(n).
+- **P1-9 Fuzzy search cap** (`services/agent/search_rank.go`): `maxQueryTokens=5`
+  prevents O(N×M) Levenshtein on huge queries; pre-filter skips Levenshtein when
+  zero literal title-token hits; `sort.SliceStable` replaces insertion sort.
+- **P1-10 GetForYou case-insensitive** (`services/agent/social.go`): library
+  lookup now uses `WHERE LOWER(user_wallet) = LOWER(?)` so mixed-case wallet
+  addresses don't silently return empty For You feed.
+- **P1-11 GetUserRank LIMIT** (`services/agent/leaderboard_extras.go`): ordered
+  query capped at 200; separate `COUNT(DISTINCT LOWER(creator_wallet))` for Total
+  prevents full-table sort on large datasets.
+- **P1-12 LastUsedAt sync** (`pkg/middleware/api_key_auth.go`): removed async
+  goroutine from LastUsedAt update — synchronous write (~1ms), eliminates ~50%
+  test flakiness from goroutine racing `t.Cleanup`.
+- **P1-13 GuildMember dedup** (`pkg/models/guild.go` +
+  `services/guild/migrate.go`): added composite `uniqueIndex:idx_guild_member_pair`
+  on (GuildID, AgentID); `dedupeGuildMembers()` migration helper runs before
+  AutoMigrate to clean existing duplicates without violating the new constraint.
+- **P1-14 MissionRun testutil** (`internal/testutil/db.go`): `MissionRun`
+  confirmed in use by `services/workspace/scheduler.go` (v3.11.4 T7 cron);
+  added documenting comment, kept in AutoMigrate list.
+- **skill.md route** (`cmd/monolith/main.go`): wired missing
+  `GET /agents/:id/skill.md` route — handler existed in `services/agent/handler.go`
+  since v3.11.x but monolith never registered it.
+
+### Frontend P0 fixes
+
+- **Legend FocusNode leak** (`legend_screen.dart`): `_shortcutFocus` hoisted to
+  state field (`late final`), initialized in `initState`, disposed in `dispose`.
+  Previously recreated on every build → leaked on every rebuild.
+- **Legend toolbar overflow** (`legend_toolbar_overflow.dart` NEW):
+  `LegendToolbarOverflowMenu` collapses secondary toolbar buttons into
+  `PopupMenuButton` below `kLegendToolbarCollapseWidth = 1100px`; Execute pinned
+  trailing and never collapses.
+- **Dialog controller disposal** (3 sites):
+  - `mission_editor_dialog.dart` NEW: StatefulWidget owns + disposes titleCtrl/promptCtrl.
+  - `creator_dialogs.dart` NEW: `CreatorEditAgentDialog`, `CreatorSetPriceDialog`,
+    `CreatorRegenerateAvatarDialog` — each owns its controllers + disposes them.
+    Viewport clamp: `math.min(500/380/420, MediaQuery…size.width - 32)`.
+  - `legend_text_input_dialog.dart` NEW: `LegendTextInputDialog` +
+    `LegendExecuteInputDialog` own + dispose their controllers.
+- **creator_dashboard_screen**: replaced 3 inline `StatefulBuilder` dialogs
+  with the new extracted dialog widgets; removed leaked `priceCtrl`/`titleCtrl`/
+  `descCtrl`/`tagCtrl` references.
+
+### Frontend P1 fixes
+
+- **AppAnimations constants** (`lib/app/animations.dart` NEW): centralizes magic
+  hover/transition durations that were scattered as inline literals.
+- **Card Editor SyncStatusBanner** (`card_editor/widgets/sync_status_banner.dart`
+  NEW): shows between toolbar and split-view when syncStatus ≠ idle/saved —
+  consistent with Mission/Legend pattern.
+- **mini_chat bubble max-width** (`agent_detail/widgets/mini_chat_widget.dart`):
+  `LayoutBuilder` replaces hardcoded `width:280` so chat bubbles don't overflow
+  on narrow viewports.
+- **settings_sidebar testPath override** (`settings/widgets/settings_sidebar.dart`):
+  `currentPath` optional parameter enables widget tests without a real GoRouter.
+- **Creator/developer dialog widths**: all modal dialogs clamped to
+  `math.min(maxW, MediaQuery.of(ctx).size.width - 32)`.
+
+### Karar notları
+
+- **Conflict resolution — legend_screen.dart**: HEAD's defensive null-safety
+  (`cast<WorkflowEdge?>().firstWhere … orElse: () => null`) kept over PR2's
+  `orElse: () => _edges.first` (wrong edge on not-found). PR2's
+  LegendTextInputDialog comment kept; old `ctrl = TextEditingController(…)`
+  dropped (dialog manages its own now).
+- **creator_dashboard conflict**: 3 inline StatefulBuilder blocks vs 3 extracted
+  widgets — accepted PR2 (extracted) for all 3; added viewport clamp to
+  `creator_dialogs.dart` because it had hardcoded widths (500/380/420).
+- **Merge order**: PR3 batches (all backend, no Legend) merged first; PR4
+  frontend merged second; PR2 (Legend-touching) merged last after confirming
+  user's uncommitted Legend files were already committed in v3.11.5.
+
+### Yeni dosyalar
+
+- `backend/pkg/middleware/strip_wallet_header.go` + `_test.go`
+- `backend/services/workspace/mission_slug_test.go`
+- `backend/services/workspace/legend_resume_rate_limit_test.go`
+- `backend/services/workspace/scheduler_test.go`
+- `backend/services/agent/versioning_retry_test.go`
+- `backend/services/guild/dedupe_test.go`
+- `agent_store/lib/features/legend/widgets/legend_toolbar_overflow.dart`
+- `agent_store/lib/features/legend/widgets/legend_text_input_dialog.dart`
+- `agent_store/lib/features/missions/widgets/mission_editor_dialog.dart`
+- `agent_store/lib/features/creator/widgets/creator_dialogs.dart`
+- `agent_store/lib/features/card_editor/widgets/sync_status_banner.dart`
+- `agent_store/lib/app/animations.dart`
+- `agent_store/lib/shared/utils/legend_error_dialog.dart`
+
+---
+
 ## v3.11.4 Closure Sprint (2026-05-05) ✅ 17/17 — backlog 75/75 closed
 
 Backend (9): T1 Discovery analytics · T2 GM KPI · T3 Template metrics ·
