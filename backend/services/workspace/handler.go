@@ -395,6 +395,18 @@ func (h *Handler) ResumeExecution(c *gin.Context) {
 	}
 	result, err := h.legendSvc.ResumeExecution(c.GetString("wallet"), uint(execID))
 	if err != nil {
+		// v3.12 P1-5/P1-6: distinct status codes for rate-limit and race.
+		if errors.Is(err, ErrResumeAttemptsExceeded) {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":        "resume attempts exceeded",
+				"max_attempts": MaxResumeAttempts,
+			})
+			return
+		}
+		if errors.Is(err, ErrResumeAlreadyRunning) {
+			c.JSON(http.StatusConflict, gin.H{"error": "execution is already running"})
+			return
+		}
 		// "not found" maps to 404; other errors (parse, credits, etc.) are 400.
 		msg := err.Error()
 		if strings.Contains(msg, "execution not found") || strings.Contains(msg, "workflow not found") {
