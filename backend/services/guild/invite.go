@@ -172,30 +172,34 @@ func (s *GuildService) AcceptInvite(wallet, token string) (*models.Guild, error)
 			return fmt.Errorf("agent lookup: %w", err)
 		}
 
-		// Idempotent insert: if this agent is already a member, treat as
-		// a successful re-accept rather than an error. Note we still bump
-		// uses_count below because the invite itself was redeemed
-		// (preserving cap semantics across retries would require a
-		// per-(invite, wallet) dedup table — out of scope).
-		role := determineMemberRole(joinedAgent)
-		member := models.GuildMember{
-			GuildID: invite.GuildID,
-			AgentID: joinedAgent.ID,
-			Role:    role,
-		}
-		insertRes := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&member)
-		if insertRes.Error != nil {
-			return fmt.Errorf("member insert: %w", insertRes.Error)
-		}
-		// SQLite + Postgres both report 0 RowsAffected when ON CONFLICT
-		// DO NOTHING fires — we use a separate existence query rather than
-		// relying on RowsAffected (which has cross-dialect inconsistencies).
-		var existing int64
-		_ = tx.Model(&models.GuildMember{}).
-			Where("guild_id = ? AND agent_id = ?", invite.GuildID, joinedAgent.ID).
-			Count(&existing).Error
-		if existing > 0 && insertRes.RowsAffected == 0 {
+		// Idempotent insert: if this agent is already a member of this
+		// guild, treat as a successful re-accept rather than creating a
+		// duplicate row. We use a SELECT-then-INSERT inside the tx
+		// because the GuildMember model doesn't carry a unique index on
+		// (guild_id, agent_id) — adding one would require a separate
+		// migration and is outside the scope of this P0.
+		//
+		// Note: we still bump uses_count below because the invite itself
+		// was redeemed. Preserving "free re-accept doesn't count against
+		// cap" semantics would require a per-(invite, wallet) dedup
+		// table — out of scope for this P0.
+		var existing models.GuildMember
+		existsErr := tx.Where("guild_id = ? AND agent_id = ?", invite.GuildID, joinedAgent.ID).
+			First(&existing).Error
+		if existsErr == nil {
 			alreadyMember = true
+		} else if !errors.Is(existsErr, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("member dedup check: %w", existsErr)
+		} else {
+			role := determineMemberRole(joinedAgent)
+			member := models.GuildMember{
+				GuildID: invite.GuildID,
+				AgentID: joinedAgent.ID,
+				Role:    role,
+			}
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&member).Error; err != nil {
+				return fmt.Errorf("member insert: %w", err)
+			}
 		}
 
 		// Atomic uses_count increment — avoids the read-then-write race
