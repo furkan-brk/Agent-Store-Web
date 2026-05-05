@@ -1259,13 +1259,17 @@ func (h *Handler) RateAgent(c *gin.Context) {
 }
 
 // GetRatings handles GET /api/v1/agents/:id/ratings
+//
+// v3.11.4: optional ?verified_only=true query param restricts results to
+// ratings whose author has actually purchased the agent (PurchasedAgent join).
 func (h *Handler) GetRatings(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	ratings, avg, count, err := h.agentSvc.GetRatings(uint(id))
+	verifiedOnly := strings.EqualFold(c.Query("verified_only"), "true")
+	ratings, avg, count, err := h.agentSvc.GetRatings(uint(id), verifiedOnly)
 	if err != nil {
 		log.Printf("[AgentHandler.GetRatings] error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
@@ -1276,7 +1280,43 @@ func (h *Handler) GetRatings(c *gin.Context) {
 	if wallet != "" {
 		userRating = h.agentSvc.GetUserRating(uint(id), wallet)
 	}
-	c.JSON(http.StatusOK, gin.H{"ratings": ratings, "average": avg, "count": count, "user_rating": userRating})
+	c.JSON(http.StatusOK, gin.H{"ratings": ratings, "average": avg, "count": count, "user_rating": userRating, "verified_only": verifiedOnly})
+}
+
+// GetAchievements handles GET /api/v1/users/:wallet/achievements.
+// Public endpoint — anyone can view a wallet's earned badges.
+func (h *Handler) GetAchievements(c *gin.Context) {
+	wallet := strings.ToLower(strings.TrimSpace(c.Param("wallet")))
+	if wallet == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "wallet required"})
+		return
+	}
+	rows, err := h.agentSvc.ListAchievements(wallet)
+	if err != nil {
+		log.Printf("[AgentHandler.GetAchievements] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"achievements": rows, "count": len(rows)})
+}
+
+// CopyAnalytics handles POST /api/v1/agents/:id/copy-analytics.
+// Records a "prompt_copy" UserActivity event so the discovery funnel can later
+// measure how often viewing a prompt converts to copying it. Auth required so
+// we attribute to the wallet; body is empty.
+func (h *Handler) CopyAnalytics(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	h.agentSvc.RecordActivity(wallet, "prompt_copy", uint(id), nil)
+	c.JSON(http.StatusOK, gin.H{"recorded": true})
 }
 
 // MarkRatingHelpful handles POST /api/v1/agents/:id/ratings/:ratingID/helpful.

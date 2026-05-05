@@ -549,6 +549,8 @@ func (s *AgentService) CreateAgent(input CreateAgentInput) (*models.Agent, error
 	s.RecordActivity(input.CreatorWallet, models.ActivityAgentCreated, agent.ID, map[string]any{
 		"title": agent.Title,
 	})
+	// v3.11.4: evaluate achievement milestones (best-effort, idempotent).
+	s.CheckAndAwardAchievements(input.CreatorWallet)
 	return agent, nil
 }
 
@@ -825,6 +827,8 @@ func (s *AgentService) ForkAgent(originalID uint, creatorWallet string) (*models
 		"original_id":    originalID,
 		"original_title": fork.Title,
 	})
+	// v3.11.4: forking unlocks first_fork milestone for the forker.
+	s.CheckAndAwardAchievements(creatorWallet)
 
 	// v3.11.3: notify the *original* creator of the fork so they know their
 	// agent is being remixed. Skip self-forks.
@@ -1056,6 +1060,10 @@ func (s *AgentService) RecordPurchase(buyerWallet string, agentID uint, txHash s
 			agent.Title+" is now in your library",
 			fmt.Sprintf("/agent/%d", agentID),
 		)
+	}
+	// v3.11.4: a sale unlocks first_sale milestone for the creator.
+	if creator != "" {
+		s.CheckAndAwardAchievements(creator)
 	}
 	return nil
 }
@@ -1308,22 +1316,32 @@ func (s *AgentService) RateAgent(agentID uint, wallet string, rating int, commen
 // GetRatings returns ratings, average, and count for an agent. Hidden=true
 // rows (auto-hidden by FlagRating) are filtered out of both the list and the
 // average so a flagged spam comment can't drag the visible score down.
-func (s *AgentService) GetRatings(agentID uint) ([]models.AgentRating, float64, int64, error) {
+//
+// v3.11.4: when verifiedOnly=true, only ratings from wallets that have actually
+// purchased the agent (PurchasedAgent row exists) are included. Useful for
+// surfacing high-trust reviews — defaults to false for backward compat.
+func (s *AgentService) GetRatings(agentID uint, verifiedOnly bool) ([]models.AgentRating, float64, int64, error) {
+	baseQuery := func() *gorm.DB {
+		q := database.DB.Model(&models.AgentRating{}).
+			Where("agent_ratings.agent_id = ? AND agent_ratings.hidden = ?", agentID, false)
+		if verifiedOnly {
+			// EXISTS subquery is dialect-agnostic (works on sqlite + postgres)
+			q = q.Where("EXISTS (SELECT 1 FROM purchased_agents WHERE purchased_agents.agent_id = agent_ratings.agent_id AND LOWER(purchased_agents.buyer_wallet) = LOWER(agent_ratings.wallet))")
+		}
+		return q
+	}
+
 	var ratings []models.AgentRating
-	err := database.DB.
-		Where("agent_id = ? AND hidden = ?", agentID, false).
-		Order("created_at DESC").Limit(20).Find(&ratings).Error
+	err := baseQuery().
+		Order("agent_ratings.created_at DESC").Limit(20).Find(&ratings).Error
 	if err != nil {
 		return nil, 0, 0, err
 	}
 	var avg float64
 	var count int64
-	database.DB.Model(&models.AgentRating{}).
-		Where("agent_id = ? AND hidden = ?", agentID, false).Count(&count)
+	baseQuery().Count(&count)
 	if count > 0 {
-		database.DB.Model(&models.AgentRating{}).
-			Where("agent_id = ? AND hidden = ?", agentID, false).
-			Select("AVG(rating)").Row().Scan(&avg)
+		baseQuery().Select("AVG(rating)").Row().Scan(&avg)
 	}
 	return ratings, avg, count, nil
 }

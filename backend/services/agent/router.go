@@ -84,6 +84,9 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("/:id/ratings", handler.GetRatings)
 		agents.POST("/:id/ratings/:ratingID/helpful", auth, handler.MarkRatingHelpful)
 		agents.POST("/:id/ratings/:ratingID/flag", auth, handler.FlagRating)
+		// v3.11.4: discovery funnel signal — record when authenticated user
+		// copies an agent's prompt. Empty body, attribution via wallet header.
+		agents.POST("/:id/copy-analytics", auth, handler.CopyAnalytics)
 
 		// v3.11.3: agent version history + rollback (owner-only).
 		agents.GET("/:id/versions", auth, handler.ListAgentVersions)
@@ -107,6 +110,8 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		agents.GET("/for-you", auth, handler.GetForYou)
 
 		v1.GET("/users/:wallet", handler.GetPublicProfile)
+		// v3.11.4: public achievement badges earned by a wallet
+		v1.GET("/users/:wallet/achievements", handler.GetAchievements)
 		v1.POST("/users/:wallet/follow", auth, handler.FollowUser)
 		v1.DELETE("/users/:wallet/follow", auth, handler.UnfollowUser)
 		v1.GET("/users/:wallet/followers", handler.GetFollowers)

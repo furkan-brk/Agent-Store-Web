@@ -30,6 +30,7 @@ func Migrate() {
 		&models.NotificationEvent{},
 		&models.APIKey{},
 		&models.RatingFlag{},
+		&models.Achievement{},
 	); err != nil {
 		log.Fatalf("Agent Service migration failed: %v", err)
 	}

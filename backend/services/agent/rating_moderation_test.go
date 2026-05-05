@@ -96,7 +96,7 @@ func TestFlagRating_AutoHidesAtThreeDistinctFlags(t *testing.T) {
 	require.NoError(t, database.DB.First(&stored, r.ID).Error)
 	assert.True(t, stored.Hidden)
 
-	rows, _, count, err := svc.GetRatings(1)
+	rows, _, count, err := svc.GetRatings(1, false)
 	require.NoError(t, err)
 	assert.Empty(t, rows, "hidden rating must not appear in public list")
 	assert.EqualValues(t, 0, count)
