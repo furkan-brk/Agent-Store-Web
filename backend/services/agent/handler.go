@@ -60,6 +60,11 @@ func (h *Handler) ListAgents(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 		return
 	}
+	// v3.11.4: discovery funnel signal — record search invocations (only when
+	// authenticated and search query is non-empty).
+	if w := c.GetString("wallet"); w != "" && strings.TrimSpace(search) != "" {
+		h.agentSvc.RecordActivity(w, discoveryEventSearch, 0, map[string]any{"q": search})
+	}
 	c.JSON(http.StatusOK, gin.H{"agents": agents, "total": total, "page": page, "limit": limit})
 }
 
@@ -80,6 +85,8 @@ func (h *Handler) GetAgent(c *gin.Context) {
 	owned := false
 	if wallet != "" {
 		owned = agent.CreatorWallet == wallet || h.agentSvc.IsPurchased(wallet, uint(id))
+		// v3.11.4: discovery funnel signal — record agent open events.
+		h.agentSvc.RecordActivity(wallet, discoveryEventOpen, uint(id), nil)
 	}
 
 	if !owned {
@@ -1281,6 +1288,52 @@ func (h *Handler) GetRatings(c *gin.Context) {
 		userRating = h.agentSvc.GetUserRating(uint(id), wallet)
 	}
 	c.JSON(http.StatusOK, gin.H{"ratings": ratings, "average": avg, "count": count, "user_rating": userRating, "verified_only": verifiedOnly})
+}
+
+// RecordImpressions handles POST /api/v1/agents/impressions.
+// Body: {"ids": [uint, uint, ...]} — bulk impression batch from store grid scroll.
+// v3.11.4: discovery funnel signal — auth required, max 100 ids per call.
+func (h *Handler) RecordImpressions(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	var body struct {
+		IDs []uint `json:"ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(body.IDs) == 0 {
+		c.JSON(http.StatusOK, gin.H{"recorded": 0})
+		return
+	}
+	if len(body.IDs) > 100 {
+		body.IDs = body.IDs[:100]
+	}
+	for _, id := range body.IDs {
+		h.agentSvc.RecordActivity(wallet, discoveryEventImpression, id, nil)
+	}
+	c.JSON(http.StatusOK, gin.H{"recorded": len(body.IDs)})
+}
+
+// GetDiscoveryFunnel handles GET /api/v1/admin/kpi/discovery?since=7d|30d|90d.
+// Returns SearchToSave / ImpressionToOpen / OpenToSave for the authenticated wallet.
+func (h *Handler) GetDiscoveryFunnel(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	metrics, err := h.agentSvc.GetDiscoveryFunnel(wallet, c.Query("since"))
+	if err != nil {
+		log.Printf("[AgentHandler.GetDiscoveryFunnel] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, metrics)
 }
 
 // GetAchievements handles GET /api/v1/users/:wallet/achievements.

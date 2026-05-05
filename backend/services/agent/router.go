@@ -126,6 +126,10 @@ func SetupRouter(handler *Handler) *gin.Engine {
 
 		// v3.11.3: cross-cutting KPI funnel (creator-scoped).
 		v1.GET("/admin/kpi/funnel", auth, handler.GetFunnelMetrics)
+		// v3.11.4: Store discovery KPI funnel (creator-scoped).
+		v1.GET("/admin/kpi/discovery", auth, handler.GetDiscoveryFunnel)
+		// v3.11.4: bulk impression batch — store grid sends IDs as cards scroll into view.
+		agents.POST("/impressions", auth, handler.RecordImpressions)
 
 		// v3.11.2: notification center
 		notif := user.Group("/notifications")
