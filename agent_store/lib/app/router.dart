@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:get/get.dart';
+import 'animations.dart';
 import '../features/store/screens/store_screen.dart';
 import '../features/agent_detail/screens/agent_detail_screen.dart';
 import '../features/library/screens/library_screen.dart';
@@ -359,7 +360,7 @@ class _WideLayout extends StatelessWidget {
           ),
           Expanded(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
+              duration: AppAnimations.routeTransition,
               child: child,
             ),
           ),
@@ -858,7 +859,7 @@ class _NavItemState extends State<_NavItem> {
         child: GestureDetector(
           onTap: _navigate,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: AppAnimations.navItemDuration,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: bgColor,
