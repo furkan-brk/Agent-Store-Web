@@ -179,6 +179,7 @@ func main() {
 		agents.GET("/categories", agentHandler.GetCategories)
 		agents.POST("/batch", optionalAuth, agentHandler.BatchGetAgents)
 		agents.GET("/:id", optionalAuth, agentHandler.GetAgent)
+		agents.GET("/:id/skill.md", optionalAuth, agentHandler.GetAgentSkillMd)
 		agents.POST("", authMW, createRL.WalletMiddleware(), agentHandler.CreateAgent)
 		agents.PUT("/:id", authMW, agentHandler.UpdateAgent)
 		agents.POST("/:id/regenerate-image", authMW, createRL.WalletMiddleware(), agentHandler.RegenerateImage)
