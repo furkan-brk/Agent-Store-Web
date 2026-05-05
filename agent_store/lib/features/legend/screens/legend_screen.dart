@@ -22,6 +22,7 @@ import '../services/legend_service.dart';
 import '../widgets/legend_export_dialog.dart';
 import '../widgets/legend_onboarding.dart';
 import '../widgets/legend_templates_dialog.dart';
+import '../widgets/legend_text_input_dialog.dart';
 import '../widgets/version_diff_panel.dart';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -288,49 +289,30 @@ class _LegendScreenState extends State<LegendScreen>
       (e) => e.id == edgeId,
       orElse: () => _edges.first,
     );
-    final ctrl = TextEditingController(text: edge.label ?? '');
+    // v3.12 FE-P0-3: LegendTextInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('Label Edge', style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(
-            hintText: 'e.g. success, data, trigger...',
-            hintStyle: TextStyle(color: AppTheme.textM),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              Navigator.pop(context);
-              _pushHistory();
-              setState(() {
-                final trimmed = ctrl.text.trim();
-                _edges = _edges
-                    .map((e) => e.id == edgeId
-                        ? WorkflowEdge(
-                            id: e.id,
-                            fromId: e.fromId,
-                            toId: e.toId,
-                            label: trimmed.isEmpty ? null : trimmed,
-                          )
-                        : e)
-                    .toList();
-              });
-            },
-            child: const Text('Apply'),
-          ),
-        ],
+      builder: (_) => LegendTextInputDialog(
+        title: 'Label Edge',
+        hint: 'e.g. success, data, trigger...',
+        confirmLabel: 'Apply',
+        initialValue: edge.label ?? '',
+        onConfirm: (value) {
+          if (!mounted) return;
+          _pushHistory();
+          setState(() {
+            _edges = _edges
+                .map((e) => e.id == edgeId
+                    ? WorkflowEdge(
+                        id: e.id,
+                        fromId: e.fromId,
+                        toId: e.toId,
+                        label: value.isEmpty ? null : value,
+                      )
+                    : e)
+                .toList();
+          });
+        },
       ),
     );
   }
@@ -407,36 +389,20 @@ class _LegendScreenState extends State<LegendScreen>
   }
 
   void _showNewWorkflowDialog() {
-    final ctrl = TextEditingController(text: 'Workflow ${_workflowCount + 1}');
+    // v3.12 FE-P0-3: LegendTextInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('New Workflow',
-            style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(hintText: 'Workflow name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _confirmReplaceCanvas(
-                  () => _startWorkflow(name: ctrl.text));
-            },
-            child: const Text('Create'),
-          ),
-        ],
+      builder: (_) => LegendTextInputDialog(
+        title: 'New Workflow',
+        hint: 'Workflow name',
+        confirmLabel: 'Create',
+        initialValue: 'Workflow ${_workflowCount + 1}',
+        // _startWorkflow trims internally; pass the raw value through.
+        trim: false,
+        onConfirm: (name) async {
+          if (!mounted) return;
+          await _confirmReplaceCanvas(() => _startWorkflow(name: name));
+        },
       ),
     );
   }
@@ -932,36 +898,19 @@ class _LegendScreenState extends State<LegendScreen>
   }
 
   void _showRenameDialog() {
-    final ctrl = TextEditingController(text: _workflowName);
+    // v3.12 FE-P0-3: LegendTextInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Text('Rename Workflow',
-            style: TextStyle(color: AppTheme.textH)),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          style: const TextStyle(color: AppTheme.textH),
-          decoration: const InputDecoration(hintText: 'Workflow name'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton(
-            style:
-                ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            onPressed: () {
-              final v = ctrl.text.trim();
-              if (v.isNotEmpty) setState(() => _workflowName = v);
-              Navigator.pop(context);
-            },
-            child: const Text('Rename'),
-          ),
-        ],
+      builder: (_) => LegendTextInputDialog(
+        title: 'Rename Workflow',
+        hint: 'Workflow name',
+        confirmLabel: 'Rename',
+        initialValue: _workflowName,
+        allowEmpty: false,
+        onConfirm: (v) {
+          if (!mounted) return;
+          setState(() => _workflowName = v);
+        },
       ),
     );
   }
@@ -1254,109 +1203,15 @@ class _LegendScreenState extends State<LegendScreen>
 
     final agentCount =
         _nodes.where((n) => n.type == WorkflowNodeType.agent).length;
-    final ctrl = TextEditingController();
-
+    // v3.12 FE-P0-3: LegendExecuteInputDialog owns + disposes its controller.
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppTheme.card,
-        title: const Row(
-          children: [
-            Icon(Icons.rocket_launch_outlined,
-                color: AppTheme.gold, size: 20),
-            SizedBox(width: 8),
-            Text('Execute Workflow',
-                style: TextStyle(color: AppTheme.textH, fontSize: 16)),
-          ],
-        ),
-        content: SizedBox(
-          width: 480,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppTheme.bg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline,
-                        size: 14, color: AppTheme.gold),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'This workflow has $agentCount agent node${agentCount != 1 ? 's' : ''} and will cost $agentCount credit${agentCount != 1 ? 's' : ''}.',
-                        style: const TextStyle(
-                            color: AppTheme.textM, fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Input Message',
-                  style: TextStyle(
-                      color: AppTheme.textH,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: ctrl,
-                autofocus: true,
-                maxLines: 4,
-                style: const TextStyle(color: AppTheme.textH, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText:
-                      'Enter the input message for your workflow...',
-                  hintStyle: TextStyle(
-                      color: AppTheme.textM.withValues(alpha: 0.6)),
-                  filled: true,
-                  fillColor: AppTheme.bg,
-                  contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: const BorderSide(color: AppTheme.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide:
-                        const BorderSide(color: AppTheme.gold, width: 2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child:
-                const Text('Cancel', style: TextStyle(color: AppTheme.textM)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.gold,
-              foregroundColor: AppTheme.bg,
-            ),
-            icon: const Icon(Icons.rocket_launch, size: 16),
-            label: const Text('Execute'),
-            onPressed: () {
-              final msg = ctrl.text.trim();
-              if (msg.isEmpty) return;
-              Navigator.pop(context);
-              _executeWorkflow(msg);
-            },
-          ),
-        ],
+      builder: (_) => LegendExecuteInputDialog(
+        agentCount: agentCount,
+        onConfirm: (msg) {
+          if (!mounted) return;
+          _executeWorkflow(msg);
+        },
       ),
     );
   }
