@@ -100,6 +100,11 @@ class _LegendScreenState extends State<LegendScreen>
   final TextEditingController _paletteSearchCtrl = TextEditingController();
   String _paletteQuery = '';
 
+  // ── Keyboard shortcut focus (v3.12 FE-L0-1) ───────────────────────────────
+  // Hoisted out of build() so we don't allocate a fresh FocusNode and steal
+  // focus on every rebuild. requestFocus() is invoked once in initState.
+  final FocusNode _shortcutFocus = FocusNode(debugLabel: 'legend-shortcuts');
+
   // ── Node clipboard ─────────────────────────────────────────────────────────
   WorkflowNode? _clipboardNode;
 
@@ -121,6 +126,14 @@ class _LegendScreenState extends State<LegendScreen>
     _pulseAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
       CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
     );
+    // v3.12 FE-L0-1: request keyboard-shortcut focus exactly once. The
+    // pre-fix code allocated `FocusNode()..requestFocus()` inside build(),
+    // re-stealing focus from every dialog/text-field on every rebuild and
+    // leaking the prior FocusNode unbounded.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _shortcutFocus.requestFocus();
+    });
     _loadData();
     _checkOnboarding();
   }
@@ -134,6 +147,7 @@ class _LegendScreenState extends State<LegendScreen>
   void dispose() {
     _pulseCtrl.dispose();
     _paletteSearchCtrl.dispose();
+    _shortcutFocus.dispose();
     super.dispose();
   }
 
@@ -1876,8 +1890,12 @@ class _LegendScreenState extends State<LegendScreen>
               : null,
           body: Stack(children: [
             KeyboardListener(
-            focusNode: FocusNode()..requestFocus(),
-            autofocus: true,
+            // v3.12 FE-L0-1: hoisted FocusNode (see _shortcutFocus field).
+            // autofocus: false — focus is requested exactly once via the
+            // post-frame callback in initState; rebuilds must NOT re-steal
+            // focus from any open dialog/text-field.
+            focusNode: _shortcutFocus,
+            autofocus: false,
             onKeyEvent: (event) {
               if (event is! KeyDownEvent) return;
               final ctrl = HardwareKeyboard.instance.isControlPressed || HardwareKeyboard.instance.isMetaPressed;
