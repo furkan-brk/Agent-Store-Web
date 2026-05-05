@@ -70,19 +70,26 @@ class VersionDiffPanel extends StatelessWidget {
     if (blob is Map<String, dynamic>) {
       final list = blob['nodes'];
       if (list is List) {
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map(WorkflowNode.fromJson)
-            .toList();
+        return _parseNodeList(list);
       }
     }
     if (blob is List) {
-      return blob
-          .whereType<Map<String, dynamic>>()
-          .map(WorkflowNode.fromJson)
-          .toList();
+      return _parseNodeList(blob);
     }
     return const [];
+  }
+
+  static List<WorkflowNode> _parseNodeList(List<dynamic> list) {
+    final result = <WorkflowNode>[];
+    for (final item in list) {
+      if (item is! Map<String, dynamic>) continue;
+      try {
+        result.add(WorkflowNode.fromJson(item));
+      } catch (e) {
+        debugPrint('[VersionDiffPanel] skipping bad node: $e');
+      }
+    }
+    return result;
   }
 
   static List<_NodeDiffEntry> _diffNodes(

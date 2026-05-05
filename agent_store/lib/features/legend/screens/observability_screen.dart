@@ -40,6 +40,7 @@ class ObservabilityScreen extends StatefulWidget {
 class _ObservabilityScreenState extends State<ObservabilityScreen> {
   WorkflowExecution? _execution;
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -53,13 +54,24 @@ class _ObservabilityScreenState extends State<ObservabilityScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final result = await ApiService.instance.getExecution(widget.executionId);
-    if (!mounted) return;
     setState(() {
-      _execution = result;
-      _loading = false;
+      _loading = true;
+      _loadError = null;
     });
+    try {
+      final result = await ApiService.instance.getExecution(widget.executionId);
+      if (!mounted) return;
+      setState(() {
+        _execution = result;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.toString();
+        _loading = false;
+      });
+    }
   }
 
   String _fmtDuration(Duration? d) {
@@ -86,7 +98,9 @@ class _ObservabilityScreenState extends State<ObservabilityScreen> {
           padding: const EdgeInsets.all(20),
           child: _loading
               ? _buildLoading()
-              : (_execution == null ? _buildEmpty() : _buildContent()),
+              : (_loadError != null
+                  ? _buildEmpty(message: _loadError)
+                  : (_execution == null ? _buildEmpty() : _buildContent())),
         ),
       ),
     );
@@ -107,11 +121,11 @@ class _ObservabilityScreenState extends State<ObservabilityScreen> {
     );
   }
 
-  Widget _buildEmpty() {
+  Widget _buildEmpty({String? message}) {
     return EmptyState(
-      icon: Icons.search_off_rounded,
-      title: 'Execution not found',
-      subtitle:
+      icon: message != null ? Icons.error_outline_rounded : Icons.search_off_rounded,
+      title: message != null ? 'Load Failed' : 'Execution not found',
+      subtitle: message ??
           'Execution #${widget.executionId} could not be loaded. It may have been deleted or you may not be the owner.',
       actionLabel: 'Back',
       onAction: () => Navigator.of(context).maybePop(),

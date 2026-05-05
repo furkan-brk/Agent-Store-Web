@@ -12,7 +12,11 @@ import '../../../shared/models/agent_model.dart';
 import '../../../shared/models/guild_model.dart';
 import '../../../shared/models/mission_model.dart';
 import '../../../shared/services/api_service.dart';
+import '../../../shared/services/conflict_resolver.dart' show ConflictException, ConflictResolution;
+import '../../../shared/widgets/conflict_dialog.dart' show showConflictDialog;
 import '../../../shared/services/mission_service.dart' show MissionService, SyncStatus;
+import '../../../shared/utils/app_snack_bar.dart';
+import '../../../shared/utils/legend_error_dialog.dart';
 import '../../../shared/widgets/monaco_editor_widget.dart';
 import '../models/workflow_models.dart';
 import '../utils/dag_utils.dart';
@@ -284,10 +288,12 @@ class _LegendScreenState extends State<LegendScreen>
 
   // ── Edge labels ────────────────────────────────────────────────────────────
   void _showLabelEdgeDialog(String edgeId) {
-    final edge = _edges.firstWhere(
-      (e) => e.id == edgeId,
-      orElse: () => _edges.first,
-    );
+    if (_edges.isEmpty) return;
+    final edge = _edges.cast<WorkflowEdge?>().firstWhere(
+          (e) => e?.id == edgeId,
+          orElse: () => null,
+        );
+    if (edge == null) return;
     final ctrl = TextEditingController(text: edge.label ?? '');
     showDialog(
       context: context,
@@ -897,14 +903,63 @@ class _LegendScreenState extends State<LegendScreen>
       edges: List.of(_edges),
       updatedAt: DateTime.now(),
     );
-    await LegendService.instance.saveWorkflow(wf);
-    setState(() {
-      _currentWorkflowId = id;
-      _savedWorkflows = LegendService.instance.workflows;
-    });
-    _markSaved();
-    _showNotice('Workflow "$_workflowName" saved',
-        background: AppTheme.success);
+    try {
+      await LegendService.instance.saveWorkflow(wf);
+      if (!mounted) return;
+      setState(() {
+        _currentWorkflowId = id;
+        _savedWorkflows = LegendService.instance.workflows;
+      });
+      _markSaved();
+      _showNotice('Workflow "$_workflowName" saved', background: AppTheme.success);
+    } on ConflictException catch (e) {
+      if (!mounted) return;
+      final choice = await showConflictDialog(
+        context,
+        resourceTypeLabel: 'workflow',
+        localLabel: 'Your canvas',
+        serverUpdatedAt: e.serverUpdatedAt,
+      );
+      if (!mounted) return;
+      if (choice == ConflictResolution.takeTheirs) {
+        try {
+          final theirs = LegendWorkflow.fromJson(e.latestServerJson);
+          setState(() {
+            _nodes = List.of(theirs.nodes);
+            _edges = List.of(theirs.edges);
+            _workflowName = theirs.name;
+            _currentWorkflowId = theirs.id;
+          });
+        } catch (_) {
+          AppSnackBar.error(context, 'Could not parse server version.');
+        }
+      } else if (choice == ConflictResolution.keepMine || choice == ConflictResolution.merge) {
+        // Bump local revision to server's value and retry.
+        final serverRevision = (e.latestServerJson['revision_id'] as num?)?.toInt() ?? wf.revisionId;
+        final retriedWf = wf.withRevisionId(serverRevision);
+        try {
+          await LegendService.instance.saveWorkflow(retriedWf);
+          if (mounted) {
+            setState(() {
+              _currentWorkflowId = retriedWf.id;
+              _savedWorkflows = LegendService.instance.workflows;
+            });
+            _markSaved();
+            _showNotice('Workflow saved after conflict resolution', background: AppTheme.success);
+          }
+        } catch (e2) {
+          if (mounted) AppSnackBar.error(context, 'Retry save failed: ${e2.toString()}');
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      final retry = await showLegendRetryDialog(
+        context,
+        title: 'Save Failed',
+        message: 'Could not save the workflow. ${e.toString()}',
+      );
+      if (retry && mounted) await _saveWorkflow();
+    }
   }
 
   void _loadWorkflow(LegendWorkflow wf) {
@@ -927,8 +982,19 @@ class _LegendScreenState extends State<LegendScreen>
   }
 
   Future<void> _deleteWorkflow(String id) async {
-    await LegendService.instance.deleteWorkflow(id);
-    setState(() => _savedWorkflows = LegendService.instance.workflows);
+    try {
+      await LegendService.instance.deleteWorkflow(id);
+      if (!mounted) return;
+      setState(() => _savedWorkflows = LegendService.instance.workflows);
+    } catch (e) {
+      if (!mounted) return;
+      final retry = await showLegendRetryDialog(
+        context,
+        title: 'Delete Failed',
+        message: 'Could not delete the workflow. ${e.toString()}',
+      );
+      if (retry && mounted) await _deleteWorkflow(id);
+    }
   }
 
   void _showRenameDialog() {
@@ -1095,9 +1161,15 @@ class _LegendScreenState extends State<LegendScreen>
       edges: newEdges,
       updatedAt: DateTime.now(),
     );
-    await LegendService.instance.saveWorkflow(copy);
-    setState(() => _savedWorkflows = LegendService.instance.workflows);
-    _showNotice('Duplicated as "${copy.name}"', background: AppTheme.success);
+    try {
+      await LegendService.instance.saveWorkflow(copy);
+      if (!mounted) return;
+      setState(() => _savedWorkflows = LegendService.instance.workflows);
+      _showNotice('Duplicated as "${copy.name}"', background: AppTheme.success);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Duplicate failed: ${e.toString()}');
+    }
   }
 
   // ── Preflight check before execution (v3.10) ─────────────────────────────
@@ -1108,8 +1180,15 @@ class _LegendScreenState extends State<LegendScreen>
       return;
     }
     // Fetch preflight report from backend
-    final report =
-        await ApiService.instance.preflightWorkflow(_currentWorkflowId!);
+    Map<String, dynamic>? report;
+    try {
+      report = await ApiService.instance.preflightWorkflow(_currentWorkflowId!);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Preflight check failed: ${e.toString()}');
+      _showExecuteDialog();
+      return;
+    }
     if (!mounted) return;
 
     if (report == null) {
@@ -1455,8 +1534,14 @@ class _LegendScreenState extends State<LegendScreen>
           background: AppTheme.error);
       return;
     }
-    final versions =
-        await ApiService.instance.getWorkflowVersions(_currentWorkflowId!);
+    List<Map<String, dynamic>> versions;
+    try {
+      versions = await ApiService.instance.getWorkflowVersions(_currentWorkflowId!);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Could not load versions: ${e.toString()}');
+      return;
+    }
     if (!mounted) return;
     if (versions.length < 2) {
       _showNotice('Need at least 2 saved versions to compare.',
@@ -1577,19 +1662,24 @@ class _LegendScreenState extends State<LegendScreen>
       _diffFromVersion = null;
       _diffToVersion = null;
     });
-    final results = await Future.wait([
-      ApiService.instance.getWorkflowVersion(workflowId, fromV),
-      ApiService.instance.getWorkflowVersion(workflowId, toV),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _diffFromVersion = results[0];
-      _diffToVersion = results[1];
-      _diffLoading = false;
-    });
-    if (_diffFromVersion == null || _diffToVersion == null) {
-      _showNotice('Failed to load workflow versions.',
-          background: AppTheme.error);
+    try {
+      final results = await Future.wait([
+        ApiService.instance.getWorkflowVersion(workflowId, fromV),
+        ApiService.instance.getWorkflowVersion(workflowId, toV),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _diffFromVersion = results[0];
+        _diffToVersion = results[1];
+      });
+      if (_diffFromVersion == null || _diffToVersion == null) {
+        _showNotice('Failed to load workflow versions.', background: AppTheme.error);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, 'Could not load version data: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _diffLoading = false);
     }
   }
 
@@ -1807,9 +1897,13 @@ class _LegendScreenState extends State<LegendScreen>
 
     // If guild has no members in local data, fetch from API
     if (guild == null || guild.members.isEmpty) {
-      final detail = await ApiService.instance.getGuild(guildId);
-      if (detail != null) {
-        guild = detail.guild;
+      try {
+        final detail = await ApiService.instance.getGuild(guildId);
+        if (detail != null) guild = detail.guild;
+      } catch (e) {
+        if (!mounted) return;
+        AppSnackBar.error(context, 'Could not load guild members: ${e.toString()}');
+        return;
       }
     }
 
@@ -3927,13 +4021,26 @@ class _ExecutionHistoryDialogState extends State<_ExecutionHistoryDialog> {
                                       ),
                                     ],
                                     const SizedBox(width: 4),
-                                    // View button
+                                    // View results button
                                     IconButton(
                                       icon: const Icon(Icons.visibility_outlined,
                                           size: 16, color: AppTheme.gold),
                                       tooltip: 'View results',
                                       onPressed: () =>
                                           widget.onViewExecution(exec),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                          minWidth: 28, minHeight: 28),
+                                    ),
+                                    // Detailed metrics button (ObservabilityScreen)
+                                    IconButton(
+                                      icon: const Icon(Icons.insights,
+                                          size: 16, color: AppTheme.textM),
+                                      tooltip: 'View detailed metrics',
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        context.go('/legend/observability/${exec.id}');
+                                      },
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(
                                           minWidth: 28, minHeight: 28),

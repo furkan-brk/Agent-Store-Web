@@ -205,30 +205,55 @@ class LegendService {
   /// for invoking [saveWorkflow] again with the chosen workflow (the resolver
   /// will have updated the workflow's revisionId via its keep-mine retry).
   Future<LegendWorkflow> saveWorkflow(LegendWorkflow wf) async {
+    final previous = _workflows.firstWhere((w) => w.id == wf.id, orElse: () => wf);
+    final isNew = !_workflows.any((w) => w.id == wf.id);
+
     _workflows.removeWhere((w) => w.id == wf.id);
     _workflows.insert(0, wf);
     _sortWorkflows();
     await _persist();
+
     if (ApiService.instance.isAuthenticated) {
-      final saved = await ApiService.instance.saveLegendWorkflow(wf);
-      // ConflictException is rethrown by ApiService; reaching here with null
-      // means a non-409 transport failure (offline, 5xx). Keep local state.
-      if (saved != null) {
-        _workflows.removeWhere((w) => w.id == saved.id);
-        _workflows.insert(0, saved);
-        _sortWorkflows();
+      try {
+        final saved = await ApiService.instance.saveLegendWorkflow(wf);
+        // ConflictException is rethrown by ApiService; reaching here with null
+        // means a non-409 transport failure (offline, 5xx). Keep local state.
+        if (saved != null) {
+          _workflows.removeWhere((w) => w.id == saved.id);
+          _workflows.insert(0, saved);
+          _sortWorkflows();
+          await _persistLocal();
+          return saved;
+        }
+      } catch (e) {
+        // Revert optimistic update on failure.
+        _workflows.removeWhere((w) => w.id == wf.id);
+        if (!isNew) {
+          _workflows.insert(0, previous);
+          _sortWorkflows();
+        }
         await _persistLocal();
-        return saved;
+        rethrow;
       }
     }
     return wf;
   }
 
   Future<void> deleteWorkflow(String id) async {
+    final removed = _workflows.firstWhere((w) => w.id == id, orElse: () => throw StateError('not found'));
     _workflows.removeWhere((w) => w.id == id);
     _sortWorkflows();
+
     if (ApiService.instance.isAuthenticated) {
-      await ApiService.instance.deleteLegendWorkflow(id);
+      try {
+        await ApiService.instance.deleteLegendWorkflow(id);
+      } catch (e) {
+        // Restore optimistic delete on failure.
+        _workflows.add(removed);
+        _sortWorkflows();
+        await _persistLocal();
+        rethrow;
+      }
     }
     await _persist();
   }
