@@ -69,6 +69,24 @@ func TestGetUserRank_ReturnsNeighbors(t *testing.T) {
 	}
 }
 
+func TestGetUserRank_TotalCountsAllCreatorsEvenWhenLimited(t *testing.T) {
+	// P1-11: Total is computed by a separate COUNT(DISTINCT) so it stays
+	// accurate when the ranked query is LIMIT-capped. Even with the user
+	// in the top portion, Total should report every distinct creator.
+	svc := newLeaderboardSvc(t)
+	// Seed 12 distinct creators so we can confirm Total >= 12 with the
+	// ranked query still bounded by LIMIT.
+	for i := 0; i < 12; i++ {
+		w := "0x" + string(rune('a'+i))
+		seedAgentForLeaderboard(t, w, "x", int64(100-i))
+	}
+
+	out, err := svc.GetUserRank("0xa", "all")
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, out.Rank)
+	assert.EqualValues(t, 12, out.Total, "Total reflects distinct creator count, not just LIMIT'd rows")
+}
+
 func TestGetUserRank_OffBoardReturnsBottom(t *testing.T) {
 	svc := newLeaderboardSvc(t)
 	seedAgentForLeaderboard(t, "0xa", "x", 50)

@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -202,12 +203,10 @@ func rankAgentsByQuery(candidates []models.Agent, query string) []models.Agent {
 	for i, c := range candidates {
 		out[i] = scored{a: c, s: scoreAgent(c, query)}
 	}
-	// Insertion sort — candidate caps at 200, simple and stable.
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && out[j].s > out[j-1].s; j-- {
-			out[j], out[j-1] = out[j-1], out[j]
-		}
-	}
+	// Stable sort — candidate caps at 200; original DB order tie-breaks.
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].s > out[j].s
+	})
 	res := make([]models.Agent, len(out))
 	for i, sc := range out {
 		res[i] = sc.a

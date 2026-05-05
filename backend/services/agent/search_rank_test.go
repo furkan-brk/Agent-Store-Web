@@ -45,11 +45,45 @@ func TestScoreAgent_TagOutweighsDescription(t *testing.T) {
 
 func TestScoreAgent_FuzzyTypoMatches(t *testing.T) {
 	// "wziard" is a transposition of "wizard" — Levenshtein dist 2 / max 6 = 0.667 sim.
+	// Pre-filter (P1-9) requires at least one query token to be a literal title hit
+	// before fuzzy scoring kicks in — "backend" satisfies that, so "wziard" still
+	// scores via the Levenshtein fallback against the title's "wizard" word.
 	a := models.Agent{Title: "Wizard of Backend"}
-	score := scoreAgent(a, "wziard")
+	score := scoreAgent(a, "wziard backend")
 	assert.Greater(t, score, 0.0, "fuzzy match should produce non-zero score")
 	// Confirm Levenshtein similarity sits above the configured threshold.
 	assert.GreaterOrEqual(t, levenshteinSimilarity("wziard", "wizard"), fuzzyThreshold)
+}
+
+func TestScoreAgent_FuzzySkippedWithoutTitleLiteralHit(t *testing.T) {
+	// Pre-filter (P1-9): a candidate whose title contains zero literal token hits
+	// must NOT be scored via Levenshtein. Substring scoring in tags/desc still applies.
+	a := models.Agent{Title: "Database Helper", Description: "no relevance"}
+	// "wziard" is not literally in title, no other field has any token —
+	// fuzzy disabled, expect zero score.
+	assert.Equal(t, 0.0, scoreAgent(a, "wziard"))
+}
+
+func TestTokenize_CapsAtMaxQueryTokens(t *testing.T) {
+	// P1-9: queries beyond maxQueryTokens are truncated to keep DP work bounded.
+	got := tokenize("alpha beta gamma delta epsilon zeta eta theta")
+	assert.Len(t, got, maxQueryTokens, "tokenize must cap at maxQueryTokens")
+	assert.Equal(t, []string{"alpha", "beta", "gamma", "delta", "epsilon"}, got)
+}
+
+func TestRankAgentsByQuery_LongQueryStillCorrect(t *testing.T) {
+	// 10-token query against a 5-row fixture: tokenize caps at 5, but the strongest
+	// title hit must still rank first.
+	agents := []models.Agent{
+		{Title: "Random Helper"},
+		{Title: "Wizard Architect"},
+		{Title: "Backend Helper"},
+		{Title: "Database Helper"},
+		{Title: "Frontend Helper"},
+	}
+	ranked := rankAgentsByQuery(agents, "wizard alpha beta gamma delta epsilon zeta eta theta iota")
+	assert.Equal(t, "Wizard Architect", ranked[0].Title)
+	assert.Len(t, ranked, 5, "ranker must keep all candidates regardless of query length")
 }
 
 func TestScoreAgent_EmptyQueryZero(t *testing.T) {

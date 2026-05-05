@@ -16,7 +16,7 @@ type APIKey struct {
 	Wallet     string     `gorm:"column:wallet;not null;index;size:64" json:"wallet"`
 	Name       string     `gorm:"column:name;size:100" json:"name"`
 	KeyHash    string     `gorm:"column:key_hash;not null;size:200" json:"-"` // bcrypt — never serialise
-	Prefix     string     `gorm:"column:prefix;size:32" json:"prefix"`
+	Prefix     string     `gorm:"column:prefix;size:32;index:idx_api_key_prefix" json:"prefix"`
 	Scopes     string     `gorm:"column:scopes;size:500" json:"scopes"`
 	LastUsedAt *time.Time `gorm:"column:last_used_at" json:"last_used_at,omitempty"`
 	RevokedAt  *time.Time `gorm:"column:revoked_at" json:"revoked_at,omitempty"`

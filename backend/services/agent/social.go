@@ -276,9 +276,12 @@ func (s *AgentService) GetForYou(wallet string) ([]models.Agent, error) {
 		}
 	}
 
-	// 1. Find agent IDs already in the user's library.
+	// 1. Find agent IDs already in the user's library. Case-insensitive lookup
+	//    matches v3.7's wallet-casing invariant — legacy mixed-case rows from
+	//    pre-v3.7 should still be detected as "saved" so they don't show up
+	//    again in For You.
 	var libEntries []models.LibraryEntry
-	database.DB.Where("user_wallet = ?", wallet).Find(&libEntries)
+	database.DB.Where("LOWER(user_wallet) = LOWER(?)", wallet).Find(&libEntries)
 	savedIDs := make([]uint, len(libEntries))
 	for i, e := range libEntries {
 		savedIDs[i] = e.AgentID
