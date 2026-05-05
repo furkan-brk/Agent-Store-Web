@@ -104,6 +104,58 @@ func TestRunDueSchedules_PersistsMissionRunWithExpandedPrompt(t *testing.T) {
 	assert.Empty(t, rows[0].Error)
 }
 
+// v3.12 P1-4: simulate two replicas trying to fire the same schedule.
+// We exercise the CAS path directly by reading the row twice (simulating
+// two replicas' SELECT phase) and then calling RunDueSchedules twice in
+// sequence. The first call advances next_run_at; the second sees the row
+// no longer matches the WHERE filter (next_run_at <= now) and returns 0.
+//
+// Sequential is the correct unit-test shape for sqlite's serialised write
+// model — concurrency in Go ≠ concurrency in sqlite. The CAS WHERE clause
+// is what makes the fix robust on real Postgres.
+func TestRunDueSchedules_AtomicCASPreventsDoubleFire(t *testing.T) {
+	svc := newSchedulerSvc(t)
+	mid := seedMissionForSchedule(t, "0xowner")
+
+	past := time.Now().Add(-1 * time.Hour).UTC().Truncate(time.Second)
+	require.NoError(t, database.DB.Create(&models.MissionSchedule{
+		MissionID: mid, Wallet: "0xowner", CronExpr: "0 9 * * *",
+		NextRunAt: past, Enabled: true,
+	}).Error)
+
+	// Pre-load the row so we can manually simulate a stale read that another
+	// replica might have done at the same instant. Then update next_run_at
+	// behind its back (replica A wins the race and advances next_run_at).
+	var staleSched models.MissionSchedule
+	require.NoError(t, database.DB.Where("mission_id = ?", mid).First(&staleSched).Error)
+
+	// Replica A: real fire — advances next_run_at via the CAS.
+	firedA := svc.RunDueSchedules()
+	assert.Equal(t, 1, firedA, "first replica should fire exactly once")
+
+	// Replica B: it had read the same staleSched.NextRunAt before A acted.
+	// Now its CAS WHERE next_run_at = staleSched.NextRunAt should match 0
+	// rows (because A already advanced it). Manually replay B's per-row CAS
+	// to assert the WHERE filter is the protective layer.
+	res := database.DB.Model(&models.MissionSchedule{}).
+		Where("id = ? AND next_run_at = ?", staleSched.ID, staleSched.NextRunAt).
+		Updates(map[string]any{"next_run_at": time.Now()})
+	require.NoError(t, res.Error)
+	assert.EqualValues(t, 0, res.RowsAffected,
+		"second replica's CAS must miss because A advanced next_run_at first")
+
+	// And RunDueSchedules called again should also do nothing — next_run_at
+	// is now in the future, so the SELECT filter eliminates the row.
+	firedB := svc.RunDueSchedules()
+	assert.Equal(t, 0, firedB, "no rows due — second pass must fire nothing")
+
+	// End state: exactly one activity marker, regardless of concurrency.
+	var n int64
+	database.DB.Model(&models.UserActivity{}).
+		Where("type = ? AND ref_id = ?", "mission_schedule_fired", mid).Count(&n)
+	assert.EqualValues(t, 1, n, "exactly one activity marker per schedule fire")
+}
+
 func TestRunDueSchedules_FiresOverdueRowsAndAdvancesNextRun(t *testing.T) {
 	svc := newSchedulerSvc(t)
 	mid := seedMissionForSchedule(t, "0xowner")
