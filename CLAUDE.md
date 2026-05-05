@@ -302,6 +302,7 @@ services:
 - [x] **v3.3 — Legend v3.5: Undo/Redo, Templates, Clone, History UI** (Frontend) ✅ 4 feature
 - [x] **v3.4 — Card Editor: split-view live editing + auto-save + undo/redo + export** (Frontend + Backend) ✅
 - [x] **v3.5 — Legend overflow fixes + GuildMaster @-mention library/store sectioning** (Frontend) ✅
+- [~] **v3.11.4 — Closure Sprint** (Backend partial) — 7/9 backend done: T1 Discovery analytics funnel · T2 Guild Master KPI · T3 Template metrics · T5 Leaderboard category+me+weekly rewards · T6 Guild member event log · T8 Post-run reflection · T9 Rating verified filter + copy analytics + achievements. Backend +27 tests. Backlog: 67/75 closed (89%). Remaining: T4 pipeline resilience, T7 cron mission scheduling, all 8 frontend (T11-T17).
 - [x] **v3.11.3 — Pro Tools Closure** (Backend + Frontend) ✅ Legend node checkpoint/resume (WorkflowExecution.NodeStates), bulk operations (4 actions + quota guard), agent versioning + rollback (LRU 20), KPI funnel queries, API key scope middleware (dual-auth pilot), notification auto-creation hooks (notifyOnce 1h dedup), workflow versioning diff UI, observability panel (CustomPainter chart), card presets (19) + before/after diff, library bulk select + version history dialog, KPI funnel panel
 - [x] **v3.11.2 — Cross-Cutting Polish** (Backend + Frontend) ✅ notification center, API keys (bcrypt + scopes), per-action credit breakdown, rating moderation, settings sectioning, i18n iskelet, theme toggle (light parchment), notification UI, developer UI, wallet error dictionary + tx timeline + per-action history icons
 - [x] **v3.11.1 — User-Facing High-Impact Polish** (Backend + Frontend) ✅ fuzzy search, similar agents, mission→legend bridge, prompt template gallery, mention preview, redaction toggle, quality score, credit early-check
@@ -314,6 +315,105 @@ services:
   - ✅ Shared `ResponsiveLayout` widget (`lib/shared/widgets/responsive_layout.dart`)
   - ⏳ Mobile Batch 1 (8 screens) — pending visual verification pass
   - ⏳ 2-day bug bash — pending
+
+## v3.11.4 Closure Sprint — Backend Partial (2026-05-05)
+7/9 backend tasks complete; closes 9 of 11 missing backlog items + 3 partial→full
+upgrades. Backend +27 unit tests. `go vet ./...` clean, `go build ./...` clean.
+Frontend (T11–T17) and remaining backend (T4 pipeline resilience, T7 cron mission
+scheduling) deferred to v3.11.4.next session due to time/quota constraints.
+
+**Done** (7 backend):
+- **T1 Discovery analytics funnel** (3.2.1 #5): `services/agent/discovery_funnel.go`.
+  GetDiscoveryFunnel returns search→save / impression→open / open→save ratios
+  with -1 sentinel for empty denominators. New event types: `search`,
+  `agent_impression`, `agent_open`. Wired into ListAgents (search recording)
+  and GetAgent (open recording). POST /agents/impressions bulk endpoint
+  (max 100 ids). GET /admin/kpi/discovery (creator-scoped, 5min cache).
+  Reuses funnelSinceCutoff + ratio helpers from funnel.go.
+- **T2 Guild Master KPI** (3.2.2 #5): `services/guild/kpi.go`. SuggestAcceptanceRate,
+  ChatToActionRate, RerunRate. **Karar**: guild package agent package'ı
+  IMPORT ETMİYOR — `recordGMActivity` helper UserActivity rows'u direkt
+  database.DB ile yazıyor (notifyExecutionResult pattern reuse). Rerun rate
+  Go-side group-by session_id (json_extract dialect divergence yok).
+  Wired into Suggest, TeamChat, BridgeService.ToMission/ToLegend.
+  GET /admin/kpi/guild-master.
+- **T3 Template kalite metrikleri** (3.2.3 #5): `LegendTemplateUsage` model,
+  `services/workspace/template_metrics.go`. RecordTemplateUse / RecordTemplateExecution
+  (1h post-instantiation window) / GetTemplateMetrics (top by usage + success
+  rate). Dialect-neutral SUM(CASE WHEN) aggregation. -1 sentinel SuccessRate
+  when no completed runs. GET /legend/templates/metrics.
+- **T5 Leaderboard kategori + me + ödül** (closes 3.2.9 #3, #4, #5 in one task):
+  `services/agent/leaderboard_extras.go`. GetLeaderboardByCategory (top 10 per
+  cat), GetUserRank (rank + 4 neighbors with IsMe flag, off-board → bottom 5
+  hint), RecordWeeklyLeaderReward (top1=100/top2=50/top3=30/top4-10=10 credits,
+  ISO week format YYYY-Www, idempotent via composite unique). New
+  `WeeklyLeaderReward` model. **Karar**: admin endpoint X-Admin-Token +
+  ADMIN_API_TOKEN env, fail-closed when env empty (v3.11.4 stopgap pending
+  RBAC sprint). 4 endpoints: /leaderboard/category/:cat, /leaderboard/me,
+  /leaderboard/weekly-rewards, POST /admin/leaderboard/award-weekly.
+- **T6 Guild member event log** (3.2.12 #5): `GuildMemberEvent` model,
+  `services/guild/events.go`. LogMemberEvent (best-effort) + ListGuildEvents
+  (newest first, max 50). Wired into AddMember, JoinGuild, LeaveGuild,
+  RemoveMember, SetMemberPermissions sites. GET /guilds/:id/events?limit=20.
+- **T8 Post-run reflection** (3.2.15 #4): `GuildMasterReflection` model,
+  `services/guild/reflection.go`. SessionService.RecordReflection /
+  ListReflections — wallet-scoped via session ownership check (foreign wallet
+  → ErrSessionNotFound to avoid leaking session existence). 4000 char summary
+  cap. **Karar**: explicit POST only, no auto-record on Legend execution
+  complete this sprint. Adapter+interface defer to v3.11.5 if FE wires it.
+  POST /guild-master/sessions/:id/reflect-on-execution + GET /reflections.
+- **T9 Rating verified + copy analytics + achievements** (3 sub-tasks, closes
+  3 partial→full upgrades 3.2.5 #2, 3.2.5 #4, 3.2.10 #3):
+  - **T9a**: GetRatings(verifiedOnly bool) — EXISTS join on PurchasedAgent.
+    Backward compat: false default preserves all behavior.
+  - **T9b**: POST /agents/:id/copy-analytics → RecordActivity prompt_copy.
+  - **T9c**: `Achievement` model + `services/agent/achievements.go`.
+    CheckAndAwardAchievements eligibility checks (first_agent, first_sale,
+    first_fork via UserActivity agent_forked events, hundred_saves,
+    top_creator). Idempotent via composite unique (wallet, type) +
+    OnConflict-DoNothing. Wired into CreateAgent (line 552), ForkAgent,
+    RecordPurchase. GET /users/:wallet/achievements.
+
+**Yeni dosyalar** (10 + 7 test = 17):
+- Backend models (5): `gm_reflection.go`, `guild_event.go`, `template_usage.go`,
+  `weekly_reward.go`, `achievement.go`
+- Backend services (5): `discovery_funnel.go`, `guild/kpi.go`, `guild/events.go`,
+  `guild/reflection.go`, `agent/leaderboard_extras.go`,
+  `workspace/template_metrics.go`, `agent/achievements.go`
+- Tests (7): discovery_funnel_test.go, kpi_test.go (guild), events_test.go,
+  reflection_test.go, leaderboard_extras_test.go, template_metrics_test.go,
+  achievements_test.go, rating_verified_test.go
+
+**Yeni endpoint'ler** (16):
+- `GET /api/v1/admin/kpi/discovery?since=`
+- `GET /api/v1/admin/kpi/guild-master?since=`
+- `POST /api/v1/agents/impressions` (bulk)
+- `POST /api/v1/agents/:id/copy-analytics`
+- `POST /api/v1/agents/:id/ratings/:ratingID/flag` already existed; GetRatings now accepts `?verified_only=true`
+- `GET /api/v1/legend/templates/metrics`
+- `POST /api/v1/user/legend/templates/:templateId/used`
+- `GET /api/v1/leaderboard/category/:cat?window=`
+- `GET /api/v1/leaderboard/me?window=`
+- `GET /api/v1/leaderboard/weekly-rewards?weeks=`
+- `POST /api/v1/admin/leaderboard/award-weekly` (admin token)
+- `GET /api/v1/guilds/:id/events?limit=`
+- `POST /api/v1/guild-master/sessions/:id/reflect-on-execution`
+- `GET /api/v1/guild-master/sessions/:id/reflections`
+- `GET /api/v1/users/:wallet/achievements`
+
+**Açık kalanlar (defer)**:
+- T4 Pipeline resilience (per-stage timeout/retry, partial success cache) — 3.2.6 #2
+- T7 Mission scheduling (cron, robfig/cron/v3 + monolith goroutine + UserActivity
+  marker) — 3.2.13 #3
+- T11–T17 frontend (8 task: smart suggestions, leaderboard UI extension, Creator
+  Dashboard bulk UI, trial→purchase CTA, guild event log UI, mission schedule
+  dialog, KPI panel discovery+GM sections + achievement badges UI)
+
+**Backlog kapanışı**: 67/75 (89%). 8 madde kaldı: T4 + T7 + 6 frontend partial/items.
+
+**Branch**: `sprint/v3.11.4-closure` (push edilmedi — uncommitted nothing).
+**Commits**: d7fd1ce (T9), [next] (T6+T2), [next] (T1), [next] (T3), [next] (T5),
+[next] (T8). 6 incremental commits, all passing.
 
 ## v3.11.3 Pro Tools Closure (2026-05-05)
 11 task; Legend resume + bulk ops + agent versioning + KPI funnel + API key
