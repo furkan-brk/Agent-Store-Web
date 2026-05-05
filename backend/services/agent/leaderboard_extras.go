@@ -145,6 +145,29 @@ func (s *AgentService) GetUserRank(wallet, window string) (*UserRankResult, erro
 	cutoff := categoryWindowCutoff(window)
 	out := &UserRankResult{Window: normalisedWindowLabel(window)}
 
+	// P1-11: separate COUNT(DISTINCT) so the ordered query can be capped at
+	// userRankCandidateLimit without losing the true creator total. Off-board
+	// users (rank > limit) fall back to the bottom-5 hint, same as before.
+	var totalCreators int64
+	var countErr error
+	if cutoff.IsZero() {
+		countErr = database.DB.Raw(`
+			SELECT COUNT(DISTINCT LOWER(creator_wallet))
+			FROM agents WHERE creator_wallet != ''`).Scan(&totalCreators).Error
+	} else {
+		countErr = database.DB.Raw(`
+			SELECT COUNT(DISTINCT LOWER(a.creator_wallet))
+			FROM agents a
+			LEFT JOIN library_entries le ON le.agent_id = a.id AND le.saved_at >= ?
+			WHERE a.creator_wallet != ''`, cutoff).Scan(&totalCreators).Error
+	}
+	if countErr != nil {
+		return nil, countErr
+	}
+	out.Total = totalCreators
+
+	const userRankCandidateLimit = 200
+
 	var rows []rankRow
 	var err error
 	if cutoff.IsZero() {
@@ -152,7 +175,8 @@ func (s *AgentService) GetUserRank(wallet, window string) (*UserRankResult, erro
 			SELECT LOWER(creator_wallet) AS wallet, SUM(save_count) AS total_saves
 			FROM agents WHERE creator_wallet != ''
 			GROUP BY LOWER(creator_wallet)
-			ORDER BY total_saves DESC`).Scan(&rows).Error
+			ORDER BY total_saves DESC
+			LIMIT ?`, userRankCandidateLimit).Scan(&rows).Error
 	} else {
 		err = database.DB.Raw(`
 			SELECT LOWER(a.creator_wallet) AS wallet, COUNT(DISTINCT le.id) AS total_saves
@@ -160,12 +184,12 @@ func (s *AgentService) GetUserRank(wallet, window string) (*UserRankResult, erro
 			LEFT JOIN library_entries le ON le.agent_id = a.id AND le.saved_at >= ?
 			WHERE a.creator_wallet != ''
 			GROUP BY LOWER(a.creator_wallet)
-			ORDER BY total_saves DESC`, cutoff).Scan(&rows).Error
+			ORDER BY total_saves DESC
+			LIMIT ?`, cutoff, userRankCandidateLimit).Scan(&rows).Error
 	}
 	if err != nil {
 		return nil, err
 	}
-	out.Total = int64(len(rows))
 
 	myIdx := -1
 	for i, r := range rows {
@@ -187,6 +211,9 @@ func (s *AgentService) GetUserRank(wallet, window string) (*UserRankResult, erro
 	}
 
 	if myIdx < 0 {
+		// User isn't in the top-N candidate set. Off-board: show the bottom
+		// 5 of the (limited) ranked rows as a "join the race" hint. Rank=0
+		// signals "off-board" to the UI.
 		from := max(len(rows)-5, 0)
 		out.Rank = 0
 		out.Neighbors = makeNeighbors(rows[from:], from+1)
