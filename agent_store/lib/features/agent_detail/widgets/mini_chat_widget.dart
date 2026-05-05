@@ -299,6 +299,9 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
           ),
 
           // ── Messages list ───────────────────────────────────────────────────
+          // FE-P1-12: this chat is inside a constrained TabView, so
+          // MediaQuery.size.width overshoots on desktop. Use LayoutBuilder
+          // to fence bubble width to 70% of the *available* container width.
           Expanded(
             child: _messages.isEmpty
                 ? const Center(
@@ -307,37 +310,38 @@ class _MiniChatWidgetState extends State<MiniChatWidget> {
                       style: TextStyle(color: Color(0xFF4A4030), fontSize: 13),
                     ),
                   )
-                : ListView.builder(
-                    controller: _scrollCtrl,
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _messages.length,
-                    itemBuilder: (_, i) {
-                      final msg = _messages[i];
-                      final isUser = msg.role == 'user';
-                      return Align(
-                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isUser ? _userBubbleBg.withValues(alpha: 0.8) : _assistantBubbleBg,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            msg.text,
-                            style: TextStyle(
-                              color: isUser ? Colors.white : _assistantText,
-                              fontSize: 13,
-                              height: 1.4,
+                : LayoutBuilder(builder: (context, constraints) {
+                    final bubbleMaxWidth = constraints.maxWidth * 0.7;
+                    return ListView.builder(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _messages.length,
+                      itemBuilder: (_, i) {
+                        final msg = _messages[i];
+                        final isUser = msg.role == 'user';
+                        return Align(
+                          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
+                            decoration: BoxDecoration(
+                              color: isUser ? _userBubbleBg.withValues(alpha: 0.8) : _assistantBubbleBg,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              msg.text,
+                              style: TextStyle(
+                                color: isUser ? Colors.white : _assistantText,
+                                fontSize: 13,
+                                height: 1.4,
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    );
+                  }),
           ),
 
           // ── Input row ───────────────────────────────────────────────────────
