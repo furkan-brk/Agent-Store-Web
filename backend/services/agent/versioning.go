@@ -55,14 +55,39 @@ type AgentVersionDTO struct {
 	CreatedAt string             `json:"created_at"`
 }
 
+// maxSnapshotRetries caps the MAX(version)+1 retry loop. v3.12 P1-7:
+// under burst edits two callers can both read the same MAX, both try to
+// INSERT version=N+1, and the loser hits the (agent_id, version) unique
+// index. Re-read MAX and retry — any single agent should converge in
+// well under this bound; the cap exists to fail loud on a stuck case.
+const maxSnapshotRetries = 3
+
+// isAgentVersionUniqueConflict matches the duplicate-key signature for the
+// (agent_id, version) composite unique. Pure-string match is dialect-
+// portable: gorm.ErrDuplicatedKey only fires on Postgres in some versions,
+// and SQLite returns "UNIQUE constraint failed" with the column names.
+func isAgentVersionUniqueConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "UNIQUE constraint failed") ||
+		strings.Contains(msg, "duplicate key value") ||
+		strings.Contains(msg, "idx_agent_version_pair")
+}
+
 // snapshotAgentVersion captures the current row's editable fields as a new
 // version. Best-effort — failures are logged and never bubble up to the
 // UpdateAgent caller (a missed snapshot is recoverable; a failed save isn't).
 //
-// Concurrency: two parallel saves can race on max(version) and produce two
-// rows with the same version number. The composite unique index on
-// (agent_id, version) makes the second insert fail; we treat that as benign
-// and log it. Real callers serialise via the editor anyway.
+// v3.12 P1-7: read-then-insert is wrapped in a retry loop. Two parallel
+// saves can race on MAX(version) and produce identical version numbers;
+// the composite unique index rejects the second insert, we re-read MAX
+// and try again. Bounded at maxSnapshotRetries to fail loud on a stuck
+// case (e.g. a corrupted index or a bug in the version sequencer).
 func (s *AgentService) snapshotAgentVersion(agentID uint) {
 	var agent models.Agent
 	if err := database.DB.First(&agent, agentID).Error; err != nil {
@@ -77,25 +102,39 @@ func (s *AgentService) snapshotAgentVersion(agentID uint) {
 		return
 	}
 
-	// Determine next version number (max + 1, or 1 for the first snapshot).
-	var maxVersion int
-	database.DB.Model(&models.AgentVersion{}).
-		Where("agent_id = ?", agentID).
-		Select("COALESCE(MAX(version), 0)").
-		Scan(&maxVersion)
+	for attempt := 1; attempt <= maxSnapshotRetries; attempt++ {
+		// Re-read MAX(version) on each attempt so a competing writer's
+		// successful insert is reflected in our next computed version.
+		var maxVersion int
+		database.DB.Model(&models.AgentVersion{}).
+			Where("agent_id = ?", agentID).
+			Select("COALESCE(MAX(version), 0)").
+			Scan(&maxVersion)
 
-	next := maxVersion + 1
-	if err := database.DB.Create(&models.AgentVersion{
-		AgentID:    agentID,
-		Version:    next,
-		FieldsJSON: string(blob),
-	}).Error; err != nil {
-		log.Printf("[versioning] snapshot insert failed for agent %d v%d: %v", agentID, next, err)
-		return
+		next := maxVersion + 1
+		err := database.DB.Create(&models.AgentVersion{
+			AgentID:    agentID,
+			Version:    next,
+			FieldsJSON: string(blob),
+		}).Error
+		if err == nil {
+			if attempt > 1 {
+				log.Printf("[versioning] snapshot succeeded for agent %d v%d after %d attempts",
+					agentID, next, attempt)
+			}
+			// LRU evict: if we now have > maxAgentVersions rows, drop the oldest.
+			pruneOldVersions(agentID)
+			return
+		}
+		if !isAgentVersionUniqueConflict(err) {
+			log.Printf("[versioning] snapshot insert failed for agent %d v%d: %v", agentID, next, err)
+			return
+		}
+		// Conflict: another writer claimed this version. Loop.
+		log.Printf("[versioning] snapshot retry %d/%d for agent %d v%d (concurrent writer)",
+			attempt, maxSnapshotRetries, agentID, next)
 	}
-
-	// LRU evict: if we now have > maxAgentVersions rows, drop the oldest.
-	pruneOldVersions(agentID)
+	log.Printf("[versioning] snapshot gave up after %d retries for agent %d", maxSnapshotRetries, agentID)
 }
 
 // pruneOldVersions trims the oldest snapshot rows so total per-agent count
