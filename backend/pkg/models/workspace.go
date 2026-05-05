@@ -7,12 +7,16 @@ import (
 )
 
 type UserMission struct {
-	ID         uint      `gorm:"primaryKey;autoIncrement" json:"-"`
-	UserWallet string    `gorm:"column:user_wallet;not null;index;uniqueIndex:idx_user_mission_client" json:"-"`
-	ClientID   string    `gorm:"column:client_id;not null;uniqueIndex:idx_user_mission_client" json:"id"`
-	Title      string    `gorm:"column:title;not null" json:"title"`
-	Slug       string    `gorm:"column:slug;not null;index" json:"slug"`
-	Prompt     string    `gorm:"column:prompt;type:text;not null" json:"prompt"`
+	ID         uint   `gorm:"primaryKey;autoIncrement" json:"-"`
+	UserWallet string `gorm:"column:user_wallet;not null;index;uniqueIndex:idx_user_mission_client;uniqueIndex:idx_user_mission_wallet_slug,priority:1" json:"-"`
+	ClientID   string `gorm:"column:client_id;not null;uniqueIndex:idx_user_mission_client" json:"id"`
+	Title      string `gorm:"column:title;not null" json:"title"`
+	// Slug is unique per wallet — composite index idx_user_mission_wallet_slug
+	// enforces this at DB level so the candidate-suffix loop in
+	// ensureUniqueSlug can rely on insert-and-retry instead of TOCTOU
+	// SELECT-then-Create. See v3.12 P1-3.
+	Slug   string `gorm:"column:slug;not null;index;uniqueIndex:idx_user_mission_wallet_slug,priority:2" json:"slug"`
+	Prompt string `gorm:"column:prompt;type:text;not null" json:"prompt"`
 	UseCount   int64     `gorm:"column:use_count;default:0" json:"use_count"`
 	// Public enables opt-in sharing to the mission marketplace.
 	Public     bool      `gorm:"column:public;default:false" json:"public"`

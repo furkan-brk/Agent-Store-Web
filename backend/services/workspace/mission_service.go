@@ -249,25 +249,33 @@ func (s *MissionService) ImportPublicMission(wallet, clientID string) (*models.U
 		return nil, fmt.Errorf("public mission not found")
 	}
 
-	// Generate a new client_id and ensure slug uniqueness for the importer.
+	// Generate a new client_id and use insert-and-retry for slug uniqueness.
 	newID := fmt.Sprintf("imported_%s_%d", clientID, time.Now().UnixNano())
-	slug := ensureUniqueSlug(wallet, src.Slug)
 
 	imported := &models.UserMission{
 		UserWallet: wallet,
 		ClientID:   newID,
 		Title:      src.Title,
-		Slug:       slug,
+		Slug:       src.Slug,
 		Prompt:     src.Prompt,
 		CreatedAt:  time.Now(),
 	}
-	if err := database.DB.Create(imported).Error; err != nil {
+	if err := CreateMissionWithUniqueSlug(database.DB, imported); err != nil {
 		return nil, fmt.Errorf("failed to import mission: %w", err)
 	}
 	return imported, nil
 }
 
-// ensureUniqueSlug returns slug if it doesn't conflict for wallet, otherwise appends _2, _3...
+// ensureUniqueSlug returns slug if it doesn't conflict for wallet, otherwise
+// appends _2, _3...
+//
+// DEPRECATED (v3.12 P1-3): the SELECT-then-Create flow is racy under
+// concurrent ImportPublicMission calls — two callers can pick the same suffix
+// before either Create lands. The DB-level fix is the
+// idx_user_mission_wallet_slug unique index on UserMission; the helper now
+// only used as a fallback candidate generator. Prefer
+// CreateMissionWithUniqueSlug, which uses insert-and-retry on unique-key
+// conflict and is safe under concurrency.
 func ensureUniqueSlug(wallet, slug string) string {
 	candidate := slug
 	for i := 2; i <= 20; i++ {
@@ -281,6 +289,53 @@ func ensureUniqueSlug(wallet, slug string) string {
 		candidate = fmt.Sprintf("%s_%d", slug, i)
 	}
 	return fmt.Sprintf("%s_%d", slug, time.Now().UnixNano())
+}
+
+// isUniqueSlugViolation reports whether err looks like a unique-index conflict
+// on idx_user_mission_wallet_slug. SQLite + PostgreSQL emit different strings;
+// we substring-match both.
+func isUniqueSlugViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "idx_user_mission_wallet_slug") {
+		return true
+	}
+	// Generic unique constraint markers used by both drivers.
+	return (strings.Contains(msg, "unique") || strings.Contains(msg, "duplicate")) &&
+		strings.Contains(msg, "slug")
+}
+
+// CreateMissionWithUniqueSlug inserts mission with a slug that is unique
+// per (wallet, slug). On unique-index conflict the slug is bumped (slug_2,
+// slug_3, ...) and Create is retried. Up to 5 retries, then a unix-nano
+// suffix as a deterministic last resort.
+//
+// Reads the slug from mission.Slug; mutates mission.Slug to the value that
+// actually landed. The mission.UserWallet is expected to be lowercased.
+//
+// v3.12 P1-3: replaces the candidate-then-Create flow that was racy under
+// concurrent imports.
+func CreateMissionWithUniqueSlug(tx *gorm.DB, mission *models.UserMission) error {
+	original := mission.Slug
+	for i := 1; i <= 5; i++ {
+		err := tx.Create(mission).Error
+		if err == nil {
+			return nil
+		}
+		if !isUniqueSlugViolation(err) {
+			return err
+		}
+		// Reset PK so GORM doesn't try to reuse a value that may have been
+		// half-set by the failed insert on some drivers.
+		mission.ID = 0
+		mission.Slug = fmt.Sprintf("%s_%d", original, i+1)
+	}
+	// Last resort: nano-suffix to guarantee uniqueness in pathological cases.
+	mission.ID = 0
+	mission.Slug = fmt.Sprintf("%s_%d", original, time.Now().UnixNano())
+	return tx.Create(mission).Error
 }
 
 // SetMissionPublic toggles the public flag on a mission owned by wallet.

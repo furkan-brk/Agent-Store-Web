@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -155,10 +156,13 @@ func TestMarkAllRead_BulkStamps(t *testing.T) {
 	svc := newNotificationTestSvc(t)
 
 	// 3 unread + 1 already-read should not be re-stamped.
-	for range 3 {
-		require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", ""))
+	// Links vary so each row produces a unique dedup_key (post-P1-2 dedup is
+	// hashed from wallet+type+link+hour-bucket).
+	for i := range 3 {
+		link := fmt.Sprintf("/test/%d", i)
+		require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", link))
 	}
-	require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", ""))
+	require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", "/test/final"))
 	var rows []models.NotificationEvent
 	require.NoError(t, database.DB.Where("wallet = ?", "0xabc").Order("id ASC").Find(&rows).Error)
 	preset := time.Now().Add(-time.Hour)
@@ -180,6 +184,54 @@ func TestMarkAllRead_BulkStamps(t *testing.T) {
 	require.NoError(t, database.DB.First(&preserved, rows[0].ID).Error)
 	require.NotNil(t, preserved.ReadAt)
 	assert.True(t, preserved.ReadAt.Equal(preset), "pre-existing ReadAt must be preserved")
+}
+
+// v3.12 P1-2: notifyOnce previously did SELECT-then-INSERT with a 1h window.
+// Two parallel triggers (e.g. fork + library-add by different actors) could
+// both pass the SELECT and both insert. The DedupKey unique index now rejects
+// the second insert at DB level.
+func TestNotifyOnce_DedupesWithinSameHour(t *testing.T) {
+	svc := newNotificationTestSvc(t)
+
+	// First call lands.
+	svc.notifyOnce("0xabc", "social", "Title", "Body", "/agents/42")
+
+	var count int64
+	require.NoError(t, database.DB.Model(&models.NotificationEvent{}).
+		Where("wallet = ?", "0xabc").Count(&count).Error)
+	require.EqualValues(t, 1, count, "first notifyOnce call should insert one row")
+
+	// Second call with same (wallet, type, link) within the same hour bucket
+	// must be silently dropped via ON CONFLICT DO NOTHING.
+	svc.notifyOnce("0xabc", "social", "Title", "Body", "/agents/42")
+	require.NoError(t, database.DB.Model(&models.NotificationEvent{}).
+		Where("wallet = ?", "0xabc").Count(&count).Error)
+	assert.EqualValues(t, 1, count, "duplicate notifyOnce within window must be dropped")
+
+	// Different link → different dedup key → new row.
+	svc.notifyOnce("0xabc", "social", "Title", "Body", "/agents/99")
+	require.NoError(t, database.DB.Model(&models.NotificationEvent{}).
+		Where("wallet = ?", "0xabc").Count(&count).Error)
+	assert.EqualValues(t, 2, count, "different link must produce a new row")
+}
+
+// computeNotifyDedupKey is deterministic in (wallet, type, link, hour) and
+// changes when any of those change. This documents the dedup contract.
+func TestComputeNotifyDedupKey_BucketsByHour(t *testing.T) {
+	now := time.Date(2026, 5, 5, 12, 30, 0, 0, time.UTC)
+	sameHour := time.Date(2026, 5, 5, 12, 59, 59, 0, time.UTC)
+	nextHour := time.Date(2026, 5, 5, 13, 0, 1, 0, time.UTC)
+
+	a := computeNotifyDedupKey("0xabc", "social", "/x", now)
+	b := computeNotifyDedupKey("0xabc", "social", "/x", sameHour)
+	c := computeNotifyDedupKey("0xabc", "social", "/x", nextHour)
+
+	assert.Equal(t, a, b, "same hour bucket must produce same key")
+	assert.NotEqual(t, a, c, "next hour bucket must produce different key")
+
+	// Wallet case must not affect the key — link & wallet are normalised.
+	mixedCase := computeNotifyDedupKey("0xABC", "social", "/x", now)
+	assert.Equal(t, a, mixedCase, "wallet casing must not affect dedup key")
 }
 
 func TestCreateNotification_RespectsDisabledPref(t *testing.T) {

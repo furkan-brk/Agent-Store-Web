@@ -82,7 +82,7 @@ func (b *BridgeService) ToMission(wallet string, sessionID uint) (*MissionDraftR
 		Prompt:     prompt,
 		CreatedAt:  time.Now(),
 	}
-	if err := database.DB.Create(mission).Error; err != nil {
+	if err := createMissionWithUniqueSlug(mission); err != nil {
 		return nil, fmt.Errorf("save mission: %w", err)
 	}
 	// v3.11.4: KPI funnel signal — bridge accepts the suggestion.
@@ -417,4 +417,34 @@ func slugify(in string) string {
 		out = "gm-" + out
 	}
 	return out
+}
+
+// createMissionWithUniqueSlug inserts mission with insert-and-retry on the
+// (wallet, slug) unique-index conflict. Mirrors workspace.CreateMissionWithUniqueSlug
+// — duplicated locally here so the guild package does not need to import
+// workspace (CLAUDE.md keeps the bridge cross-cutting via interface adapters).
+//
+// v3.12 P1-3: previous flow called database.DB.Create directly with a slug
+// derived from the title; two simultaneous bridges from the same suggestion
+// could land identical slugs.
+func createMissionWithUniqueSlug(mission *models.UserMission) error {
+	original := mission.Slug
+	for i := 1; i <= 5; i++ {
+		err := database.DB.Create(mission).Error
+		if err == nil {
+			return nil
+		}
+		msg := strings.ToLower(err.Error())
+		isUnique := strings.Contains(msg, "idx_user_mission_wallet_slug") ||
+			((strings.Contains(msg, "unique") || strings.Contains(msg, "duplicate")) &&
+				strings.Contains(msg, "slug"))
+		if !isUnique {
+			return err
+		}
+		mission.ID = 0
+		mission.Slug = fmt.Sprintf("%s_%d", original, i+1)
+	}
+	mission.ID = 0
+	mission.Slug = fmt.Sprintf("%s_%d", original, time.Now().UnixNano())
+	return database.DB.Create(mission).Error
 }

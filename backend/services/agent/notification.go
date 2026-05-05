@@ -8,15 +8,19 @@ package agent
 // matching GetActivityFeed in social.go.
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/agentstore/backend/pkg/database"
 	"github.com/agentstore/backend/pkg/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Notification channels and types are intentionally a closed set: the seed
@@ -25,6 +29,11 @@ import (
 var (
 	notificationChannels = []string{"web", "email"}
 	notificationTypes    = []string{"social", "system", "credit"}
+
+	// rawDedupCounter ensures CreateNotification's per-call dedup key is
+	// unique even when callers fire in tight loops where time.Now().UnixNano()
+	// might tie (Windows time resolution can be coarse).
+	rawDedupCounter uint64
 )
 
 // validNotificationChannel reports whether s is a recognised channel.
@@ -221,8 +230,32 @@ func (s *AgentService) CreateNotification(wallet, ntype, title, body, link strin
 		Title:  title,
 		Body:   body,
 		Link:   link,
+		// CreateNotification is the non-deduped raw insert path (notifyOnce
+		// handles dedup separately). Use a per-call unique key so multiple
+		// raw inserts with identical content don't collide on the
+		// uniqueIndex. The "raw-" prefix can never collide with the hex
+		// hash format used by computeNotifyDedupKey. Combine UnixNano with
+		// an atomic counter so tight-loop callers (Windows time resolution
+		// can be coarse) still get unique keys.
+		DedupKey: fmt.Sprintf("raw-%d-%d", time.Now().UnixNano(), atomic.AddUint64(&rawDedupCounter, 1)),
 	}
 	return database.DB.Create(&row).Error
+}
+
+// computeNotifyDedupKey hashes (wallet, type, link, hour-bucket) into a stable
+// short string used as the unique-index key for the 1-hour dedup window.
+//
+// Hour bucket is the UTC hour the call happened in. Two calls inside the same
+// hour produce the same key → the second insert is rejected by the unique
+// index. Callers a millisecond apart on either side of the hour boundary can
+// race through both inserts (acceptable: this is a polish-level dedup, not a
+// security boundary; the alternative is a sliding-window calculation that
+// requires reading-then-writing in a transaction).
+func computeNotifyDedupKey(wallet, ntype, link string, t time.Time) string {
+	hourBucket := t.UTC().Format("2006010215")
+	raw := strings.Join([]string{strings.ToLower(wallet), ntype, link, hourBucket}, "|")
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:16]) // 32-char hex; unique-index column is size:96
 }
 
 // notificationDedupCheck reports whether a recent (wallet, type, link) event
@@ -233,6 +266,12 @@ func (s *AgentService) CreateNotification(wallet, ntype, title, body, link strin
 // notifications point at the same place inside the window, the second one is
 // almost certainly noise (same agent saved twice in 5 minutes by different
 // people, etc.). Title/body can drift; the link is stable.
+//
+// Note: this function is the legacy SELECT-then-decide check. It races under
+// concurrent triggers — both readers can pass before either insert lands. The
+// authoritative dedup is now enforced by the unique index on
+// NotificationEvent.DedupKey (see notifyOnce). This helper is retained for
+// callers that want a non-fatal check without performing a write.
 func (s *AgentService) notificationDedupCheck(wallet, ntype, link string, dedupWindow time.Duration) bool {
 	if database.DB == nil {
 		return false
@@ -274,19 +313,41 @@ func (s *AgentService) IsPrefEnabled(wallet, channel, ntype string) bool {
 	return pref.Enabled
 }
 
-// notifyOnce wraps CreateNotification with the standard 1-hour dedup window
-// and pref check. The whole flow is best-effort: errors are logged via the
-// caller (which usually has more context).
+// notifyOnce wraps the inbox insert with a DB-enforced 1-hour dedup window
+// (via DedupKey unique index + ON CONFLICT DO NOTHING) and a pref check. The
+// whole flow is best-effort: errors are logged via the caller (which usually
+// has more context).
+//
+// v3.12 P1-2: replaced the prior SELECT-then-INSERT pattern, which was racy
+// under parallel triggers. Two simultaneous calls (e.g. ForkAgent +
+// AddToLibrary by different actors against the same creator) would both pass
+// the dedup check and both insert. The unique index on DedupKey now rejects
+// the second insert at DB level; OnConflict-DoNothing keeps the call
+// best-effort.
 func (s *AgentService) notifyOnce(wallet, ntype, title, body, link string) {
 	wallet = strings.ToLower(strings.TrimSpace(wallet))
 	if wallet == "" {
 		return
 	}
+	if database.DB == nil {
+		return
+	}
+	if !validNotificationType(ntype) {
+		return
+	}
 	if !s.IsPrefEnabled(wallet, "web", ntype) {
 		return
 	}
-	if s.notificationDedupCheck(wallet, ntype, link, time.Hour) {
-		return
+	row := models.NotificationEvent{
+		Wallet:   wallet,
+		Type:     ntype,
+		Title:    title,
+		Body:     body,
+		Link:     link,
+		DedupKey: computeNotifyDedupKey(wallet, ntype, link, time.Now()),
 	}
-	_ = s.CreateNotification(wallet, ntype, title, body, link)
+	// ON CONFLICT DO NOTHING — sqlite + postgres both honour this via the
+	// unique index. RowsAffected == 0 means a parallel call already inserted
+	// in the current hour bucket; we drop silently.
+	_ = database.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error
 }
