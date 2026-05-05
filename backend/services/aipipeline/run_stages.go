@@ -166,9 +166,18 @@ func (p *PipelineService) RunStages(
 			if p.Score == nil {
 				return nil, nil
 			}
-			// Existing Score service is sync; honour ctx via select.
+			// Bail early if parent already canceled, to avoid even starting
+			// the worker goroutine.
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			// Existing Score service is sync; channel is buffered (cap=1)
+			// so the goroutine never blocks on send when we abandon it.
+			// The HTTP request inside ScoreAndDescribeCtx honours ctx, so
+			// a real cancellation tears down the in-flight call rather
+			// than leaving it accumulating LLM cost.
 			done := make(chan *PromptScoreResult, 1)
-			go func() { done <- p.Score.ScoreAndDescribe(prompt) }()
+			go func() { done <- p.Score.ScoreAndDescribeCtx(ctx, prompt) }()
 			select {
 			case res := <-done:
 				return res, nil
@@ -191,9 +200,16 @@ func (p *PipelineService) RunStages(
 
 	if wantSet[StageAvatar] {
 		v, err := runStageWithRetry(parent, StageAvatar, AvatarTimeout, func(ctx context.Context) (any, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			// Buffered channel so abandoned goroutines GC cleanly. The
+			// inner Imagen HTTP request runs under ctx, so cancellation
+			// terminates the request rather than waiting full Imagen
+			// latency for a discarded response.
 			done := make(chan [2]string, 1)
 			go func() {
-				img, fmtStr := p.GenerateImageWithFallback(profile, imagePrompt, charType)
+				img, fmtStr := p.GenerateImageWithFallbackCtx(ctx, profile, imagePrompt, charType)
 				done <- [2]string{img, fmtStr}
 			}()
 			select {

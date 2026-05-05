@@ -2,6 +2,7 @@ package aipipeline
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -324,11 +325,23 @@ Rules:
 }
 
 // GenerateAvatarImage generates a medieval fantasy avatar using Imagen.
+// Uses background ctx; prefer GenerateAvatarImageCtx when caller has a deadline.
 func (g *GeminiService) GenerateAvatarImage(profile *AgentProfile) (string, error) {
-	return g.callImagen("Game character asset, " + BuildAvatarPrompt(profile))
+	return g.GenerateAvatarImageCtx(context.Background(), profile)
+}
+
+// GenerateAvatarImageCtx is the ctx-aware variant. The in-flight HTTP request
+// is torn down when the caller's ctx cancels — used by the v3.11.4
+// pipeline-resilience orchestrator (see run_stages.go).
+func (g *GeminiService) GenerateAvatarImageCtx(ctx context.Context, profile *AgentProfile) (string, error) {
+	return g.callImagenCtx(ctx, "Game character asset, "+BuildAvatarPrompt(profile))
 }
 
 func (g *GeminiService) callImagen(prompt string) (string, error) {
+	return g.callImagenCtx(context.Background(), prompt)
+}
+
+func (g *GeminiService) callImagenCtx(ctx context.Context, prompt string) (string, error) {
 	if g.apiKey == "" {
 		return "", fmt.Errorf("gemini api key not configured")
 	}
@@ -350,7 +363,7 @@ func (g *GeminiService) callImagen(prompt string) (string, error) {
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return "", err
 	}

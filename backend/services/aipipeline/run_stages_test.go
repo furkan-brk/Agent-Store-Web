@@ -68,3 +68,44 @@ func TestSetStageTimeoutsForTest_RestoresOnCleanup(t *testing.T) {
 	cleanup()
 	assert.Equal(t, prevAnalyze, AnalyzeTimeout)
 }
+
+// v3.12 P1-1 regression: when parent ctx is canceled, runOnce returns
+// ctx.Err() promptly rather than waiting for the (potentially long-running)
+// stage worker. The stage closure receives a derived ctx that already carries
+// the cancellation, so a well-behaved closure exits without paying full
+// LLM latency.
+func TestRunOnce_ParentCancellationReturnsPromptly(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	cancel() // already canceled
+
+	start := time.Now()
+	_, err := runOnce(parent, time.Second, func(ctx context.Context) (any, error) {
+		// Closure should observe the cancel.
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+			return "should-not-reach", nil
+		}
+	})
+	elapsed := time.Since(start)
+	assert.Error(t, err)
+	assert.Less(t, elapsed, 200*time.Millisecond, "must return promptly on parent cancel, not wait for stage timeout")
+}
+
+// v3.12 P1-1 regression: the stage closure receives a ctx that is canceled
+// when the parent times out — caller can hook this into HTTP requests via
+// http.NewRequestWithContext to tear down in-flight LLM calls.
+func TestRunOnce_StageReceivesContextWithDeadline(t *testing.T) {
+	parent := context.Background()
+	var deadline time.Time
+	var hasDeadline bool
+
+	_, _ = runOnce(parent, 50*time.Millisecond, func(ctx context.Context) (any, error) {
+		deadline, hasDeadline = ctx.Deadline()
+		return "ok", nil
+	})
+
+	assert.True(t, hasDeadline, "stage closure must receive ctx with deadline")
+	assert.WithinDuration(t, time.Now().Add(50*time.Millisecond), deadline, 100*time.Millisecond)
+}

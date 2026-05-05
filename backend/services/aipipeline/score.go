@@ -2,6 +2,7 @@ package aipipeline
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,9 +63,17 @@ func NewScoreService(geminiAPIKey string) *ScoreService {
 }
 
 // ScoreAndDescribe scores a prompt (0-100) and generates a service description.
+// Uses background ctx; prefer ScoreAndDescribeCtx when caller has a deadline.
 func (s *ScoreService) ScoreAndDescribe(prompt string) *PromptScoreResult {
+	return s.ScoreAndDescribeCtx(context.Background(), prompt)
+}
+
+// ScoreAndDescribeCtx is the ctx-aware variant. If ctx is canceled or the
+// deadline is exceeded the in-flight HTTP request is torn down — important
+// for the v3.11.4 pipeline-resilience orchestrator (see run_stages.go).
+func (s *ScoreService) ScoreAndDescribeCtx(ctx context.Context, prompt string) *PromptScoreResult {
 	if s.apiKey != "" {
-		if result, err := s.scoreWithGemini(prompt); err == nil {
+		if result, err := s.scoreWithGeminiCtx(ctx, prompt); err == nil {
 			return result
 		}
 	}
@@ -72,6 +81,10 @@ func (s *ScoreService) ScoreAndDescribe(prompt string) *PromptScoreResult {
 }
 
 func (s *ScoreService) scoreWithGemini(prompt string) (*PromptScoreResult, error) {
+	return s.scoreWithGeminiCtx(context.Background(), prompt)
+}
+
+func (s *ScoreService) scoreWithGeminiCtx(ctx context.Context, prompt string) (*PromptScoreResult, error) {
 	excerpt := prompt
 	if len(excerpt) > 800 {
 		excerpt = excerpt[:800]
@@ -107,7 +120,7 @@ Return ONLY the JSON object.`, excerpt)
 	}
 
 	body, _ := json.Marshal(reqBody)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}

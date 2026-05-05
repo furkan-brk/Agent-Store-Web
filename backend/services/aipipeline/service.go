@@ -1,6 +1,7 @@
 package aipipeline
 
 import (
+	"context"
 	"encoding/base64"
 	"log"
 )
@@ -29,9 +30,17 @@ func NewPipelineService(gemini *GeminiService, claude *AIService,
 // then removes the background using the pure-Go BgRemover.
 // Returns (base64-encoded image, format) or ("", "") on failure.
 func (p *PipelineService) GenerateImageWithFallback(profile *AgentProfile, imagePrompt, charType string) (string, string) {
+	return p.GenerateImageWithFallbackCtx(context.Background(), profile, imagePrompt, charType)
+}
+
+// GenerateImageWithFallbackCtx is the ctx-aware variant. The Imagen HTTP
+// request is canceled if ctx is canceled — required by the v3.11.4
+// pipeline-resilience orchestrator (see run_stages.go) so timed-out stages
+// don't keep paid LLM calls in flight.
+func (p *PipelineService) GenerateImageWithFallbackCtx(ctx context.Context, profile *AgentProfile, imagePrompt, charType string) (string, string) {
 	sanitized := sanitizeProfile(*profile)
 
-	img, err := p.Gemini.GenerateAvatarImage(&sanitized)
+	img, err := p.Gemini.GenerateAvatarImageCtx(ctx, &sanitized)
 	if err != nil {
 		log.Printf("[Avatar] Imagen failed: %v", err)
 		return "", ""
