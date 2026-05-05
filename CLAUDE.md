@@ -335,13 +335,26 @@ Yeni kod yazarken bu pattern'leri **reuse et, yeniden yazma**:
 - [x] v3.11.3 — Pro Tools Closure (Legend resume, bulk operations, agent versioning
       + rollback, KPI funnel, API key middleware, notification hooks, diff/observability/
       presets/bulk UI/KPI panel)
-- [x] v3.11.4 — Closure Sprint (17/17 ✅ — backlog 75/75 closed). Backend (9):
+- [x] v3.11.4 — Closure Sprint (17/17 ✅). Backend (9):
       Discovery analytics, GM KPI, Template metrics, Pipeline resilience,
       Leaderboard category+me+rewards, Guild events, Mission scheduling (cron),
       Post-run reflection, Rating verified+copy+achievements. Frontend (8):
       Smart suggest, Leaderboard extras, Creator bulk action bar, Trial CTA,
       Guild events UI, Mission schedule dialog, KPI panel sections, Achievement
       section.
+- [x] v3.11.5 — True 75/75 Closure (5 backlog gaps). Honest audit caught 4
+      "already-built" claims (verified ✅ in code) + 5 partial/deferred items
+      now shipped: Library Custom Collections cascade-on-Future bug fix
+      (`(await getAll())..add(...)`), Card Editor batch tag/category UI
+      (PopupMenu + tag dialog), Leaderboard widget integration (YouAreHereRail
+      in header + collapsible footer with category + weekly rewards), Mission
+      scheduling **real execution** (MissionRun model + ExpandMissionTags
+      wired via MissionExpander interface, GET /missions/:id/runs endpoint),
+      Post-run reflection auto-record (workspace.ReflectionTarget interface +
+      adapter; notifyExecutionResult parses "guildmaster:<id>" workflow
+      clientID → calls SessionService.RecordReflection on completed runs).
+      Plus 6 backend tests (1 scheduler + 5 reflection auto-record).
+      **Backlog: 75/75 (100%) — verified end-to-end.**
 
 ---
 
