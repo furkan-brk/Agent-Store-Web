@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/agentstore/backend/pkg/database"
@@ -28,6 +29,11 @@ import (
 var (
 	notificationChannels = []string{"web", "email"}
 	notificationTypes    = []string{"social", "system", "credit"}
+
+	// rawDedupCounter ensures CreateNotification's per-call dedup key is
+	// unique even when callers fire in tight loops where time.Now().UnixNano()
+	// might tie (Windows time resolution can be coarse).
+	rawDedupCounter uint64
 )
 
 // validNotificationChannel reports whether s is a recognised channel.
@@ -224,6 +230,14 @@ func (s *AgentService) CreateNotification(wallet, ntype, title, body, link strin
 		Title:  title,
 		Body:   body,
 		Link:   link,
+		// CreateNotification is the non-deduped raw insert path (notifyOnce
+		// handles dedup separately). Use a per-call unique key so multiple
+		// raw inserts with identical content don't collide on the
+		// uniqueIndex. The "raw-" prefix can never collide with the hex
+		// hash format used by computeNotifyDedupKey. Combine UnixNano with
+		// an atomic counter so tight-loop callers (Windows time resolution
+		// can be coarse) still get unique keys.
+		DedupKey: fmt.Sprintf("raw-%d-%d", time.Now().UnixNano(), atomic.AddUint64(&rawDedupCounter, 1)),
 	}
 	return database.DB.Create(&row).Error
 }

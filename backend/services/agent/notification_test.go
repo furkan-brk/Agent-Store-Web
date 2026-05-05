@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -155,10 +156,13 @@ func TestMarkAllRead_BulkStamps(t *testing.T) {
 	svc := newNotificationTestSvc(t)
 
 	// 3 unread + 1 already-read should not be re-stamped.
-	for range 3 {
-		require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", ""))
+	// Links vary so each row produces a unique dedup_key (post-P1-2 dedup is
+	// hashed from wallet+type+link+hour-bucket).
+	for i := range 3 {
+		link := fmt.Sprintf("/test/%d", i)
+		require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", link))
 	}
-	require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", ""))
+	require.NoError(t, svc.CreateNotification("0xabc", "system", "T", "B", "/test/final"))
 	var rows []models.NotificationEvent
 	require.NoError(t, database.DB.Where("wallet = ?", "0xabc").Order("id ASC").Find(&rows).Error)
 	preset := time.Now().Add(-time.Hour)
