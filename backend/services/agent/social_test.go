@@ -223,6 +223,25 @@ func TestGetForYou_ExcludesAlreadySavedAgents(t *testing.T) {
 	}
 }
 
+func TestGetForYou_ExcludesSavedWithMixedCaseWallet(t *testing.T) {
+	// P1-10: legacy library rows persisted with mixed-case wallets (pre-v3.7
+	// lowercasing pass) must still be treated as "saved" when GetForYou is
+	// called with the canonical lowercase wallet.
+	testutil.NewTestDB(t)
+	svc := NewAgentService(nil, nil, cache.NewStore(), "", "")
+
+	a := models.Agent{Title: "Saved Mixed-Case", CharacterType: "wizard", Prompt: "p", CreatorWallet: "0xcreator", Rarity: "common"}
+	database.DB.Create(&a)
+	// Library row written with the legacy mixed-case wallet.
+	database.DB.Create(&models.LibraryEntry{UserWallet: "0xMeMixedCASE", AgentID: a.ID})
+
+	recs, err := svc.GetForYou("0xmemixedcase")
+	require.NoError(t, err)
+	for _, r := range recs {
+		assert.NotEqual(t, a.ID, r.ID, "mixed-case-saved agent must still be excluded from recommendations")
+	}
+}
+
 func TestGetForYou_ExcludesOwnAgents(t *testing.T) {
 	testutil.NewTestDB(t)
 	svc := NewAgentService(nil, nil, cache.NewStore(), "", "")
