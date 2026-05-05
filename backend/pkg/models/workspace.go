@@ -96,6 +96,11 @@ type WorkflowExecution struct {
 	CompletedNodes int        `gorm:"column:completed_nodes;default:0" json:"completed_nodes"`
 	CreditsUsed    int64      `gorm:"column:credits_used;default:0" json:"credits_used"`
 	ErrorMessage   string     `gorm:"column:error_message;type:text" json:"error_message,omitempty"`
+	// ResumeAttempts (v3.12 P1-5) caps how many times a single failed
+	// execution can be resumed. After MaxResumeAttempts, ResumeExecution
+	// returns ErrResumeAttemptsExceeded — closes the partial-spend exploit
+	// where a user could resume an opus-heavy workflow indefinitely.
+	ResumeAttempts int        `gorm:"column:resume_attempts;not null;default:0" json:"resume_attempts"`
 	StartedAt      time.Time  `gorm:"column:started_at;autoCreateTime" json:"started_at"`
 	FinishedAt     *time.Time `gorm:"column:finished_at" json:"finished_at,omitempty"`
 }

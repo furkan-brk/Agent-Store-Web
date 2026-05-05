@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -1099,6 +1100,21 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 	return s.executionToDTO(execution.ID)
 }
 
+// MaxResumeAttempts caps how many times a single failed execution can be
+// resumed. v3.12 P1-5 — closes the partial-spend exploit where a user
+// could resume an opus-heavy workflow indefinitely after burning some
+// credits, hoping to extract more value than a single $X budget.
+const MaxResumeAttempts = 3
+
+// ErrResumeAttemptsExceeded surfaces when a caller hits MaxResumeAttempts.
+// The handler maps this to 429 Too Many Requests.
+var ErrResumeAttemptsExceeded = errors.New("resume attempts exceeded")
+
+// ErrResumeAlreadyRunning surfaces when two callers race to resume the same
+// execution. The status-guard CAS at the top of ResumeExecution lets only
+// one caller proceed; the other sees this error.
+var ErrResumeAlreadyRunning = errors.New("execution is already running")
+
 // ResumeExecution re-runs a previously failed execution, skipping nodes that
 // completed successfully (their cached output is reused). Pending and failed
 // nodes are re-executed from scratch. Credit deduction only happens on the
@@ -1108,7 +1124,14 @@ func (s *LegendService) ExecuteWorkflow(wallet string, input ExecuteWorkflowInpu
 // Behaviour:
 //   - 404 if execution not found or wrong wallet
 //   - resumes a "completed" execution as a no-op (returns the existing DTO)
+//   - 429 (ErrResumeAttemptsExceeded) once ResumeAttempts >= MaxResumeAttempts
+//   - 409 (ErrResumeAlreadyRunning) when another caller is already resuming
 //   - any other status → re-walks the DAG from the persisted checkpoints
+//
+// Concurrency (v3.12 P1-6): the initial state load + status flip happens via
+// a single atomic UPDATE that asserts status='failed' in the WHERE clause and
+// bumps resume_attempts. RowsAffected==1 means we won the race; 0 means
+// either someone else already flipped it to "running" or the cap is hit.
 func (s *LegendService) ResumeExecution(wallet string, execID uint) (*ExecutionStatusDTO, error) {
 	wallet = strings.ToLower(wallet)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -1124,6 +1147,13 @@ func (s *LegendService) ResumeExecution(wallet string, execID uint) (*ExecutionS
 	if execution.Status == "completed" {
 		// Nothing to do — return current state.
 		return buildExecutionDTO(&execution)
+	}
+
+	// v3.12 P1-5: rate-limit. Cap is enforced before the status-flip CAS so
+	// a caller that's already at the cap fails fast without disturbing other
+	// state.
+	if execution.ResumeAttempts >= MaxResumeAttempts {
+		return nil, ErrResumeAttemptsExceeded
 	}
 
 	// 2. Load workflow definition (must still exist).
@@ -1142,13 +1172,39 @@ func (s *LegendService) ResumeExecution(wallet string, execID uint) (*ExecutionS
 		return nil, fmt.Errorf("invalid workflow structure: %w", err)
 	}
 
-	// 3. Reset run state: mark "running", clear failure info, keep checkpoints.
+	// 3. v3.12 P1-6: atomic CAS — flip status from "failed" to "running",
+	// bump resume_attempts, clear failure info — all in one UPDATE so two
+	// concurrent ResumeExecution callers can't both proceed and corrupt
+	// NodeStates. WHERE status='failed' AND resume_attempts < cap is the
+	// guard.
+	res := database.DB.Model(&models.WorkflowExecution{}).
+		Where("id = ? AND status = ? AND resume_attempts < ?", execID, "failed", MaxResumeAttempts).
+		Updates(map[string]any{
+			"status":          "running",
+			"error_message":   "",
+			"finished_at":     nil,
+			"resume_attempts": gorm.Expr("resume_attempts + 1"),
+		})
+	if res.Error != nil {
+		return nil, fmt.Errorf("resume CAS: %w", res.Error)
+	}
+	if res.RowsAffected != 1 {
+		// Re-read to disambiguate: cap hit vs. already running.
+		var fresh models.WorkflowExecution
+		if err := database.DB.First(&fresh, execID).Error; err != nil {
+			return nil, fmt.Errorf("resume CAS reload: %w", err)
+		}
+		if fresh.ResumeAttempts >= MaxResumeAttempts {
+			return nil, ErrResumeAttemptsExceeded
+		}
+		return nil, ErrResumeAlreadyRunning
+	}
+
+	// Reload so we see the bumped attempt count + cleared error message.
+	if err := database.DB.First(&execution, execID).Error; err != nil {
+		return nil, fmt.Errorf("post-CAS reload: %w", err)
+	}
 	checkpoints := loadNodeStates(execution.NodeStates)
-	database.DB.Model(&execution).Updates(map[string]any{
-		"status":        "running",
-		"error_message": "",
-		"finished_at":   nil,
-	})
 
 	// 4. Topological order + predecessor map (same as ExecuteWorkflow).
 	adj, inDegree, _ := buildDAG(nodes, edges)

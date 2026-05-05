@@ -187,11 +187,22 @@ func (s *LegendService) RunDueSchedules() int {
 		}
 		next := parsed.Next(now)
 		ts := now
-		updates := map[string]any{
-			"next_run_at": next,
-			"last_run_at": ts,
+		// v3.12 P1-4: atomic CAS on next_run_at so multi-replica deploys can't
+		// fire the same schedule twice. The WHERE clause includes the OLD
+		// next_run_at value we read; if another replica already advanced the
+		// row, RowsAffected == 0 and we silently skip the rest of the per-row
+		// work (mission run + activity marker). The single winner proceeds.
+		res := database.DB.Model(&models.MissionSchedule{}).
+			Where("id = ? AND next_run_at = ?", sched.ID, sched.NextRunAt).
+			Updates(map[string]any{
+				"next_run_at": next,
+				"last_run_at": ts,
+			})
+		if res.Error != nil {
+			continue
 		}
-		if err := database.DB.Model(&sched).Updates(updates).Error; err != nil {
+		if res.RowsAffected != 1 {
+			// Another replica won the CAS — skip silently.
 			continue
 		}
 

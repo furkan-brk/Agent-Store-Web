@@ -1,5 +1,7 @@
 // lib/features/legend/models/workflow_models.dart
 
+import 'package:flutter/foundation.dart';
+
 enum WorkflowNodeType { start, agent, mission, guild, end }
 
 extension WorkflowNodeTypeX on WorkflowNodeType {
@@ -55,7 +57,7 @@ class WorkflowNode {
   };
 
   factory WorkflowNode.fromJson(Map<String, dynamic> j) => WorkflowNode(
-    id: j['id'] as String,
+    id: j['id'] as String? ?? '',
     type: WorkflowNodeType.values.firstWhere(
       (t) => t.name == j['type'],
       orElse: () => WorkflowNodeType.agent,
@@ -96,9 +98,9 @@ class WorkflowEdge {
       };
 
   factory WorkflowEdge.fromJson(Map<String, dynamic> j) => WorkflowEdge(
-        id: j['id'] as String,
-        fromId: j['from'] as String,
-        toId: j['to'] as String,
+        id: j['id'] as String? ?? '',
+        fromId: j['from'] as String? ?? '',
+        toId: j['to'] as String? ?? '',
         label: j['label'] as String?,
       );
 }
@@ -133,19 +135,37 @@ class LegendWorkflow {
     'revision_id': revisionId,
   };
 
-  factory LegendWorkflow.fromJson(Map<String, dynamic> j) => LegendWorkflow(
-    id: j['id'] as String,
-    name: j['name'] as String? ?? 'Untitled',
-    nodes: (j['nodes'] as List<dynamic>? ?? [])
-        .map((n) => WorkflowNode.fromJson(n as Map<String, dynamic>))
-        .toList(),
-    edges: (j['edges'] as List<dynamic>? ?? [])
-        .map((e) => WorkflowEdge.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    updatedAt:
-        DateTime.tryParse(j['updated_at'] as String? ?? '') ?? DateTime.now(),
-    revisionId: (j['revision_id'] as num?)?.toInt() ?? 0,
-  );
+  factory LegendWorkflow.fromJson(Map<String, dynamic> j) {
+    final nodes = <WorkflowNode>[];
+    for (final raw in (j['nodes'] as List<dynamic>? ?? [])) {
+      try {
+        nodes.add(WorkflowNode.fromJson(raw as Map<String, dynamic>));
+      } catch (e) {
+        debugPrint('[LegendWorkflow] skipping bad node: $e');
+      }
+    }
+    final edges = <WorkflowEdge>[];
+    for (final raw in (j['edges'] as List<dynamic>? ?? [])) {
+      try {
+        final edge = WorkflowEdge.fromJson(raw as Map<String, dynamic>);
+        if (edge.fromId.isNotEmpty && edge.toId.isNotEmpty) {
+          edges.add(edge);
+        } else {
+          debugPrint('[LegendWorkflow] skipping edge with empty from/to: ${edge.id}');
+        }
+      } catch (e) {
+        debugPrint('[LegendWorkflow] skipping bad edge: $e');
+      }
+    }
+    return LegendWorkflow(
+      id: j['id'] as String? ?? '',
+      name: j['name'] as String? ?? 'Untitled',
+      nodes: nodes,
+      edges: edges,
+      updatedAt: DateTime.tryParse(j['updated_at'] as String? ?? '') ?? DateTime.now(),
+      revisionId: (j['revision_id'] as num?)?.toInt() ?? 0,
+    );
+  }
 
   LegendWorkflow copyWithNodes(
           List<WorkflowNode> nodes, List<WorkflowEdge> edges) =>
