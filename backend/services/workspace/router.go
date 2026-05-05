@@ -49,6 +49,10 @@ func SetupRouter(handler *Handler) *gin.Engine {
 		missions.POST("/sync", handler.BatchSyncMissions)
 		missions.POST("/expand", handler.ExpandMissions)
 
+		// v3.11.4: template usage metrics (public read; auth-only write)
+		v1.GET("/legend/templates/metrics", handler.GetTemplateMetrics)
+		v1.POST("/user/legend/templates/:templateId/used", auth, handler.RecordTemplateUse)
+
 		// Legend workflow endpoints
 		legend := user.Group("/legend")
 		legend.GET("/workflows", handler.GetLegendWorkflows)

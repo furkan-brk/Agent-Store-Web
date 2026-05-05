@@ -53,6 +53,42 @@ func (h *Handler) SetMissionBridge(bridge MissionLegendBridge) {
 	h.missionBridge = bridge
 }
 
+// GetTemplateMetrics handles GET /api/v1/legend/templates/metrics?limit=20.
+// v3.11.4: usage counts + success rates per template_id for the gallery's
+// trending-templates badge. Public endpoint — no auth required.
+func (h *Handler) GetTemplateMetrics(c *gin.Context) {
+	limit := 0
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			limit = n
+		}
+	}
+	metrics, err := h.legendSvc.GetTemplateMetrics(limit)
+	if err != nil {
+		log.Printf("[WorkspaceHandler.GetTemplateMetrics] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"metrics": metrics, "count": len(metrics)})
+}
+
+// RecordTemplateUse handles POST /api/v1/legend/templates/:templateId/used.
+// Auth required — wallet attribution.
+func (h *Handler) RecordTemplateUse(c *gin.Context) {
+	wallet := c.GetString("wallet")
+	if wallet == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth required"})
+		return
+	}
+	templateID := c.Param("templateId")
+	if err := h.legendSvc.RecordTemplateUse(wallet, templateID); err != nil {
+		log.Printf("[WorkspaceHandler.RecordTemplateUse] error: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"recorded": true})
+}
+
 // GetMissions returns all missions for the authenticated user.
 func (h *Handler) GetMissions(c *gin.Context) {
 	missions, err := h.missionSvc.ListUserMissions(c.GetString("wallet"))
